@@ -27,24 +27,28 @@ export function QueuePanel({ onClose, open = false }: { onClose?: () => void; op
   const toast = useToast();
 
   useEffect(() => {
+    if (!open) return;
     let alive = true;
+    let timer: number | undefined;
+    let delay = 2500;
     const load = async () => {
       try {
         const res = await fetch("/api/outreach", { cache: "no-store" });
-        if (!res.ok || !alive) return;
-        setSnap(await res.json());
+        if (!alive) return;
+        if (res.ok) setSnap(await res.json());
+        delay = res.ok ? 2500 : Math.min(delay * 2, 60_000);
       } catch {
-        /* ignore */
+        delay = Math.min(delay * 2, 60_000);
       }
+      if (alive) timer = window.setTimeout(() => void load(), delay);
     };
     const boot = window.setTimeout(() => void load(), 0);
-    const t = window.setInterval(load, 2500);
     return () => {
       alive = false;
       window.clearTimeout(boot);
-      window.clearInterval(t);
+      if (timer) window.clearTimeout(timer);
     };
-  }, []);
+  }, [open]);
 
   async function control(action: "pause" | "resume" | "stop") {
     await fetch("/api/outreach/control", {

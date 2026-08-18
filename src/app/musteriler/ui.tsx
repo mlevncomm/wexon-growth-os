@@ -38,8 +38,9 @@ export default function MusterilerPage() {
     if (nextQ) params.set("q", nextQ);
     if (nextStatus) params.set("status", nextStatus);
     const res = await fetch(`/api/leads?${params.toString()}`, { cache: "no-store" });
-    if (!res.ok) throw new Error("Liste alınamadı");
-    setLeads(await res.json());
+    const data = (await res.json()) as Lead[] & { error?: string };
+    if (!res.ok) throw new Error(data.error ?? "Liste alınamadı");
+    setLeads(data as Lead[]);
     setLoading(false);
   }
 

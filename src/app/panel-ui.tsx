@@ -43,12 +43,14 @@ export default function PanelPage() {
     const boot = window.setTimeout(() => {
       void Promise.all([
         fetch("/api/stats").then(async (res) => {
-          if (!res.ok) throw new Error("Panel yüklenemedi");
-          return res.json() as Promise<Stats>;
+          const data = (await res.json()) as Stats & { error?: string };
+          if (!res.ok) throw new Error(data.error ?? "Panel yüklenemedi");
+          return data as Stats;
         }),
         fetch("/api/leads").then(async (res) => {
-          if (!res.ok) throw new Error("Liste alınamadı");
-          return res.json() as Promise<Lead[]>;
+          const data = (await res.json()) as Lead[] & { error?: string };
+          if (!res.ok) throw new Error(data.error ?? "Liste alınamadı");
+          return data as Lead[];
         }),
       ])
         .then(([s, rows]) => {

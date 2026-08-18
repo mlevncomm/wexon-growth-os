@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { badRequest, readJson } from "@/lib/http";
+import { badRequest, databaseUnavailable, readJson } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
 import { denyIfGuest } from "@/lib/session";
 
@@ -29,18 +29,22 @@ function leadWhere(opts: { q?: string; status?: string; campaignId?: string }) {
 export async function GET(request: Request) {
   const denied = await denyIfGuest();
   if (denied) return denied;
-  const { searchParams } = new URL(request.url);
-  const leads = await prisma.lead.findMany({
-    where: leadWhere({
-      q: searchParams.get("q") ?? "",
-      status: searchParams.get("status") ?? "",
-      campaignId: searchParams.get("campaignId") ?? "",
-    }),
-    orderBy: { createdAt: "desc" },
-    take: 400,
-  });
+  try {
+    const { searchParams } = new URL(request.url);
+    const leads = await prisma.lead.findMany({
+      where: leadWhere({
+        q: searchParams.get("q") ?? "",
+        status: searchParams.get("status") ?? "",
+        campaignId: searchParams.get("campaignId") ?? "",
+      }),
+      orderBy: { createdAt: "desc" },
+      take: 400,
+    });
 
-  return NextResponse.json(leads);
+    return NextResponse.json(leads);
+  } catch (err) {
+    return databaseUnavailable(err);
+  }
 }
 
 export async function DELETE(request: Request) {

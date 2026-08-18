@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { badRequest, readJson } from "@/lib/http";
+import { badRequest, databaseUnavailable, readJson } from "@/lib/http";
 import { enqueueLeads, ensureQueueLoop, getQueueSnapshot } from "@/lib/whatsapp/queue";
 import { denyIfGuest } from "@/lib/session";
 
@@ -10,8 +10,12 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const denied = await denyIfGuest();
   if (denied) return denied;
-  ensureQueueLoop();
-  return NextResponse.json(await getQueueSnapshot());
+  try {
+    ensureQueueLoop();
+    return NextResponse.json(await getQueueSnapshot());
+  } catch (err) {
+    return databaseUnavailable(err);
+  }
 }
 
 export async function POST(request: Request) {

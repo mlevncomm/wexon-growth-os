@@ -29,31 +29,33 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let alive = true;
+    let timer: number | undefined;
+    let delay = 4000;
     const load = async () => {
       try {
-        const [s, o] = await Promise.all([
-          fetch("/api/stats", { cache: "no-store" }).then((r) => {
-            if (r.status === 401) {
-              window.location.href = "/giris";
-              return {};
-            }
-            return r.json();
-          }),
-          fetch("/api/outreach", { cache: "no-store" }).then((r) => (r.ok ? r.json() : {})),
+        const [sRes, oRes] = await Promise.all([
+          fetch("/api/stats", { cache: "no-store" }),
+          fetch("/api/outreach", { cache: "no-store" }),
         ]);
         if (!alive) return;
-        setStats(s);
-        setSnap(o);
+        if (sRes.status === 401) {
+          window.location.href = "/giris";
+          return;
+        }
+        const failed = !sRes.ok || !oRes.ok;
+        if (sRes.ok) setStats(await sRes.json());
+        if (oRes.ok) setSnap(await oRes.json());
+        delay = failed ? Math.min(delay * 2, 60_000) : scanning ? 1500 : 4000;
       } catch {
-        /* ignore */
+        delay = Math.min(delay * 2, 60_000);
       }
+      if (alive) timer = window.setTimeout(() => void load(), delay);
     };
     const boot = window.setTimeout(() => void load(), 0);
-    const t = window.setInterval(load, scanning ? 1500 : 4000);
     return () => {
       alive = false;
       window.clearTimeout(boot);
-      window.clearInterval(t);
+      if (timer) window.clearTimeout(timer);
     };
   }, [scanning]);
 
