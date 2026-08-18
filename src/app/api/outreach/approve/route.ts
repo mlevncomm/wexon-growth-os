@@ -1,0 +1,38 @@
+import { NextResponse } from "next/server";
+import { badRequest, readJson } from "@/lib/http";
+import { moderateJobs } from "@/lib/whatsapp/queue";
+import { denyIfGuest } from "@/lib/session";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+export async function POST(request: Request) {
+  const denied = await denyIfGuest();
+  if (denied) return denied;
+  const body = await readJson<{
+    ids?: string[];
+    id?: string;
+    action?: string;
+    message?: string;
+  }>(request);
+  if (!body) return badRequest("Geçersiz istek.");
+  const ids = [...(body.ids ?? []), body.id ?? ""].filter(Boolean);
+  const action = body.action;
+  if (!ids.length || (action !== "approve" && action !== "reject" && action !== "edit")) {
+    return badRequest("Onaylanacak iş ve eylem gerekli.");
+  }
+  if (action === "edit" && !String(body.message ?? "").trim()) {
+    return badRequest("Düzenlenen metin boş olamaz.");
+  }
+  try {
+    const result = await moderateJobs({
+      ids,
+      action,
+      message: typeof body.message === "string" ? body.message : undefined,
+    });
+    return NextResponse.json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Onaylanamadı";
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
+}

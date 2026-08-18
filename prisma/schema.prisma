@@ -1,0 +1,132 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+// Üretim: PostgreSQL (Supabase). Yerel SQLite için prisma/schema.sqlite.prisma
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Campaign {
+  id           String   @id @default(cuid())
+  query        String
+  city         String
+  district     String   @default("")
+  targetCount  Int
+  minRating    Float    @default(0)
+  requirePhone Boolean  @default(true)
+  phonePrefix  String   @default("")
+  status       String   @default("idle")
+  foundCount   Int      @default(0)
+  skippedCount Int      @default(0)
+  error        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  leads        Lead[]
+}
+
+model Lead {
+  id          String         @id @default(cuid())
+  placeId     String         @unique
+  campaignId  String?
+  campaign    Campaign?      @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  name        String
+  address     String         @default("")
+  phone       String         @default("")
+  website     String         @default("")
+  rating      Float?
+  reviewCount Int?
+  mapsUrl     String         @default("")
+  lat         Float?
+  lng         Float?
+  district    String         @default("")
+  city        String         @default("")
+  status      String         @default("yeni")
+  notes       String         @default("")
+  consented   Boolean        @default(false)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  jobs        OutreachJob[]
+}
+
+model Template {
+  id        String   @id @default(cuid())
+  name      String
+  body      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model OutreachJob {
+  id          String    @id @default(cuid())
+  leadId      String
+  lead        Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  templateId  String?
+  message     String
+  status      String    @default("pending")
+  channel     String    @default("whatsapp")
+  error       String?
+  scheduledAt DateTime  @default(now())
+  sentAt      DateTime?
+  createdAt   DateTime  @default(now())
+}
+
+model BrandPlaybook {
+  id        String   @id @default("default")
+  tone      String   @default("")
+  rules     String   @default("")
+  forbidden String   @default("")
+  offer     String   @default("")
+  cta       String   @default("")
+  updatedAt DateTime @updatedAt
+}
+
+model CoachMessage {
+  id        String   @id @default(cuid())
+  role      String
+  body      String
+  createdAt DateTime @default(now())
+}
+
+model IgThread {
+  id        String      @id
+  igsid     String      @default("")
+  username  String      @default("")
+  lastText  String      @default("")
+  lastAt    DateTime?
+  draft     String      @default("")
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  messages  IgMessage[]
+}
+
+model IgMessage {
+  id        String   @id @default(cuid())
+  threadId  String
+  thread    IgThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  direction String
+  body      String
+  createdAt DateTime @default(now())
+}
+
+model AppSettings {
+  id                   String  @id @default("default")
+  googlePlacesApiKey   String  @default("")
+  waCloudToken         String  @default("")
+  waPhoneNumberId      String  @default("")
+  delayMinSec          Int     @default(20)
+  delayMaxSec          Int     @default(45)
+  dailyCap             Int     @default(40)
+  queuePaused          Boolean @default(false)
+  queueStopped         Boolean @default(false)
+  llmApiKey            String  @default("")
+  llmBaseUrl           String  @default("https://api.groq.com/openai/v1")
+  llmModel             String  @default("openai/gpt-oss-20b")
+  llmProvider          String  @default("groq")
+  igAccessToken        String  @default("")
+  igUserId             String  @default("")
+  igWebhookVerifyToken String  @default("")
+}
