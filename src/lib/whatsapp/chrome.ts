@@ -15,8 +15,10 @@ const WINDOWS_CHROME = [
 ];
 
 export function findChromeExecutable(): string | null {
+  if (process.env.VERCEL === "1") return null;
   for (const candidate of WINDOWS_CHROME) {
-    if (candidate && fs.existsSync(candidate)) return candidate;
+    if (!candidate) continue;
+    if (fs.existsSync(/* turbopackIgnore: true */ candidate)) return candidate;
   }
   return null;
 }
