@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { fetchStats } from "@/lib/stats-client";
 import { isActive, NavRail } from "./NavRail";
 
 const QueuePanel = dynamic(
@@ -101,14 +102,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     const load = async () => {
       if (!alive || document.hidden) return;
       try {
-        const sRes = await fetch("/api/stats", { cache: "no-store" });
+        const next = await fetchStats(scanning);
         if (!alive) return;
-        if (sRes.status === 401) {
-          window.location.href = "/giris";
-          return;
-        }
-        if (sRes.ok) setStats(await sRes.json());
-        delay = sRes.ok ? (scanning ? 2000 : 12_000) : Math.min(delay * 2, 60_000);
+        setStats(next);
+        delay = scanning ? 2000 : 12_000;
       } catch {
         delay = Math.min(delay * 2, 60_000);
       }

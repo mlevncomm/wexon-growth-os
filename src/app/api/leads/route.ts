@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { denyIfGuest } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
+export const preferredRegion = ["fra1"];
 
 function leadWhere(opts: { q?: string; status?: string; campaignId?: string }) {
   const q = (opts.q ?? "").trim();
@@ -31,8 +32,9 @@ export async function GET(request: Request) {
   if (denied) return denied;
   try {
     const { searchParams } = new URL(request.url);
-    const takeRaw = Number(searchParams.get("take") ?? 400);
-    const take = Number.isFinite(takeRaw) ? Math.min(400, Math.max(1, Math.floor(takeRaw))) : 400;
+    const takeRaw = Number(searchParams.get("take") ?? 150);
+    const take = Number.isFinite(takeRaw) ? Math.min(400, Math.max(1, Math.floor(takeRaw))) : 150;
+    const lite = searchParams.get("lite") === "1";
     const leads = await prisma.lead.findMany({
       where: leadWhere({
         q: searchParams.get("q") ?? "",
@@ -41,6 +43,19 @@ export async function GET(request: Request) {
       }),
       orderBy: { createdAt: "desc" },
       take,
+      ...(lite
+        ? {
+            select: {
+              id: true,
+              name: true,
+              phone: true,
+              status: true,
+              city: true,
+              district: true,
+              createdAt: true,
+            },
+          }
+        : {}),
     });
 
     return NextResponse.json(leads);

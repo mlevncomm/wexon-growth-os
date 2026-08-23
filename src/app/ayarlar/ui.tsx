@@ -65,7 +65,7 @@ export default function AyarlarPage() {
     authConfigured: false,
   });
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [llmBusy, setLlmBusy] = useState(false);
 
   useEffect(() => {

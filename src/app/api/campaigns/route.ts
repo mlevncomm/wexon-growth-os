@@ -13,7 +13,6 @@ export const maxDuration = 300;
 export async function GET() {
   const denied = await denyIfGuest();
   if (denied) return denied;
-  await ensureSeed();
   const campaigns = await prisma.campaign.findMany({
     orderBy: { createdAt: "desc" },
     take: 30,

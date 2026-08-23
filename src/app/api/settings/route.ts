@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { ensureSeed } from "@/lib/campaigns";
 import { badRequest, readJson } from "@/lib/http";
 import { getSettings, updateSettings } from "@/lib/settings";
 import { deployHints } from "@/lib/platform";
@@ -10,7 +9,6 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const denied = await denyIfGuest();
   if (denied) return denied;
-  await ensureSeed();
   const settings = await getSettings();
   const deploy = deployHints();
   return NextResponse.json({

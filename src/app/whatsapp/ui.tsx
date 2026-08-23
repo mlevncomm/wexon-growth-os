@@ -39,7 +39,7 @@ export default function OutreachPage() {
   const [angle, setAngle] = useState<CopyAngle>("kirec");
   const [wa, setWa] = useState<WaInfo | null>(null);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [copyBusy, setCopyBusy] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [brief, setBrief] = useState("");

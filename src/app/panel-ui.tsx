@@ -2,26 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { EMPTY_STATS, fetchStats, type DashboardStats } from "@/lib/stats-client";
 import { formatPhoneDisplay } from "@/lib/phone";
 import { statusLabel } from "@/lib/lead-status";
-
-type Stats = {
-  leadsTotal: number;
-  leadsToday: number;
-  queued: number;
-  sentToday: number;
-  dailyCap: number;
-  yeni: number;
-  hasPlacesKey: boolean;
-  lastCampaign: {
-    query: string;
-    city: string;
-    district: string;
-    status: string;
-    foundCount: number;
-    targetCount: number;
-  } | null;
-};
 
 type Lead = {
   id: string;
@@ -34,32 +17,24 @@ type Lead = {
 };
 
 export default function PanelPage() {
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [leads, setLeads] = useState<Lead[] | null>(null);
+  const [stats, setStats] = useState<DashboardStats>(EMPTY_STATS);
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [listReady, setListReady] = useState(false);
   const [error, setError] = useState("");
   const [mode, setMode] = useState<"daily" | "weekly">("daily");
 
   useEffect(() => {
-    const boot = window.setTimeout(() => {
-      void Promise.all([
-        fetch("/api/stats").then(async (res) => {
-          const data = (await res.json()) as Stats & { error?: string };
-          if (!res.ok) throw new Error(data.error ?? "Panel yüklenemedi");
-          return data as Stats;
-        }),
-        fetch("/api/leads?take=80").then(async (res) => {
-          const data = (await res.json()) as Lead[] & { error?: string };
-          if (!res.ok) throw new Error(data.error ?? "Liste alınamadı");
-          return data as Lead[];
-        }),
-      ])
-        .then(([s, rows]) => {
-          setStats(s);
-          setLeads(rows);
-        })
-        .catch((err: Error) => setError(err.message));
-    }, 0);
-    return () => window.clearTimeout(boot);
+    void fetchStats()
+      .then(setStats)
+      .catch((err: Error) => setError(err.message));
+    void fetch("/api/leads?take=60&lite=1")
+      .then(async (res) => {
+        const data = (await res.json()) as Lead[] & { error?: string };
+        if (!res.ok) throw new Error(data.error ?? "Liste alınamadı");
+        setLeads(data);
+      })
+      .catch((err: Error) => setError(err.message))
+      .finally(() => setListReady(true));
   }, []);
 
   const buckets = useMemo(() => buildBuckets(leads ?? [], mode), [leads, mode]);
@@ -73,38 +48,30 @@ export default function PanelPage() {
   return (
     <div>
       {error ? <p className="error-box">{error}</p> : null}
-      {!stats ? (
-        <div className="card"><div className="skel" style={{ height: 160 }} /></div>
-      ) : (
-        <>
-          {!stats.hasPlacesKey ? (
-            <p className="notice" style={{ marginBottom: 14 }}>
-              Places anahtarı yok. Keşiften önce <Link href="/ayarlar">Sistem</Link> ekranına anahtarı yaz.
-            </p>
-          ) : null}
+      {!stats.hasPlacesKey ? (
+        <p className="notice" style={{ marginBottom: 14 }}>
+          Places anahtarı yok. Keşiften önce <Link href="/ayarlar">Sistem</Link> ekranına anahtarı yaz.
+        </p>
+      ) : null}
 
-          <section className="hero">
-            <div>
-              <div className="hero-kicker">Satış pipeline</div>
-              <div className="hero-val">
-                {stats.leadsTotal.toLocaleString("tr-TR")}
-                <span className="delta">{delta >= 0 ? "+" : ""}{delta}% ↗</span>
-              </div>
-              <div style={{ marginTop: 8, color: "rgba(255,255,255,0.7)", fontSize: 13 }}>
-                Bugün {stats.leadsToday} yeni · {stats.yeni} henüz yazılmadı
-              </div>
-            </div>
-            <div className="hero-actions">
-              <Link className="btn btn-mint" href="/ara">+ Keşif</Link>
-              <Link className="btn btn-on-teal" href="/whatsapp">Gönder</Link>
-              <Link className="btn btn-on-teal" href="/musteriler">Liste</Link>
-            </div>
-          </section>
-        </>
-      )}
+      <section className="hero">
+        <div>
+          <div className="hero-kicker">Satış pipeline</div>
+          <div className="hero-val">
+            {stats.leadsTotal.toLocaleString("tr-TR")}
+            <span className="delta">{delta >= 0 ? "+" : ""}{delta}% ↗</span>
+          </div>
+          <div style={{ marginTop: 8, color: "rgba(255,255,255,0.7)", fontSize: 13 }}>
+            Bugün {stats.leadsToday} yeni · {stats.yeni} henüz yazılmadı
+          </div>
+        </div>
+        <div className="hero-actions">
+          <Link className="btn btn-mint" href="/ara">+ Keşif</Link>
+          <Link className="btn btn-on-teal" href="/whatsapp">Gönder</Link>
+          <Link className="btn btn-on-teal" href="/musteriler">Liste</Link>
+        </div>
+      </section>
 
-      {stats ? (
-        <>
       <div className="flow">
         <div className="card">
           <div className="flow-head">
@@ -117,19 +84,15 @@ export default function PanelPage() {
               <button type="button" className={mode === "daily" ? "on" : ""} onClick={() => setMode("daily")}>Günlük</button>
             </div>
           </div>
-          {leads === null ? (
-            <div className="skel" style={{ height: 220 }} />
-          ) : (
-            <div className="bars" aria-label="Keşif ve gönderim çubukları">
-              {buckets.map((b) => (
-                <div key={b.label} className="bar-col">
-                  <div className="bar-up" style={{ height: `${Math.max(8, (b.found / maxUp) * 100)}%` }} />
-                  <div className="bar-lab">{b.label}</div>
-                  <div className="bar-dn" style={{ height: `${Math.max(8, (b.sent / maxDn) * 100)}%` }} />
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="bars" aria-label="Keşif ve gönderim çubukları">
+            {buckets.map((b) => (
+              <div key={b.label} className="bar-col">
+                <div className="bar-up" style={{ height: `${Math.max(8, (b.found / maxUp) * 100)}%` }} />
+                <div className="bar-lab">{b.label}</div>
+                <div className="bar-dn" style={{ height: `${Math.max(8, (b.sent / maxDn) * 100)}%` }} />
+              </div>
+            ))}
+          </div>
         </div>
         <div className="side-kpis">
           <article className="side-kpi">
@@ -148,9 +111,9 @@ export default function PanelPage() {
       </div>
 
       <div className="kpis">
-        <Mini title="Bekleyen kuyruk" value={stats?.queued ?? 0} hint="Mesaj sırası" />
-        <Mini title="Günlük tavan" value={`${stats?.sentToday ?? 0}/${stats?.dailyCap ?? 40}`} hint="Bugün giden mesaj" />
-        <Mini title="Yeni kayıt" value={stats?.yeni ?? 0} hint="Henüz yazılmayan" />
+        <Mini title="Bekleyen kuyruk" value={stats.queued} hint="Mesaj sırası" />
+        <Mini title="Günlük tavan" value={`${stats.sentToday}/${stats.dailyCap}`} hint="Bugün giden mesaj" />
+        <Mini title="Yeni kayıt" value={stats.yeni} hint="Henüz yazılmayan" />
       </div>
 
       <div className="split-bottom">
@@ -168,8 +131,8 @@ export default function PanelPage() {
             <span>Durum</span>
             <span>Yöntem</span>
           </div>
-          {leads === null ? (
-            <div className="skel" style={{ height: 120 }} />
+          {!listReady ? (
+            <div className="skel" style={{ height: 80 }} />
           ) : leads.length === 0 ? (
             <div className="empty" style={{ padding: "24px 0" }}>
               <strong>Kayıt yok</strong>
@@ -193,7 +156,7 @@ export default function PanelPage() {
         <article className="campaign-card">
           <div>
             <div className="page-kicker" style={{ color: "rgba(255,255,255,0.7)" }}>Son keşif</div>
-            {stats?.lastCampaign ? (
+            {stats.lastCampaign ? (
               <>
                 <h3 style={{ margin: "10px 0 6px", fontSize: 22 }}>{stats.lastCampaign.query}</h3>
                 <div style={{ opacity: 0.8, fontSize: 13 }}>
@@ -206,16 +169,14 @@ export default function PanelPage() {
           </div>
           <div>
             <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: "-0.04em" }}>
-              {stats?.lastCampaign ? `${stats.lastCampaign.foundCount}/${stats.lastCampaign.targetCount}` : "—"}
+              {stats.lastCampaign ? `${stats.lastCampaign.foundCount}/${stats.lastCampaign.targetCount}` : "—"}
             </div>
             <div style={{ opacity: 0.75, fontSize: 12, marginTop: 4 }}>
-              {stats?.hasPlacesKey ? "Places bağlı" : "Places anahtarı yok"}
+              {stats.hasPlacesKey ? "Places bağlı" : "Places anahtarı yok"}
             </div>
           </div>
         </article>
       </div>
-        </>
-      ) : null}
     </div>
   );
 }

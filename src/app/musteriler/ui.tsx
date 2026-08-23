@@ -37,6 +37,7 @@ export default function MusterilerPage() {
     const params = new URLSearchParams();
     if (nextQ) params.set("q", nextQ);
     if (nextStatus) params.set("status", nextStatus);
+    params.set("take", "150");
     const res = await fetch(`/api/leads?${params.toString()}`, { cache: "no-store" });
     const data = (await res.json()) as Lead[] & { error?: string };
     if (!res.ok) throw new Error(data.error ?? "Liste alınamadı");
