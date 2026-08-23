@@ -31,6 +31,8 @@ export async function GET(request: Request) {
   if (denied) return denied;
   try {
     const { searchParams } = new URL(request.url);
+    const takeRaw = Number(searchParams.get("take") ?? 400);
+    const take = Number.isFinite(takeRaw) ? Math.min(400, Math.max(1, Math.floor(takeRaw))) : 400;
     const leads = await prisma.lead.findMany({
       where: leadWhere({
         q: searchParams.get("q") ?? "",
@@ -38,7 +40,7 @@ export async function GET(request: Request) {
         campaignId: searchParams.get("campaignId") ?? "",
       }),
       orderBy: { createdAt: "desc" },
-      take: 400,
+      take,
     });
 
     return NextResponse.json(leads);

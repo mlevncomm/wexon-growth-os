@@ -136,24 +136,34 @@ export async function runCampaign(id: string): Promise<void> {
   }
 }
 
+const seedOnce = globalThis as unknown as { __wexonSeed?: Promise<void> };
+
 export async function ensureSeed(): Promise<void> {
-  const needed = [
-    generateSalesCopy("kirec"),
-    generateSalesCopy("maliyet"),
-    generateSalesCopy("hijyen"),
-    generateSalesCopy("isletme"),
-    generateSalesCopy("takip"),
-  ];
-  for (const t of needed) {
-    const exists = await prisma.template.findFirst({ where: { name: t.name } });
-    if (!exists) await prisma.template.create({ data: t });
+  if (!seedOnce.__wexonSeed) {
+    seedOnce.__wexonSeed = (async () => {
+      const needed = [
+        generateSalesCopy("kirec"),
+        generateSalesCopy("maliyet"),
+        generateSalesCopy("hijyen"),
+        generateSalesCopy("isletme"),
+        generateSalesCopy("takip"),
+      ];
+      for (const t of needed) {
+        const exists = await prisma.template.findFirst({ where: { name: t.name } });
+        if (!exists) await prisma.template.create({ data: t });
+      }
+      if ((await prisma.template.count()) === 0) {
+        await prisma.template.create({ data: generateSalesCopy("kirec") });
+      }
+      await prisma.appSettings.upsert({
+        where: { id: "default" },
+        update: {},
+        create: { id: "default" },
+      });
+    })().catch((err) => {
+      seedOnce.__wexonSeed = undefined;
+      throw err;
+    });
   }
-  if ((await prisma.template.count()) === 0) {
-    await prisma.template.create({ data: generateSalesCopy("kirec") });
-  }
-  await prisma.appSettings.upsert({
-    where: { id: "default" },
-    update: {},
-    create: { id: "default" },
-  });
+  await seedOnce.__wexonSeed;
 }

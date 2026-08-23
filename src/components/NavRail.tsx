@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 
 const MAIN = [
@@ -102,13 +101,6 @@ export function NavRail({
   waLocal?: string;
 }) {
   const pathname = usePathname();
-  const [canLogout, setCanLogout] = useState(false);
-  useEffect(() => {
-    void fetch("/api/auth", { cache: "no-store" })
-      .then((r) => r.json())
-      .then((j: { configured?: boolean }) => setCanLogout(Boolean(j.configured)))
-      .catch(() => setCanLogout(false));
-  }, []);
   const waOn = waCloud || waLocal === "ready";
   const live = waOn || waLocal === "qr" || waLocal === "starting";
   const line = operatorLine({ places, waCloud, waLocal });
@@ -186,7 +178,6 @@ export function NavRail({
             <span>{line}</span>
           </div>
         </Link>
-        {canLogout ? (
         <button
           className="btn btn-ghost"
           type="button"
@@ -199,7 +190,6 @@ export function NavRail({
         >
           Çıkış
         </button>
-        ) : null}
       </div>
     </nav>
   );

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { dialCodeFor, formatPhoneDisplay } from "@/lib/phone";
-import { TURKEY_ZONES, WORLD_GROUPS, WORLD_HUBS, hubFor } from "@/lib/regions";
+import { REGIONS, TURKEY_ZONES, WORLD_GROUPS, WORLD_HUBS, hubFor } from "@/lib/regions";
 import { SECTOR_GROUPS } from "@/lib/sectors";
 import { ChipStrip } from "@/components/ChipStrip";
 import { useToast } from "@/components/Toast";
@@ -28,6 +28,7 @@ type Campaign = {
 };
 type Scope = "city" | "zone" | "turkey" | "hub" | "worldGroup" | "world";
 
+const PINNED_CITIES = ["İstanbul", "Ankara", "İzmir", "Bursa", "Antalya", "Adana", "Kocaeli", "Gaziantep"];
 const COUNT_PRESETS = [10, 20, 40, 60];
 const RATING_PRESETS = [
   { label: "Hepsi", value: 0 },
@@ -38,7 +39,8 @@ const RATING_PRESETS = [
 
 export default function AraPage() {
   const toast = useToast();
-  const [regions, setRegions] = useState<Region[] | null>(null);
+  const [regions] = useState<Region[]>(REGIONS);
+  const [showAllCities, setShowAllCities] = useState(false);
   const [scope, setScope] = useState<Scope>("city");
   const [selectedQueries, setSelectedQueries] = useState<string[]>(["restoran"]);
   const [customQuery, setCustomQuery] = useState("");
@@ -58,24 +60,22 @@ export default function AraPage() {
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [campaignId, setCampaignId] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetch("/api/regions")
-      .then((r) => r.json())
-      .then(setRegions)
-      .catch(() => setRegions([]));
-  }, []);
-
   const districts = useMemo(
-    () => regions?.find((r) => r.city === city)?.districts ?? [],
+    () => regions.find((r) => r.city === city)?.districts ?? [],
     [regions, city],
   );
 
   const filteredCities = useMemo(() => {
     const q = cityFilter.trim().toLocaleLowerCase("tr");
-    const list = regions ?? [];
-    if (!q) return list;
-    return list.filter((r) => r.city.toLocaleLowerCase("tr").includes(q));
+    if (!q) return regions;
+    return regions.filter((r) => r.city.toLocaleLowerCase("tr").includes(q));
   }, [regions, cityFilter]);
+
+  const visibleCities = useMemo(() => {
+    if (cityFilter.trim() || showAllCities) return filteredCities;
+    const pinned = filteredCities.filter((r) => PINNED_CITIES.includes(r.city) || r.city === city);
+    return pinned.length ? pinned : filteredCities.slice(0, 8);
+  }, [filteredCities, cityFilter, showAllCities, city]);
 
   const filteredHubs = useMemo(() => {
     const q = hubFilter.trim().toLowerCase();
@@ -219,24 +219,25 @@ export default function AraPage() {
             </label>
             <div className="field" style={{ marginTop: 12 }}>
               <span>İl · {filteredCities.length}</span>
-              <ChipStrip>
-                {regions === null
-                  ? [1, 2, 3, 4, 5].map((n) => (
-                      <span key={n} className="skel" style={{ width: 88, height: 44, borderRadius: 999 }} />
-                    ))
-                  : filteredCities.map((r) => (
-                      <button
-                        key={r.city}
-                        type="button"
-                        className={`chip${city === r.city ? " on" : ""}`}
-                        onClick={() => {
-                          setCity(r.city);
-                          setDistrict(r.districts[0] ?? "");
-                        }}
-                      >
-                        {r.city}
-                      </button>
-                    ))}
+              <ChipStrip wrap>
+                {visibleCities.map((r) => (
+                  <button
+                    key={r.city}
+                    type="button"
+                    className={`chip${city === r.city ? " on" : ""}`}
+                    onClick={() => {
+                      setCity(r.city);
+                      setDistrict(r.districts[0] ?? "");
+                    }}
+                  >
+                    {r.city}
+                  </button>
+                ))}
+                {!cityFilter.trim() && !showAllCities && filteredCities.length > visibleCities.length ? (
+                  <button type="button" className="chip" onClick={() => setShowAllCities(true)}>
+                    Tüm iller · {filteredCities.length}
+                  </button>
+                ) : null}
               </ChipStrip>
             </div>
             <div className="field" style={{ marginTop: 16 }}>
@@ -356,7 +357,7 @@ export default function AraPage() {
                     {allOn ? "Grubu kaldır" : "Grubun tümü"}
                   </button>
                 </div>
-                <ChipStrip>
+                <ChipStrip wrap>
                   {g.items.map((s) => (
                     <button
                       key={s.query}
@@ -429,7 +430,7 @@ export default function AraPage() {
         Telefonu olmayanları alma
       </label>
 
-      <div style={{ marginTop: 16, display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
+      <div className="kesif-bar">
         <button className="btn btn-wexon" type="button" disabled={busy} onClick={() => void startSearch()}>
           {busy ? "Keşif sürüyor…" : "Keşif başlat"}
         </button>

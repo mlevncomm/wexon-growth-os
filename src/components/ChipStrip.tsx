@@ -2,12 +2,19 @@
 
 import { useEffect, useRef, useState } from "react";
 
-export function ChipStrip({ children }: { children: React.ReactNode }) {
+export function ChipStrip({
+  children,
+  wrap = false,
+}: {
+  children: React.ReactNode;
+  wrap?: boolean;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const [left, setLeft] = useState(false);
   const [right, setRight] = useState(false);
 
   useEffect(() => {
+    if (wrap) return;
     const el = ref.current;
     if (!el) return;
 
@@ -21,17 +28,22 @@ export function ChipStrip({ children }: { children: React.ReactNode }) {
     el.addEventListener("scroll", update, { passive: true });
     const ro = new ResizeObserver(update);
     ro.observe(el);
-    const mo = new MutationObserver(update);
-    mo.observe(el, { childList: true });
     return () => {
       el.removeEventListener("scroll", update);
       ro.disconnect();
-      mo.disconnect();
     };
-  }, []);
+  }, [wrap]);
 
   function nudge(dir: number) {
     ref.current?.scrollBy({ left: dir * 240, behavior: "smooth" });
+  }
+
+  if (wrap) {
+    return (
+      <div className="chip-strip wrap">
+        <div className="chip-row wrap">{children}</div>
+      </div>
+    );
   }
 
   return (

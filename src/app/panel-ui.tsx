@@ -47,7 +47,7 @@ export default function PanelPage() {
           if (!res.ok) throw new Error(data.error ?? "Panel yüklenemedi");
           return data as Stats;
         }),
-        fetch("/api/leads").then(async (res) => {
+        fetch("/api/leads?take=80").then(async (res) => {
           const data = (await res.json()) as Lead[] & { error?: string };
           if (!res.ok) throw new Error(data.error ?? "Liste alınamadı");
           return data as Lead[];

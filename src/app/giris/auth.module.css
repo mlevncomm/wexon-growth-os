@@ -293,31 +293,43 @@
   .card {
     grid-template-columns: 1fr;
     min-height: 100dvh;
+    min-height: 100svh;
     border-radius: 0;
     border: 0;
   }
   .brand {
-    min-height: 340px;
-    padding: 28px 22px 20px;
+    min-height: 220px;
+    padding: calc(22px + env(safe-area-inset-top, 0px)) 22px 16px;
   }
   .brandInner {
-    gap: 28px;
+    gap: 16px;
   }
   .brandCopy {
     margin-top: 8px;
     padding-bottom: 0;
   }
   .brandCopy h1 {
-    font-size: 32px;
+    font-size: 30px;
+  }
+  .brandCopy p {
+    display: none;
+  }
+  .steps {
+    display: none;
   }
   .panel {
-    padding: 24px 16px 36px;
+    padding: 20px 16px calc(28px + env(safe-area-inset-bottom, 0px));
     place-items: start center;
   }
   .form {
-    padding: 28px 22px 24px;
+    padding: 24px 20px 20px;
+    width: 100%;
+    max-width: 440px;
   }
   .head h2 {
-    font-size: 32px;
+    font-size: 28px;
+  }
+  .field input {
+    font-size: 16px;
   }
 }
