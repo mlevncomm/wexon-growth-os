@@ -156,39 +156,56 @@ export function NavRail({
       </Link>
 
       <div className="rail-foot">
-        <div className="rail-switch">
-          <span>Kuyruk</span>
-          <button
-            type="button"
-            className={`switch${queueOpen ? " on" : ""}`}
-            aria-pressed={queueOpen}
-            aria-label="Kuyruğu aç"
-            onClick={onQueueToggle}
-          >
+        <button
+          type="button"
+          className={`rail-row${queueOpen ? " is-on" : ""}`}
+          aria-pressed={queueOpen}
+          aria-label={queueOpen ? "Kuyruğu kapat" : "Kuyruğu aç"}
+          onClick={onQueueToggle}
+        >
+          <span className="rail-ico" aria-hidden>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
+              <path d="M5 7h14M5 12h10M5 17h14" />
+            </svg>
+          </span>
+          <span className="rail-copy">
+            <b>Kuyruk</b>
+            <em>{queueOpen ? "Açık" : "Kapalı"}</em>
+          </span>
+          <span className={`switch${queueOpen ? " on" : ""}`} aria-hidden>
             <i />
-          </button>
-        </div>
-        <Link href="/ayarlar" className="op-card" onClick={onNavigate}>
-          <div className={`op-ava${live ? " on" : waLocal === "error" ? " bad" : ""}`}>
+          </span>
+        </button>
+        <Link href="/ayarlar" className="rail-row" onClick={onNavigate}>
+          <span className={`op-ava${live ? " on" : waLocal === "error" ? " bad" : ""}`}>
             W
             <i className={`op-dot${waOn ? "" : waLocal === "error" ? " bad" : live ? " warn" : " off"}`} />
-          </div>
-          <div className="op-meta">
+          </span>
+          <span className="rail-copy">
             <b>Admin</b>
-            <span>{line}</span>
-          </div>
+            <em>{line}</em>
+          </span>
         </Link>
         <button
-          className="btn btn-ghost"
+          className="rail-row rail-logout"
           type="button"
-          style={{ width: "100%" }}
+          data-lpignore="true"
+          data-1p-ignore="true"
           onClick={() => {
             void fetch("/api/auth", { method: "DELETE" }).then(() => {
               window.location.href = "/giris";
             });
           }}
         >
-          Çıkış
+          <span className="rail-ico" aria-hidden>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
+              <path d="M10 7V6.2A1.2 1.2 0 0 1 11.2 5h6.6A1.2 1.2 0 0 1 19 6.2v11.6a1.2 1.2 0 0 1-1.2 1.2h-6.6A1.2 1.2 0 0 1 10 17.8V17" />
+              <path d="M4.6 12H15M7.2 9l-2.6 3 2.6 3" />
+            </svg>
+          </span>
+          <span className="rail-copy">
+            <b>Çıkış</b>
+          </span>
         </button>
       </div>
     </nav>
