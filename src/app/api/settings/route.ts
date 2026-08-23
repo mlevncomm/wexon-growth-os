@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { badRequest, readJson } from "@/lib/http";
 import { getSettings, updateSettings } from "@/lib/settings";
+import { bustStatsCache } from "@/lib/stats";
 import { deployHints } from "@/lib/platform";
 import { denyIfGuest } from "@/lib/session";
 
@@ -86,6 +87,7 @@ export async function PUT(request: Request) {
   }
 
   const settings = await updateSettings(patch);
+  bustStatsCache();
   return NextResponse.json({
     ...settings,
     googlePlacesApiKey: settings.googlePlacesApiKey ? mask(settings.googlePlacesApiKey) : "",

@@ -123,6 +123,8 @@ export async function runCampaign(id: string): Promise<void> {
       where: { id },
       data: { status: "done" },
     });
+    const { bustStatsCache } = await import("./stats");
+    bustStatsCache();
   } catch (err) {
     const latest = await prisma.campaign.findUnique({ where: { id } });
     if (latest?.status === "cancelled") return;
@@ -133,6 +135,8 @@ export async function runCampaign(id: string): Promise<void> {
         error: err instanceof Error ? err.message : "Arama başarısız",
       },
     });
+    const { bustStatsCache } = await import("./stats");
+    bustStatsCache();
   }
 }
 

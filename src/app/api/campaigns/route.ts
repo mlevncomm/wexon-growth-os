@@ -6,6 +6,7 @@ import { hubFor, worldGroupFor, zoneFor } from "@/lib/regions";
 import { getSettings } from "@/lib/settings";
 import { denyIfGuest } from "@/lib/session";
 import { isServerless } from "@/lib/platform";
+import { bustStatsCache } from "@/lib/stats";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -108,6 +109,7 @@ export async function POST(request: Request) {
     },
   });
 
+  bustStatsCache();
   if (isServerless()) {
     after(() => runCampaign(campaign.id));
   } else {

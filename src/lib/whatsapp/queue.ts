@@ -238,10 +238,10 @@ export async function moderateJobs(opts: {
       updated += 1;
       continue;
     }
-    const message = opts.action === "edit" ? (opts.message ?? job.message).trim() : job.message;
+    const message = (opts.message ?? job.message).trim();
     if (!message) continue;
-    const wait = jitter(settings.delayMinSec, settings.delayMaxSec) + offsetSec;
-    offsetSec += jitter(settings.delayMinSec, settings.delayMaxSec);
+    const wait = isServerless() ? 0 : jitter(settings.delayMinSec, settings.delayMaxSec) + offsetSec;
+    if (!isServerless()) offsetSec += jitter(settings.delayMinSec, settings.delayMaxSec);
     await prisma.outreachJob.update({
       where: { id: job.id },
       data: {
@@ -262,7 +262,7 @@ export async function moderateJobs(opts: {
 
 export async function getQueueSnapshot() {
   const settings = await getSettings();
-  const [queued, pending, sending, sentToday, failed, current, pendingJobs] = await Promise.all([
+  const [queued, pending, sending, sentToday, failed, current, pendingJobs, lastFailed] = await Promise.all([
     prisma.outreachJob.count({ where: { status: "queued" } }),
     prisma.outreachJob.count({ where: { status: "pending" } }),
     prisma.outreachJob.count({ where: { status: "sending" } }),
@@ -279,6 +279,11 @@ export async function getQueueSnapshot() {
       take: 30,
       include: { lead: { select: { name: true, phone: true } } },
     }),
+    prisma.outreachJob.findFirst({
+      where: { status: "failed", error: { not: null } },
+      orderBy: { createdAt: "desc" },
+      select: { error: true },
+    }),
   ]);
 
   return {
@@ -288,11 +293,13 @@ export async function getQueueSnapshot() {
     delayMinSec: settings.delayMinSec,
     delayMaxSec: settings.delayMaxSec,
     cloud: await cloudConfigured(),
+    serverless: isServerless(),
     queued,
     pending,
     sending,
     sentToday,
     failed,
+    lastError: lastFailed?.error ?? null,
     current: current
       ? {
           id: current.id,

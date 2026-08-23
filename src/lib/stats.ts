@@ -29,17 +29,25 @@ const g = globalThis as unknown as {
 
 const TTL_MS = 3_000;
 
-function todayUtc(): Date {
-  const start = new Date();
-  start.setUTCHours(0, 0, 0, 0);
-  return start;
+function todayIstanbul(): Date {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Istanbul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  const y = parts.find((p) => p.type === "year")?.value;
+  const m = parts.find((p) => p.type === "month")?.value;
+  const d = parts.find((p) => p.type === "day")?.value;
+  return new Date(`${y}-${m}-${d}T00:00:00+03:00`);
 }
 
 export async function loadDashboardStats(force = false): Promise<DashboardStats> {
   const hit = g.__wexonStats;
   if (!force && hit && Date.now() - hit.at < TTL_MS) return hit.data;
 
-  const start = todayUtc();
+  const start = todayIstanbul();
   const postgres = /postgres/i.test(process.env.DATABASE_URL ?? "");
 
   const [settings, lastCampaign, counts] = await Promise.all([
@@ -71,7 +79,7 @@ export async function loadDashboardStats(force = false): Promise<DashboardStats>
             (SELECT COUNT(*)::int FROM "Lead") AS "leadsTotal",
             (SELECT COUNT(*)::int FROM "Lead" WHERE "createdAt" >= ${start}) AS "leadsToday",
             (SELECT COUNT(*)::int FROM "Campaign" WHERE "createdAt" >= ${start}) AS "campaignsToday",
-            (SELECT COUNT(*)::int FROM "OutreachJob" WHERE status IN ('queued', 'sending')) AS queued,
+            (SELECT COUNT(*)::int FROM "OutreachJob" WHERE status IN ('queued', 'sending', 'pending')) AS queued,
             (SELECT COUNT(*)::int FROM "OutreachJob" WHERE status = 'sent' AND "sentAt" >= ${start}) AS "sentToday",
             (SELECT COUNT(*)::int FROM "Lead" WHERE status = 'yeni') AS yeni,
             (SELECT COUNT(*)::int FROM "Lead" WHERE status = 'yazildi') AS yazildi
@@ -91,7 +99,7 @@ export async function loadDashboardStats(force = false): Promise<DashboardStats>
           prisma.lead.count(),
           prisma.lead.count({ where: { createdAt: { gte: start } } }),
           prisma.campaign.count({ where: { createdAt: { gte: start } } }),
-          prisma.outreachJob.count({ where: { status: { in: ["queued", "sending"] } } }),
+          prisma.outreachJob.count({ where: { status: { in: ["queued", "sending", "pending"] } } }),
           prisma.outreachJob.count({ where: { status: "sent", sentAt: { gte: start } } }),
           prisma.lead.count({ where: { status: "yeni" } }),
           prisma.lead.count({ where: { status: "yazildi" } }),

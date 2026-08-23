@@ -1,8 +1,9 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { badRequest, readJson } from "@/lib/http";
 import { updateSettings } from "@/lib/settings";
-import { ensureQueueLoop } from "@/lib/whatsapp/queue";
+import { bustStatsCache } from "@/lib/stats";
+import { ensureQueueLoop, processQueueTick } from "@/lib/whatsapp/queue";
 import { denyIfGuest } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -28,5 +29,13 @@ export async function POST(request: Request) {
     return badRequest("Bilinmeyen işlem");
   }
 
+  bustStatsCache();
+  if (action === "resume") {
+    after(() =>
+      processQueueTick({ serverless: true, maxJobs: 3 })
+        .then(() => bustStatsCache())
+        .catch(() => undefined),
+    );
+  }
   return NextResponse.json({ ok: true });
 }

@@ -4,6 +4,7 @@ import { normalizePhone } from "@/lib/phone";
 import { resolveSearchLocations } from "@/lib/search-scope";
 import { badRequest, readJson } from "@/lib/http";
 import { denyIfGuest } from "@/lib/session";
+import { bustStatsCache } from "@/lib/stats";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +48,7 @@ export async function PATCH(
 
   try {
     const lead = await prisma.lead.update({ where: { id }, data });
+    bustStatsCache();
     return NextResponse.json(lead);
   } catch {
     return NextResponse.json({ error: "Kayıt bulunamadı" }, { status: 404 });
@@ -62,6 +64,7 @@ export async function DELETE(
   const { id } = await context.params;
   try {
     await prisma.lead.delete({ where: { id } });
+    bustStatsCache();
     return NextResponse.json({ ok: true, deleted: 1 });
   } catch {
     return NextResponse.json({ error: "Kayıt bulunamadı" }, { status: 404 });

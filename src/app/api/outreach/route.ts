@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { badRequest, databaseUnavailable, readJson } from "@/lib/http";
+import { bustStatsCache } from "@/lib/stats";
 import { enqueueLeads, ensureQueueLoop, getQueueSnapshot } from "@/lib/whatsapp/queue";
 import { denyIfGuest } from "@/lib/session";
 
@@ -68,6 +69,7 @@ export async function POST(request: Request) {
   }
   try {
     const result = await enqueueLeads({ leadIds, templateId });
+    bustStatsCache();
     return NextResponse.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Kuyruk oluşmadı";

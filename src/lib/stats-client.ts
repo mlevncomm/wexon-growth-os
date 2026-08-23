@@ -35,6 +35,11 @@ export const EMPTY_STATS: DashboardStats = {
 let inflight: Promise<DashboardStats> | null = null;
 let memo: { at: number; data: DashboardStats } | null = null;
 
+export function invalidateStats() {
+  memo = null;
+  inflight = null;
+}
+
 export async function fetchStats(force = false): Promise<DashboardStats> {
   const ttl = memo?.data.lastCampaign &&
     (memo.data.lastCampaign.status === "running" || memo.data.lastCampaign.status === "queued")

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { markStatsDirty } from "@/lib/os-events";
 import { useToast } from "./Toast";
 
 type Draft = { id: string; name: string; phone: string; message: string; channel: string };
@@ -12,11 +13,13 @@ type Snapshot = {
   delayMinSec: number;
   delayMaxSec: number;
   cloud?: boolean;
+  serverless?: boolean;
   queued: number;
   pending?: number;
   sending: number;
   sentToday: number;
   failed: number;
+  lastError?: string | null;
   current: { id: string; status: string; name: string; phone: string } | null;
   drafts?: Draft[];
 };
@@ -58,17 +61,22 @@ export function QueuePanel({ onClose, open = false }: { onClose?: () => void; op
     });
     const res = await fetch("/api/outreach", { cache: "no-store" });
     if (res.ok) setSnap(await res.json());
+    markStatsDirty();
     toast.push(
       action === "pause" ? "Gönderim duraklatıldı" : action === "resume" ? "Gönderim devam ediyor" : "Kuyruk durduruldu",
     );
   }
 
   async function moderate(id: string, action: "approve" | "reject" | "edit") {
-    const message = action === "edit" ? (editing[id] ?? snap?.drafts?.find((d) => d.id === id)?.message ?? "") : undefined;
+    const message = editing[id] ?? snap?.drafts?.find((d) => d.id === id)?.message ?? "";
     const res = await fetch("/api/outreach/approve", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, action, message }),
+      body: JSON.stringify({
+        id,
+        action,
+        message: action === "reject" ? undefined : message,
+      }),
     });
     const json = await res.json();
     if (!res.ok) {
@@ -77,7 +85,21 @@ export function QueuePanel({ onClose, open = false }: { onClose?: () => void; op
     }
     const next = await fetch("/api/outreach", { cache: "no-store" });
     if (next.ok) setSnap(await next.json());
-    toast.push(action === "reject" ? "Reddedildi" : action === "edit" ? "Düzenlenip kuyruğa alındı" : "Onaylandı, gönderilecek");
+    markStatsDirty();
+    toast.push(action === "reject" ? "Reddedildi" : action === "edit" ? "Düzenlenip kuyruğa alındı" : "Onaylandı, gönderim deneniyor");
+  }
+
+  async function tickNow() {
+    const res = await fetch("/api/outreach/tick", { method: "POST" });
+    const json = await res.json().catch(() => ({}));
+    const next = await fetch("/api/outreach", { cache: "no-store" });
+    if (next.ok) setSnap(await next.json());
+    markStatsDirty();
+    if (!res.ok) {
+      toast.push(json.error || "Tick çalışmadı", "bad");
+      return;
+    }
+    toast.push("Kuyruk şimdi denendi");
   }
 
   const waiting = (snap?.queued ?? 0) + (snap?.sending ?? 0);
@@ -85,7 +107,8 @@ export function QueuePanel({ onClose, open = false }: { onClose?: () => void; op
   const cap = snap?.dailyCap ?? 40;
   const sent = snap?.sentToday ?? 0;
   const pct = Math.min(100, Math.round((sent / Math.max(1, cap)) * 100));
-  const live = waiting > 0 && !snap?.paused && !snap?.stopped;
+  const canSend = Boolean(snap?.cloud);
+  const live = canSend && waiting > 0 && !snap?.paused && !snap?.stopped;
   const label = snap?.stopped
     ? "Durdu"
     : snap?.paused
@@ -105,7 +128,11 @@ export function QueuePanel({ onClose, open = false }: { onClose?: () => void; op
         <div className="page-kicker">Kuyruk</div>
         <h2 style={{ margin: "8px 0 0", fontSize: 26, letterSpacing: "-0.04em" }}>{label}</h2>
         <div className="muted" style={{ marginTop: 6, fontSize: 13 }}>
-          {snap?.cloud ? "Kanal: WhatsApp Cloud" : "Kanal: QR yedek (Cloud yok)"}
+          {snap?.cloud
+            ? "Kanal: WhatsApp Cloud"
+            : snap?.serverless
+              ? "Cloud yok — canlı gönderim yok. QR Vercel’de çalışmaz."
+              : "Kanal: QR yedek (Cloud yok)"}
         </div>
       </div>
       {pending > 0 ? (
@@ -146,14 +173,23 @@ export function QueuePanel({ onClose, open = false }: { onClose?: () => void; op
         <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>Bugün {sent}/{cap}</div>
         <div className="progress teal"><span style={{ width: `${pct}%` }} /></div>
         <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
-          {waiting} sırada · {pending} onay · {snap?.delayMinSec ?? 20}–{snap?.delayMaxSec ?? 45} sn
+          {waiting} sırada · {pending} onay · {snap?.failed ?? 0} hata
+          {snap?.serverless ? "" : ` · ${snap?.delayMinSec ?? 20}–${snap?.delayMaxSec ?? 45} sn`}
         </div>
+        {snap?.lastError ? (
+          <div className="muted" style={{ fontSize: 12, marginTop: 8, color: "var(--danger)" }}>
+            Son hata: {snap.lastError}
+          </div>
+        ) : null}
       </div>
       <div className="muted" style={{ fontSize: 13 }}>
         <span className={`dot${live ? "" : snap?.paused ? " warn" : " off"}`} />
-        {live ? "Canlı gönderim" : "Beklemede"}
+        {live ? "Canlı gönderim" : canSend ? "Beklemede" : "Gönderim kapalı (Cloud yok)"}
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: "auto" }}>
+        <button className="btn btn-ghost" type="button" onClick={() => void tickNow()}>
+          Şimdi dene
+        </button>
         {snap?.paused || snap?.stopped ? (
           <button className="btn btn-wexon" type="button" onClick={() => void control("resume")}>
             Gönderime devam et

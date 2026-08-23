@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { badRequest, readJson } from "@/lib/http";
-import { moderateJobs } from "@/lib/whatsapp/queue";
+import { bustStatsCache } from "@/lib/stats";
+import { moderateJobs, processQueueTick } from "@/lib/whatsapp/queue";
 import { denyIfGuest } from "@/lib/session";
 
 export const runtime = "nodejs";
@@ -30,6 +31,14 @@ export async function POST(request: Request) {
       action,
       message: typeof body.message === "string" ? body.message : undefined,
     });
+    bustStatsCache();
+    if (result.updated && (action === "approve" || action === "edit")) {
+      after(() =>
+        processQueueTick({ serverless: true, maxJobs: 3 })
+          .then(() => bustStatsCache())
+          .catch(() => undefined),
+      );
+    }
     return NextResponse.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Onaylanamadı";

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { dialCodeFor, formatPhoneDisplay } from "@/lib/phone";
 import { REGIONS, TURKEY_ZONES, WORLD_GROUPS, WORLD_HUBS, hubFor } from "@/lib/regions";
@@ -466,6 +467,14 @@ export default function AraPage() {
         ) : null}
       </div>
 
+      {campaign?.status === "done" && found > 0 ? (
+        <p className="notice" style={{ marginTop: 16 }}>
+          {found} işletme eklendi.{" "}
+          <Link href="/musteriler">Müşterilere git</Link>
+          {" · "}
+          <Link href="/musteriler?queue=1">Kuyruğu aç</Link>
+        </p>
+      ) : null}
       {error ? <p className="error-box" style={{ marginTop: 16 }}>{error}</p> : null}
       {campaign?.error ? (
         <p className="error-box" style={{ marginTop: 16 }}>

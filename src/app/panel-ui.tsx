@@ -14,6 +14,7 @@ type Lead = {
   city: string;
   district: string;
   createdAt: string;
+  updatedAt?: string;
 };
 
 export default function PanelPage() {
@@ -43,7 +44,10 @@ export default function PanelPage() {
   const foundSum = buckets.reduce((n, b) => n + b.found, 0);
   const sentSum = buckets.reduce((n, b) => n + b.sent, 0);
   const prevFound = useMemo(() => previousFound(leads ?? [], mode), [leads, mode]);
-  const delta = prevFound === 0 ? (foundSum > 0 ? 100 : 0) : Math.round(((foundSum - prevFound) / prevFound) * 100);
+  const delta = prevFound === 0 ? 0 : Math.round(((foundSum - prevFound) / prevFound) * 100);
+  const deltaLabel = prevFound === 0
+    ? (foundSum > 0 ? `${foundSum} yeni` : "—")
+    : `${delta >= 0 ? "+" : ""}${delta}%`;
 
   return (
     <div>
@@ -63,7 +67,7 @@ export default function PanelPage() {
           <div className="hero-kicker">Satış pipeline</div>
           <div className="hero-val">
             {stats.leadsTotal.toLocaleString("tr-TR")}
-            <span className="delta">{delta >= 0 ? "+" : ""}{delta}% ↗</span>
+            <span className="delta">{deltaLabel}{prevFound === 0 ? "" : " ↗"}</span>
           </div>
           <div style={{ marginTop: 8, color: "rgba(255,255,255,0.7)", fontSize: 13 }}>
             Bugün {stats.leadsToday} yeni · {stats.yeni} henüz yazılmadı
@@ -103,7 +107,7 @@ export default function PanelPage() {
             <div className="ico-round">↑</div>
             <div className="muted" style={{ marginTop: 10, fontSize: 13 }}>Keşif</div>
             <b>{foundSum}</b>
-            <span className="pill ok">{delta >= 0 ? "+" : ""}{delta}%</span>
+            <span className="pill ok">{deltaLabel}</span>
           </article>
           <article className="side-kpi">
             <div className="ico-round">↓</div>
@@ -190,7 +194,7 @@ function Mini({ title, value, hint }: { title: string; value: number | string; h
     <div className="card">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div className="kpi-ico">◆</div>
-        <span className="muted" style={{ fontSize: 12 }}>Son 30 gün</span>
+        <span className="muted" style={{ fontSize: 12 }}>Anlık</span>
       </div>
       <div className="muted" style={{ marginTop: 10, fontSize: 13 }}>{title}</div>
       <div className="kpi-val">{value}</div>
@@ -230,7 +234,7 @@ function buildBuckets(leads: Lead[], mode: "daily" | "weekly") {
       return {
         label: day.toLocaleDateString("tr-TR", { weekday: "short" }).replace(".", "").slice(0, 2),
         found: leads.filter((l) => inRange(l.createdAt, day, next)).length,
-        sent: leads.filter((l) => l.status === "yazildi" && inRange(l.createdAt, day, next)).length,
+        sent: leads.filter((l) => l.status === "yazildi" && inRange(l.updatedAt ?? l.createdAt, day, next)).length,
       };
     }
     const end = new Date(now);
@@ -240,7 +244,7 @@ function buildBuckets(leads: Lead[], mode: "daily" | "weekly") {
     return {
       label: `H${i + 1}`,
       found: leads.filter((l) => inRange(l.createdAt, start, end)).length,
-      sent: leads.filter((l) => l.status === "yazildi" && inRange(l.createdAt, start, end)).length,
+      sent: leads.filter((l) => l.status === "yazildi" && inRange(l.updatedAt ?? l.createdAt, start, end)).length,
     };
   });
 }

@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { formatPhoneDisplay } from "@/lib/phone";
 import { LEAD_STATUSES } from "@/lib/lead-status";
+import { markStatsDirty, openQueue } from "@/lib/os-events";
 import { useToast } from "@/components/Toast";
 
 type Lead = {
@@ -23,8 +25,10 @@ type Template = { id: string; name: string };
 
 export default function MusterilerPage() {
   const toast = useToast();
+  const searchParams = useSearchParams();
+  const urlQ = searchParams.get("q") ?? "";
   const [leads, setLeads] = useState<Lead[]>([]);
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(urlQ);
   const [status, setStatus] = useState("");
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -46,23 +50,22 @@ export default function MusterilerPage() {
   }
 
   useEffect(() => {
-    const boot = window.setTimeout(() => {
-      const initial = new URLSearchParams(window.location.search).get("q") ?? "";
-      setQ(initial);
-      void load(initial, "").catch((err: Error) => {
-        setError(err.message);
-        setLoading(false);
-      });
-      fetch("/api/templates")
-        .then((r) => r.json())
-        .then((rows: Template[]) => {
-          setTemplates(rows);
-          if (rows[0]) setTemplateId(rows[0].id);
-        })
-        .catch(() => undefined);
-    }, 0);
-    return () => window.clearTimeout(boot);
+    setQ(urlQ);
+    void load(urlQ, status).catch((err: Error) => {
+      setError(err.message);
+      setLoading(false);
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlQ]);
+
+  useEffect(() => {
+    fetch("/api/templates")
+      .then((r) => r.json())
+      .then((rows: Template[]) => {
+        setTemplates(rows);
+        if (rows[0]) setTemplateId(rows[0].id);
+      })
+      .catch(() => undefined);
   }, []);
 
   const selectedIds = useMemo(
@@ -102,6 +105,8 @@ export default function MusterilerPage() {
       return;
     }
     setSelected({});
+    markStatsDirty();
+    openQueue();
     toast.push(`${json.queued} kişi onay bekliyor${json.skipped ? `, ${json.skipped} atlandı` : ""}. Kuyruk çekmecesinden Onayla.`);
   }
 

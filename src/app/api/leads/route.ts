@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { badRequest, databaseUnavailable, readJson } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
 import { denyIfGuest } from "@/lib/session";
+import { bustStatsCache } from "@/lib/stats";
 
 export const dynamic = "force-dynamic";
 export const preferredRegion = ["fra1"];
@@ -53,6 +54,7 @@ export async function GET(request: Request) {
               city: true,
               district: true,
               createdAt: true,
+              updatedAt: true,
             },
           }
         : {}),
@@ -79,6 +81,7 @@ export async function DELETE(request: Request) {
     const result = await prisma.lead.deleteMany({
       where: leadWhere({ q: body.q, status: body.status }),
     });
+    bustStatsCache();
     return NextResponse.json({ deleted: result.count });
   }
 
@@ -88,5 +91,6 @@ export async function DELETE(request: Request) {
   const result = await prisma.lead.deleteMany({
     where: { id: { in: leadIds } },
   });
+  bustStatsCache();
   return NextResponse.json({ deleted: result.count });
 }

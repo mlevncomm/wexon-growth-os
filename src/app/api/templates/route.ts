@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { ensureSeed } from "@/lib/campaigns";
 import { badRequest, readJson } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
 import { denyIfGuest } from "@/lib/session";
@@ -8,10 +9,17 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const denied = await denyIfGuest();
   if (denied) return denied;
+  await ensureSeed();
   const templates = await prisma.template.findMany({
     orderBy: { createdAt: "desc" },
   });
-  return NextResponse.json(templates);
+  const seen = new Set<string>();
+  const unique = templates.filter((row) => {
+    if (seen.has(row.name)) return false;
+    seen.add(row.name);
+    return true;
+  });
+  return NextResponse.json(unique);
 }
 
 export async function POST(request: Request) {

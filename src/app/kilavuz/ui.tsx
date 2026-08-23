@@ -158,7 +158,7 @@ export default function KilavuzPage() {
         <Status ok={Boolean(ready?.llm)} label="AI / Groq" href="/ayarlar" />
         <Status ok={Boolean(ready?.ig)} label="Instagram" href="/instagram" />
         <Status ok={leads > 0} label={leads ? `${leads} müşteri` : "Keşif yok"} href="/ara" />
-        <Status ok={queued > 0} label={queued ? `${queued} kuyruk` : "Kuyruk boş"} href="/" />
+        <Status ok={queued > 0} label={queued ? `${queued} kuyruk` : "Kuyruk boş"} href="/?queue=1" />
       </div>
 
       <section className="hero" style={{ marginTop: 22 }}>

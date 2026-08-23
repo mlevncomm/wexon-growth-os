@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type MouseEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { COPY_ANGLES, generateSalesCopy, type CopyAngle } from "@/lib/copy-ai";
 import { renderTemplate } from "@/lib/templates";
 import { ChipStrip } from "@/components/ChipStrip";
@@ -46,6 +46,7 @@ export default function OutreachPage() {
   const [hasLlm, setHasLlm] = useState(false);
   const [playbookActive, setPlaybookActive] = useState(false);
   const [copySource, setCopySource] = useState<"ai" | "local">("local");
+  const seeded = useRef(false);
 
   async function refresh() {
     const [t, w, c] = await Promise.all([
@@ -54,6 +55,11 @@ export default function OutreachPage() {
       fetch("/api/copy").then((r) => r.json()).catch(() => ({ hasLlm: false })),
     ]);
     setTemplates(t);
+    if (!seeded.current && Array.isArray(t) && t[0]) {
+      setName(t[0].name);
+      setBody(t[0].body);
+      seeded.current = true;
+    }
     setWa(w);
     setHasLlm(Boolean(c?.hasLlm));
     setPlaybookActive(Boolean(c?.playbookActive));
@@ -68,13 +74,16 @@ export default function OutreachPage() {
         setLoading(false);
       });
     }, 0);
+    if (wa?.serverless) {
+      return () => window.clearTimeout(boot);
+    }
     const live = wa?.local.state === "starting" || wa?.local.state === "qr" || connecting;
     const t = window.setInterval(() => void refresh(), live ? 1500 : 4000);
     return () => {
       window.clearTimeout(boot);
       window.clearInterval(t);
     };
-  }, [wa?.local.state, connecting]);
+  }, [wa?.serverless, wa?.local.state, connecting]);
 
   async function applyAngle(next: CopyAngle) {
     setAngle(next);

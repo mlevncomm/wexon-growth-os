@@ -2,9 +2,10 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { fetchStats } from "@/lib/stats-client";
+import { OPEN_QUEUE, STATS_DIRTY } from "@/lib/os-events";
+import { fetchStats, invalidateStats } from "@/lib/stats-client";
 import { isActive, NavRail } from "./NavRail";
 
 const QueuePanel = dynamic(
@@ -79,7 +80,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [navOpen, setNavOpen] = useState(false);
   const [stats, setStats] = useState<Stats | null>(null);
   const [q, setQ] = useState("");
-  const [range, setRange] = useState("Son 30 gün");
+  const searchRef = useRef<HTMLInputElement>(null);
   const campaign = stats?.lastCampaign;
   const scanning = Boolean(campaign && (campaign.status === "running" || campaign.status === "queued"));
   const scanPct = campaign && scanning
@@ -124,7 +125,31 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [scanning]);
 
   useEffect(() => {
-    setRange(last30());
+    const onOpen = () => setQueueOpen(true);
+    const onDirty = () => {
+      invalidateStats();
+      void fetchStats(true).then(setStats).catch(() => undefined);
+    };
+    window.addEventListener(OPEN_QUEUE, onOpen);
+    window.addEventListener(STATS_DIRTY, onDirty);
+    if (new URLSearchParams(window.location.search).get("queue") === "1") {
+      setQueueOpen(true);
+    }
+    return () => {
+      window.removeEventListener(OPEN_QUEUE, onOpen);
+      window.removeEventListener(STATS_DIRTY, onDirty);
+    };
+  }, []);
+
+  useEffect(() => {
+    const onFind = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onFind);
+    return () => window.removeEventListener("keydown", onFind);
   }, []);
 
   useEffect(() => {
@@ -170,6 +195,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </svg>
             </span>
             <input
+              ref={searchRef}
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Müşteri veya bölge"
@@ -178,16 +204,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <kbd className="kbd">Ctrl F</kbd>
           </form>
           <div className="top-actions">
-            <div className="top-chip" title="Gösterge: son 30 gün. Listeyi filtrelemez.">
+            <div className="top-chip" title="Tarih aralığı gösterge içindir. Listeyi filtrelemez.">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
                 <rect x="4" y="5.5" width="16" height="14.5" rx="2.2" />
                 <path d="M8 3.8v3.2M16 3.8v3.2M4 10h16" />
               </svg>
-              <span>{range}</span>
+              <span>Gösterge</span>
             </div>
             {/* File download, not an App Router page */}
             {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-            <a className="top-export" href="/api/leads/export">
+            <a className="top-export" href="/api/leads/export" title="Tüm müşteri listesini indirir. Ekran filtresi uygulanmaz.">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
                 <path d="M12 4.5v10.2M8.2 11.2 12 15l3.8-3.8M5 19.2h14" />
               </svg>
@@ -232,12 +258,4 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <button type="button" className="queue-backdrop" aria-label="Kuyruğu kapat" onClick={() => setQueueOpen(false)} />
     </div>
   );
-}
-
-function last30() {
-  const end = new Date();
-  const start = new Date();
-  start.setDate(end.getDate() - 30);
-  const fmt = (d: Date) => d.toLocaleDateString("tr-TR", { day: "2-digit", month: "short" });
-  return `${fmt(start)} — ${fmt(end)}`;
 }
