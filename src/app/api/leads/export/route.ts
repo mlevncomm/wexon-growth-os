@@ -26,11 +26,11 @@ export async function GET(request: Request) {
       ...(q
         ? {
             OR: [
-              { name: { contains: q } },
-              { address: { contains: q } },
-              { phone: { contains: q } },
-              { district: { contains: q } },
-              { city: { contains: q } },
+            { name: { contains: q } },
+            { address: { contains: q } },
+            { phone: { contains: q } },
+            { district: { contains: q } },
+            { city: { contains: q } },
             ],
           }
         : {}),

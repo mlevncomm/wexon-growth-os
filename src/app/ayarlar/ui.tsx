@@ -183,7 +183,7 @@ export default function AyarlarPage() {
       <div className="page-kicker">Sistem</div>
       <h1 className="page-title">Anahtarlar ve tavan</h1>
       <p className="page-copy">
-        Yerelde anahtarlar bu makinede (SQLite) durur. Vercel’de Sistem kaydı Supabase Postgres’e yazılır; isterseniz aynı değerleri Vercel env’e de koyabilirsiniz.
+        Canlıda anahtarlar Supabase’e yazılır. Places için Cloud Console’da Places API (New) ve Places API açık olsun. Maskeli alanı değiştirmezseniz eski sır korunur.
       </p>
 
       {error ? <p className="error-box" style={{ marginTop: 16 }}>{error}</p> : null}
@@ -204,7 +204,7 @@ export default function AyarlarPage() {
               </div>
             </div>
             <p className="panel-note">
-              Places keşif için zorunlu. WhatsApp Cloud token canlıda (Vercel) zorunlu; yerelde yoksa QR yedek kalır.
+              Places keşif için zorunlu. Anahtar yetmez: Google Cloud’da Places API (New) ve Places API’yi açın. WhatsApp Cloud canlıda zorunlu; yerelde yoksa QR yedek kalır.
             </p>
             <div className="key-stack">
               <div className="key-block">
@@ -460,7 +460,7 @@ export default function AyarlarPage() {
             </span>
           </div>
           <p className="panel-note">
-            SQLite bu makinededir. Canlıya çıkınca Postgres (Supabase) şart. Vercel’de WhatsApp QR ve dosya veritabanı çalışmaz.
+            Canlı veritabanı Supabase Postgres’tir. Vercel’de WhatsApp QR ve dosya veritabanı çalışmaz.
             {deploy.authConfigured ? " Admin girişi tanımlı." : " Admin için AUTH_SECRET + e-posta + şifre yazın."}
           </p>
         </section>

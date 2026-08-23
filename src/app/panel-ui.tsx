@@ -50,7 +50,11 @@ export default function PanelPage() {
       {error ? <p className="error-box">{error}</p> : null}
       {!stats.hasPlacesKey ? (
         <p className="notice" style={{ marginBottom: 14 }}>
-          Places anahtarı yok. Keşiften önce <Link href="/ayarlar">Sistem</Link> ekranına anahtarı yaz.
+          Places anahtarı yok. Keşiften önce <Link href="/ayarlar">Sistem</Link> ekranına anahtarı yaz. Adımlar <Link href="/kilavuz">Kılavuz</Link>’da.
+        </p>
+      ) : stats.leadsTotal === 0 ? (
+        <p className="notice" style={{ marginBottom: 14 }}>
+          İlk tarama için <Link href="/ara">Keşif</Link>’e gidin. Places açık ama kayıt yoksa Cloud Console’da Places API’yi kontrol edin. Adımlar: <Link href="/kilavuz">Kılavuz</Link>.
         </p>
       ) : null}
 

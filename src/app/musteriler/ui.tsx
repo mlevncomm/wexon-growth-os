@@ -269,8 +269,9 @@ export default function MusterilerPage() {
         <div className="card empty" style={{ marginTop: 8 }}>
           <strong>Kayıt yok</strong>
           Keşif ekranından alıcı işletme tarayın.
-          <div style={{ marginTop: 14 }}>
+          <div style={{ marginTop: 14, display: "flex", gap: 8, flexWrap: "wrap" }}>
             <a className="btn btn-wexon" href="/ara">Keşfe git</a>
+            <a className="btn btn-ghost" href="/kilavuz">Kılavuz</a>
           </div>
         </div>
       ) : (

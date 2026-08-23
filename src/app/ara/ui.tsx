@@ -24,6 +24,9 @@ type Campaign = {
   targetCount: number;
   error: string | null;
   city?: string;
+  district?: string;
+  query?: string;
+  createdAt?: string;
   leads?: Lead[];
 };
 type Scope = "city" | "zone" | "turkey" | "hub" | "worldGroup" | "world";
@@ -59,6 +62,7 @@ export default function AraPage() {
   const [error, setError] = useState("");
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [campaignId, setCampaignId] = useState<string | null>(null);
+  const [recent, setRecent] = useState<Campaign[]>([]);
 
   const districts = useMemo(
     () => regions.find((r) => r.city === city)?.districts ?? [],
@@ -82,6 +86,15 @@ export default function AraPage() {
     if (!q) return WORLD_HUBS;
     return WORLD_HUBS.filter((h) => h.city.toLowerCase().includes(q));
   }, [hubFilter]);
+
+  useEffect(() => {
+    void fetch("/api/campaigns", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((rows: Campaign[]) => {
+        if (Array.isArray(rows)) setRecent(rows);
+      })
+      .catch(() => undefined);
+  }, [campaign?.status, campaignId]);
 
   useEffect(() => {
     if (!campaignId) return;
@@ -454,7 +467,48 @@ export default function AraPage() {
       </div>
 
       {error ? <p className="error-box" style={{ marginTop: 16 }}>{error}</p> : null}
-      {campaign?.error ? <p className="error-box" style={{ marginTop: 16 }}>{campaign.error}</p> : null}
+      {campaign?.error ? (
+        <p className="error-box" style={{ marginTop: 16 }}>
+          {campaign.error}{" "}
+          <a href="/kilavuz" style={{ textDecoration: "underline" }}>Kılavuz</a>
+        </p>
+      ) : null}
+
+      {recent.length ? (
+        <div className="card" style={{ marginTop: 16 }}>
+          <div className="flow-head">
+            <div>
+              <div className="page-kicker">Geçmiş</div>
+              <h2 style={{ margin: "6px 0 0", fontSize: 18 }}>Son taramalar</h2>
+            </div>
+          </div>
+          <div className="activity-row act-head">
+            <span>Arama</span>
+            <span>Yer</span>
+            <span>Durum</span>
+            <span>Bulunan</span>
+          </div>
+          {recent.slice(0, 6).map((row) => (
+            <button
+              key={row.id}
+              type="button"
+              className="activity-row"
+              style={{ width: "100%", textAlign: "left", background: "none", border: 0, cursor: "pointer" }}
+              onClick={() => {
+                setCampaignId(row.id);
+                setCampaign(row);
+              }}
+            >
+              <strong>{row.query || "Tarama"}</strong>
+              <span className="muted">{[row.district, row.city].filter(Boolean).join(" · ") || "—"}</span>
+              <span className={`pill ${row.status === "done" ? "ok" : row.status === "error" ? "warn" : "mute"}`}>
+                {row.status === "done" ? "bitti" : row.status === "error" ? "hata" : row.status === "cancelled" ? "durdu" : "çalışıyor"}
+              </span>
+              <span className="muted">{row.foundCount}/{row.targetCount}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       <div className="table-wrap" style={{ marginTop: 20 }}>
         <table className="data">

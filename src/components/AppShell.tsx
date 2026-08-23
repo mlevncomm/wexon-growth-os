@@ -178,7 +178,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <kbd className="kbd">Ctrl F</kbd>
           </form>
           <div className="top-actions">
-            <div className="top-chip" title="Son 30 gün">
+            <div className="top-chip" title="Gösterge: son 30 gün. Listeyi filtrelemez.">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
                 <rect x="4" y="5.5" width="16" height="14.5" rx="2.2" />
                 <path d="M8 3.8v3.2M16 3.8v3.2M4 10h16" />

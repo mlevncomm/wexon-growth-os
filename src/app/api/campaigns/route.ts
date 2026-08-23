@@ -15,7 +15,19 @@ export async function GET() {
   if (denied) return denied;
   const campaigns = await prisma.campaign.findMany({
     orderBy: { createdAt: "desc" },
-    take: 30,
+    take: 12,
+    select: {
+      id: true,
+      query: true,
+      city: true,
+      district: true,
+      status: true,
+      foundCount: true,
+      skippedCount: true,
+      targetCount: true,
+      error: true,
+      createdAt: true,
+    },
   });
   return NextResponse.json(campaigns);
 }

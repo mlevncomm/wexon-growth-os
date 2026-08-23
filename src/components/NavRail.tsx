@@ -145,6 +145,20 @@ export function NavRail({
         <span className="nav-label">Instagram</span>
       </Link>
       <Link
+        href="/kilavuz"
+        className={`nav-link${pathname.startsWith("/kilavuz") ? " active" : ""}`}
+        onClick={onNavigate}
+      >
+        <div className="nav-ico-wrap" aria-hidden>
+          <svg className="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6.4 5.4h9.2A2.2 2.2 0 0 1 17.8 7.6v11.2H8.2A1.8 1.8 0 0 1 6.4 17V5.4z" />
+            <path d="M6.4 17a1.8 1.8 0 0 1 1.8-1.8H17.8" />
+            <path d="M9.2 8.6h5.4M9.2 11.4h3.6" />
+          </svg>
+        </div>
+        <span className="nav-label">Kılavuz</span>
+      </Link>
+      <Link
         href="/ayarlar"
         className={`nav-link${pathname.startsWith("/ayarlar") ? " active" : ""}`}
         onClick={onNavigate}
