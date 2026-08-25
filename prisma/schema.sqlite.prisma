@@ -62,6 +62,7 @@ model Campaign {
   minRating    Float    @default(0)
   requirePhone Boolean  @default(true)
   phonePrefix  String   @default("")
+  websiteFilter String  @default("any")
   status       String   @default("idle")
   foundCount   Int      @default(0)
   skippedCount Int      @default(0)

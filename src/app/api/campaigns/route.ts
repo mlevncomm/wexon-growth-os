@@ -7,6 +7,7 @@ import { getSettings } from "@/lib/settings";
 import { isServerless } from "@/lib/platform";
 import { bustStatsCache } from "@/lib/stats";
 import { withTenant } from "@/lib/tenant";
+import { parseWebsiteFilter } from "@/lib/website";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -49,6 +50,7 @@ export async function POST(request: Request) {
       minRating?: number;
       requirePhone?: boolean;
       phonePrefix?: string;
+      websiteFilter?: string;
     }>(request);
     if (!body) return badRequest("Geçersiz istek.");
 
@@ -106,6 +108,7 @@ export async function POST(request: Request) {
         minRating: Number(body.minRating) || 0,
         requirePhone: body.requirePhone !== false,
         phonePrefix: (body.phonePrefix ?? "").trim(),
+        websiteFilter: parseWebsiteFilter(body.websiteFilter),
         status: "queued",
       },
     });

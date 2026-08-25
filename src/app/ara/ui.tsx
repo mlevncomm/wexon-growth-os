@@ -6,6 +6,7 @@ import { dialCodeFor, formatPhoneDisplay } from "@/lib/phone";
 import { REGIONS, TURKEY_ZONES, WORLD_GROUPS, WORLD_HUBS, hubFor } from "@/lib/regions";
 import { ChipStrip } from "@/components/ChipStrip";
 import { useToast } from "@/components/Toast";
+import { siteKind, websiteLabel, type WebsiteFilter } from "@/lib/website";
 
 type Region = { city: string; districts: string[] };
 type Lead = {
@@ -13,6 +14,7 @@ type Lead = {
   name: string;
   address: string;
   phone: string;
+  website: string;
   rating: number | null;
   mapsUrl: string;
 };
@@ -31,7 +33,13 @@ type Campaign = {
 };
 type Scope = "city" | "zone" | "turkey" | "hub" | "worldGroup" | "world";
 type SectorGroup = { id: string; label: string; items: { label: string; query: string }[] };
-type SectorPreset = { id: string; label: string; hint: string; queries: string[] };
+type SectorPreset = {
+  id: string;
+  label: string;
+  hint: string;
+  queries: string[];
+  websiteFilter?: WebsiteFilter;
+};
 
 const PINNED_CITIES = ["İstanbul", "Ankara", "İzmir", "Bursa", "Antalya", "Adana", "Kocaeli", "Gaziantep"];
 const COUNT_PRESETS = [10, 20, 40, 60];
@@ -40,6 +48,11 @@ const RATING_PRESETS = [
   { label: "3.5+", value: 3.5 },
   { label: "4.0+", value: 4 },
   { label: "4.5+", value: 4.5 },
+];
+const WEBSITE_PRESETS: { id: WebsiteFilter; label: string; hint: string }[] = [
+  { id: "without", label: "Sitesi yok", hint: "Web satışı" },
+  { id: "with", label: "Sitesi var", hint: "Yenileme / SEO" },
+  { id: "any", label: "Fark etmez", hint: "Hepsini al" },
 ];
 
 export default function AraPage() {
@@ -60,6 +73,8 @@ export default function AraPage() {
   const [minRating, setMinRating] = useState(0);
   const [requirePhone, setRequirePhone] = useState(true);
   const [phonePrefix, setPhonePrefix] = useState("");
+  const [websiteFilter, setWebsiteFilter] = useState<WebsiteFilter>("any");
+  const [vertical, setVertical] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [campaign, setCampaign] = useState<Campaign | null>(null);
@@ -100,9 +115,11 @@ export default function AraPage() {
         const presets = Array.isArray(json.presets) ? json.presets : [];
         setSectorGroups(groups);
         setSectorPresets(presets);
+        setVertical(json.vertical ?? "");
         const allowed = new Set(groups.flatMap((g) => g.items.map((i) => i.query)));
         const first = groups[0]?.items[0]?.query;
         const seeded = json.vertical === "software" || json.vertical === "yks";
+        if (json.vertical === "software") setWebsiteFilter("without");
         setSelectedQueries((prev) => {
           const pack = presets[0]?.queries.filter((q) => allowed.has(q)) ?? [];
           if (seeded && pack.length && prev.length === 1 && prev[0] === "restoran") return pack;
@@ -174,6 +191,7 @@ export default function AraPage() {
 
   function applyPreset(preset: SectorPreset) {
     setSelectedQueries(preset.queries);
+    if (preset.websiteFilter) setWebsiteFilter(preset.websiteFilter);
     setSectorFilter("");
   }
 
@@ -213,6 +231,7 @@ export default function AraPage() {
         minRating,
         requirePhone,
         phonePrefix: trPhone ? phonePrefix : "",
+        websiteFilter,
       }),
     });
     const json = await res.json();
@@ -241,16 +260,31 @@ export default function AraPage() {
   const target = campaign?.targetCount ?? targetCount;
   const foundPct = target ? Math.min(100, Math.round((found / target) * 100)) : 0;
   const rows = campaign?.leads ?? [];
+  const software = vertical === "software";
+  const websiteHint =
+    websiteFilter === "without"
+      ? "Haritada web sitesi görünmeyenler (sosyal link sayılmaz)."
+      : websiteFilter === "with"
+        ? "Gerçek alan adı olanlar. Facebook / Instagram elenir."
+        : "Site var ya da yok, hepsi gelir.";
 
   return (
     <div>
       <div className="page-kicker">Keşif</div>
-      <h1 className="page-title">Alıcı işletme bul</h1>
+      <h1 className="page-title">{software ? "Web alıcısı bul" : "Alıcı işletme bul"}</h1>
       <p className="page-copy">
-        İl, bölge veya dünya şehri seçin; birden fazla sektörü birlikte tarayın. Hedef dolunca durur, aynı işletme ikinci kez yazılmaz.
+        {software
+          ? "Müşteri her sektör olabilir: restoran, klinik, avukat, mağaza. Web hizmeti satıyorsan ‘Sitesi yok’u aç; yenileme satıyorsan ‘Sitesi var’."
+          : "İl, bölge veya dünya şehri seçin; birden fazla sektörü birlikte tarayın. Hedef dolunca durur, aynı işletme ikinci kez yazılmaz."}
       </p>
 
       <div className="card" style={{ marginTop: 20 }}>
+        <div className="panel-head" style={{ marginBottom: 8 }}>
+          <div>
+            <div className="page-kicker">Nerede</div>
+            <h2 style={{ margin: "4px 0 0", fontSize: 18 }}>Kapsam</h2>
+          </div>
+        </div>
         <div className="field">
           <span>Kapsam</span>
           <ChipStrip>
@@ -404,9 +438,9 @@ export default function AraPage() {
       <div className="card" style={{ marginTop: 12 }}>
         <div className="panel-head" style={{ marginBottom: 8 }}>
           <div>
-            <div className="page-kicker">Alıcı sektör</div>
+            <div className="page-kicker">{software ? "Kimlere satıyorsun" : "Alıcı sektör"}</div>
             <h2 style={{ margin: "4px 0 0", fontSize: 18 }}>
-              {selectedQueries.length ? `${selectedQueries.length} sektör seçili` : "Kimleri tarayacaksınız?"}
+              {selectedQueries.length ? `${selectedQueries.length} sektör seçili` : "Sektör seç"}
             </h2>
           </div>
           <button type="button" className="btn btn-ghost" onClick={() => setSelectedQueries([])} disabled={!selectedQueries.length}>
@@ -418,7 +452,9 @@ export default function AraPage() {
             <span>Hazır paket</span>
             <ChipStrip wrap>
               {sectorPresets.map((p) => {
-                const on = p.queries.length > 0 && p.queries.every((q) => selectedQueries.includes(q));
+                const queriesOn = p.queries.length > 0 && p.queries.every((q) => selectedQueries.includes(q));
+                const siteOn = !p.websiteFilter || p.websiteFilter === websiteFilter;
+                const on = queriesOn && siteOn;
                 return (
                   <button
                     key={p.id}
@@ -439,7 +475,7 @@ export default function AraPage() {
           <input
             value={sectorFilter}
             onChange={(e) => setSectorFilter(e.target.value)}
-            placeholder="ör. klinik, ajans, otel"
+            placeholder="klinik, avukat, kuaför, inşaat…"
           />
         </label>
         {selectedQueries.length ? (
@@ -452,7 +488,7 @@ export default function AraPage() {
           </div>
         ) : (
           <p className="muted" style={{ margin: "10px 0 0", fontSize: 13 }}>
-            Paket seçin veya aşağıdaki etiketlerden ekleyin. Ek kelime ayrı durur.
+            Paket seçin veya aşağıdaki etiketlerden ekleyin. Listede yoksa alta kelime yazın.
           </p>
         )}
         <div className="sector-groups" style={{ marginTop: 14 }}>
@@ -490,65 +526,93 @@ export default function AraPage() {
         </div>
         {sectorFilter.trim() && visibleSectorGroups.length === 0 ? (
           <p className="muted" style={{ marginTop: 12, fontSize: 13 }}>
-            Eşleşen sektör yok. Aşağıya ek kelime yazabilirsiniz.
+            Eşleşen etiket yok. Aşağıya kendi kelimeni yaz.
           </p>
         ) : null}
+        <label className="field" style={{ marginTop: 14 }}>
+          <span>Listede yoksa yaz</span>
+          <input value={customQuery} onChange={(e) => setCustomQuery(e.target.value)} placeholder="ör. diş protez laboratuvarı" />
+        </label>
         <p className="muted" style={{ marginTop: 12, fontSize: 13 }}>
-          {queries.length ? `Tarama: ${queries.map(queryLabel).join(" · ")}` : "Sektör seçin veya aşağıya kelime yazın."}
+          {queries.length
+            ? `${queries.length} tarama · ${websiteFilter === "without" ? "sitesi yok" : websiteFilter === "with" ? "sitesi var" : "site fark etmez"}`
+            : "Sektör seçin veya kelime yazın."}
         </p>
       </div>
 
-      <div className="toolbar" style={{ marginTop: 12 }}>
-        <label className="field">
-          <span>Ek kelime</span>
-          <input value={customQuery} onChange={(e) => setCustomQuery(e.target.value)} placeholder="ör. endüstriyel mutfak" />
-        </label>
-        <div className="field">
-          <span>Adet</span>
-          <ChipStrip>
-            {COUNT_PRESETS.map((n) => (
-              <button key={n} type="button" className={`chip${targetCount === n ? " on" : ""}`} onClick={() => setTargetCount(n)}>
-                {n}
-              </button>
-            ))}
-          </ChipStrip>
+      <div className="card" style={{ marginTop: 12 }}>
+        <div className="panel-head" style={{ marginBottom: 8 }}>
+          <div>
+            <div className="page-kicker">Eleme</div>
+            <h2 style={{ margin: "4px 0 0", fontSize: 18 }}>Kimler kalsın</h2>
+          </div>
         </div>
         <div className="field">
-          <span>Min. puan</span>
-          <ChipStrip>
-            {RATING_PRESETS.map((r) => (
+          <span>{software ? "Web sitesi" : "Site"}</span>
+          <ChipStrip wrap>
+            {WEBSITE_PRESETS.map((w) => (
               <button
-                key={r.label}
+                key={w.id}
                 type="button"
-                className={`chip${minRating === r.value ? " on" : ""}`}
-                onClick={() => setMinRating(r.value)}
+                className={`chip${websiteFilter === w.id ? " on" : ""}`}
+                title={w.hint}
+                onClick={() => setWebsiteFilter(w.id)}
               >
-                {r.label}
+                {w.label}
               </button>
             ))}
           </ChipStrip>
+          <p className="muted" style={{ marginTop: 8, fontSize: 13, lineHeight: 1.5 }}>
+            {websiteHint}
+          </p>
         </div>
-        <label className="field">
-          <span>Telefon öneki</span>
-          <input
-            value={phonePrefix}
-            onChange={(e) => setPhonePrefix(e.target.value)}
-            placeholder={trPhone ? "0532" : activeDial ? `+${activeDial}` : "ülke kodu otomatik"}
-            disabled={!trPhone}
-          />
+        <div className="kesif-filters">
+          <div className="field">
+            <span>Adet</span>
+            <ChipStrip>
+              {COUNT_PRESETS.map((n) => (
+                <button key={n} type="button" className={`chip${targetCount === n ? " on" : ""}`} onClick={() => setTargetCount(n)}>
+                  {n}
+                </button>
+              ))}
+            </ChipStrip>
+          </div>
+          <div className="field">
+            <span>Min. puan</span>
+            <ChipStrip>
+              {RATING_PRESETS.map((r) => (
+                <button
+                  key={r.label}
+                  type="button"
+                  className={`chip${minRating === r.value ? " on" : ""}`}
+                  onClick={() => setMinRating(r.value)}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </ChipStrip>
+          </div>
+          <label className="field">
+            <span>Telefon öneki</span>
+            <input
+              value={phonePrefix}
+              onChange={(e) => setPhonePrefix(e.target.value)}
+              placeholder={trPhone ? "0532" : activeDial ? `+${activeDial}` : "ülke kodu otomatik"}
+              disabled={!trPhone}
+            />
+          </label>
+        </div>
+        <label className="check-row">
+          <input type="checkbox" checked={requirePhone} onChange={(e) => setRequirePhone(e.target.checked)} />
+          Telefonu olmayanları alma
         </label>
       </div>
 
-      <p className="muted" style={{ marginTop: 8, fontSize: 13 }}>
+      <p className="muted" style={{ marginTop: 10, fontSize: 13 }}>
         {activeDial
           ? `Telefonlar +${activeDial} ile kaydedilir.${activeDial === "90" ? " +90 yalnızca Türkiye." : ""}`
           : "Telefonlar şehirdeki ülke koduyla kaydedilir (Dubai +971, Londra +44). +90 yalnızca Türkiye."}
       </p>
-
-      <label className="muted" style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8, minHeight: 44 }}>
-        <input type="checkbox" checked={requirePhone} onChange={(e) => setRequirePhone(e.target.checked)} />
-        Telefonu olmayanları alma
-      </label>
 
       <div className="kesif-bar">
         <button className="btn btn-wexon" type="button" disabled={busy} onClick={() => void startSearch()}>
@@ -632,16 +696,21 @@ export default function AraPage() {
               <th>İşletme</th>
               <th>Adres</th>
               <th>Telefon</th>
+              <th>Site</th>
               <th>Puan</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={4}>
+                <td colSpan={5}>
                   <div className="empty">
                     <strong>{busy ? "Keşif taranıyor" : "Sonuç yok"}</strong>
-                    {busy ? "Places cevap verdikçe satırlar belirir." : "Kapsamı seçip keşif başlat."}
+                    {busy
+                      ? "Places cevap verdikçe satırlar belirir."
+                      : software
+                        ? "Konum, sektör ve site filtresini seçip keşif başlat."
+                        : "Kapsamı seçip keşif başlat."}
                   </div>
                 </td>
               </tr>
@@ -654,6 +723,9 @@ export default function AraPage() {
                   </td>
                   <td>{lead.address}</td>
                   <td>{lead.phone ? formatPhoneDisplay(lead.phone) : "—"}</td>
+                  <td>
+                    <WebMark url={lead.website ?? ""} />
+                  </td>
                   <td>{lead.rating ?? "—"}</td>
                 </tr>
               ))
@@ -674,10 +746,23 @@ export default function AraPage() {
               <strong>{lead.name}</strong>
               <span className="muted">{lead.address}</span>
               <span>{lead.phone ? formatPhoneDisplay(lead.phone) : "—"} · {lead.rating ?? "puan yok"}</span>
+              <WebMark url={lead.website ?? ""} />
             </article>
           ))
         )}
       </div>
     </div>
+  );
+}
+
+function WebMark({ url }: { url: string }) {
+  const kind = siteKind(url);
+  const label = websiteLabel(url);
+  if (kind === "none") return <span className="pill warn">Site yok</span>;
+  if (kind === "social") return <span className="pill mute">{label}</span>;
+  return (
+    <a className="web-link" href={url.startsWith("http") ? url : `https://${url}`} target="_blank" rel="noreferrer">
+      {label}
+    </a>
   );
 }

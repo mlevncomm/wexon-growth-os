@@ -61,8 +61,8 @@ const MODULES = [
     kicker: "Satış",
     title: "Keşif",
     points: [
-      "İstanbul + Kadıköy + restoran ile başlayın. Hedefi 10–20 tutun.",
-      "Telefonu olmayanları alma açık kalsın. Önek (0532) daraltır.",
+      "Sektör her şey olabilir. Web satıyorsan ‘Sitesi yok’, yenileme satıyorsan ‘Sitesi var’.",
+      "Hedefi 10–20 tutun. Telefonu olmayanları alma açık kalsın.",
       "Hata görürseniz Cloud Console’da Places API (eski) açık olsun. Sistem’e AIza anahtarı yazın; New API kapalıysa uygulama eskiye düşer.",
     ],
   },

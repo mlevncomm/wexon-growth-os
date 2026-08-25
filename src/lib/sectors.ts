@@ -98,22 +98,10 @@ export const SECTOR_GROUPS: SectorGroup[] = [
   },
 ];
 
-const SOFTWARE_GROUPS: SectorGroup[] = [
-  {
-    id: "tech",
-    label: "Yazılım & ajans",
-    items: [
-      { label: "Yazılım şirketi", query: "yazılım şirketi", en: "software company" },
-      { label: "Ajans", query: "reklam ajansı", en: "advertising agency" },
-      { label: "Dijital pazarlama", query: "dijital pazarlama ajansı", en: "digital marketing agency" },
-      { label: "Web tasarım", query: "web tasarım", en: "web design agency" },
-      { label: "E-ticaret", query: "e-ticaret", en: "ecommerce store" },
-      { label: "Start-up", query: "teknoloji startup", en: "tech startup" },
-    ],
-  },
+const AGENCY_GROUPS: SectorGroup[] = [
   {
     id: "pro",
-    label: "Profesyonel hizmet",
+    label: "Profesyonel ofis",
     items: [
       { label: "Muhasebe", query: "muhasebe ofisi", en: "accounting office" },
       { label: "Mali müşavir", query: "mali müşavir", en: "certified public accountant" },
@@ -121,19 +109,8 @@ const SOFTWARE_GROUPS: SectorGroup[] = [
       { label: "Emlak", query: "emlak ofisi", en: "real estate agency" },
       { label: "Sigorta", query: "sigorta acentesi", en: "insurance agency" },
       { label: "Danışmanlık", query: "yönetim danışmanlığı", en: "management consulting" },
-    ],
-  },
-  {
-    id: "local",
-    label: "Yerel işletme",
-    items: [
-      { label: "Restoran", query: "restoran", en: "restaurant" },
-      { label: "Kafe", query: "kafe", en: "cafe" },
-      { label: "Otel", query: "otel", en: "hotel" },
-      { label: "Klinik", query: "özel klinik", en: "private clinic" },
-      { label: "Diş", query: "diş kliniği", en: "dental clinic" },
-      { label: "Kuaför", query: "kuaför", en: "hair salon" },
-      { label: "Oto servis", query: "oto servis", en: "auto repair shop" },
+      { label: "Mimar", query: "mimarlık ofisi", en: "architecture office" },
+      { label: "Noter", query: "noter", en: "notary" },
     ],
   },
   {
@@ -142,44 +119,76 @@ const SOFTWARE_GROUPS: SectorGroup[] = [
     items: [
       { label: "İnşaat", query: "inşaat şirketi", en: "construction company" },
       { label: "Lojistik", query: "lojistik", en: "logistics company" },
-      { label: "Mağaza", query: "mağaza", en: "retail store" },
-      { label: "Fabrika", query: "fabrika", en: "factory" },
       { label: "Toptan", query: "toptan satış", en: "wholesaler" },
       { label: "İthalat", query: "ithalat ihracat", en: "import export company" },
+      { label: "Oto servis", query: "oto servis", en: "auto repair shop" },
+      { label: "Elektrikçi", query: "elektrikçi", en: "electrician" },
+      { label: "Tesisatçı", query: "tesisatçı", en: "plumber" },
+      { label: "Nakliyat", query: "nakliyat", en: "moving company" },
     ],
   },
   {
-    id: "work",
-    label: "Ofis",
+    id: "shop",
+    label: "Mağaza & e-ticaret",
     items: [
-      { label: "Ofis", query: "ofis", en: "office" },
-      { label: "Coworking", query: "coworking", en: "coworking space" },
-      { label: "Plaza", query: "plaza ofis", en: "office building" },
-      { label: "Call center", query: "çağrı merkezi", en: "call center" },
+      { label: "Mağaza", query: "mağaza", en: "retail store" },
+      { label: "Butik", query: "butik", en: "boutique" },
+      { label: "Mobilya", query: "mobilya mağazası", en: "furniture store" },
+      { label: "E-ticaret", query: "e-ticaret", en: "ecommerce store" },
     ],
   },
 ];
 
-export type SectorPreset = { id: string; label: string; hint: string; queries: string[] };
+export type SectorPreset = {
+  id: string;
+  label: string;
+  hint: string;
+  queries: string[];
+  websiteFilter?: "any" | "with" | "without";
+};
 
 const SOFTWARE_PRESETS: SectorPreset[] = [
   {
-    id: "kobi-web",
-    label: "KOBİ web",
-    hint: "Site / reklam alıcısı",
-    queries: ["reklam ajansı", "e-ticaret", "muhasebe ofisi", "özel klinik", "otel", "emlak ofisi"],
+    id: "sitesiz",
+    label: "Sitesi yok",
+    hint: "Web satışı — haritada site görünmeyen KOBİ",
+    websiteFilter: "without",
+    queries: [
+      "restoran",
+      "kafe",
+      "kuaför",
+      "güzellik salonu",
+      "diş kliniği",
+      "emlak ofisi",
+      "muhasebe ofisi",
+      "oto servis",
+      "mağaza",
+    ],
   },
   {
-    id: "lokal",
-    label: "Yerel hizmet",
-    hint: "Restoran, klinik, mağaza",
-    queries: ["restoran", "kafe", "kuaför", "mağaza", "oto servis", "diş kliniği"],
+    id: "yenileme",
+    label: "Sitesi var",
+    hint: "Yenileme, SEO, bakım teklifi",
+    websiteFilter: "with",
+    queries: ["otel", "klinik", "inşaat şirketi", "avukatlık bürosu", "e-ticaret", "fabrika"],
   },
   {
-    id: "kurumsal",
-    label: "Kurumsal yazılım",
-    hint: "Ajans ve saha firması",
-    queries: ["yazılım şirketi", "inşaat şirketi", "lojistik", "fabrika", "muhasebe ofisi", "yönetim danışmanlığı"],
+    id: "yeme",
+    label: "Yeme-içme",
+    hint: "Restoran, kafe, otel",
+    queries: ["restoran", "lokanta", "kafe", "kahve dükkanı", "otel", "pastane"],
+  },
+  {
+    id: "saglik",
+    label: "Sağlık & bakım",
+    hint: "Klinik, diş, güzellik",
+    queries: ["klinik", "diş kliniği", "veteriner", "eczane", "kuaför", "güzellik salonu"],
+  },
+  {
+    id: "ofis",
+    label: "Ofis hizmeti",
+    hint: "Muhasebe, avukat, emlak",
+    queries: ["muhasebe ofisi", "mali müşavir", "avukatlık bürosu", "emlak ofisi", "sigorta acentesi", "mimarlık ofisi"],
   },
 ];
 
@@ -236,10 +245,10 @@ const YKS_GROUPS: SectorGroup[] = [
   },
 ];
 
-const ALL_FLAT = [...SECTOR_GROUPS, ...SOFTWARE_GROUPS, ...YKS_GROUPS].flatMap((g) => g.items);
+const ALL_FLAT = [...SECTOR_GROUPS, ...AGENCY_GROUPS, ...YKS_GROUPS].flatMap((g) => g.items);
 
 export function sectorGroupsFor(vertical: string): SectorGroup[] {
-  if (vertical === "software") return SOFTWARE_GROUPS;
+  if (vertical === "software") return [...SECTOR_GROUPS, ...AGENCY_GROUPS];
   if (vertical === "yks") return YKS_GROUPS;
   return SECTOR_GROUPS;
 }

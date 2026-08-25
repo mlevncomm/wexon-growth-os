@@ -1,5 +1,6 @@
 import { matchesPrefix, normalizePhone } from "./phone";
 import { getSettings } from "./settings";
+import { matchesWebsiteFilter, parseWebsiteFilter, type WebsiteFilter } from "./website";
 
 export type PlaceHit = {
   placeId: string;
@@ -130,6 +131,7 @@ export async function searchPlaces(opts: {
   minRating: number;
   requirePhone: boolean;
   phonePrefix: string;
+  websiteFilter?: WebsiteFilter;
   regionCode?: string;
   languageCode?: string;
   onHit?: (hit: PlaceHit) => Promise<void> | void;
@@ -141,6 +143,7 @@ export async function searchPlaces(opts: {
   }
 
   const textQuery = [opts.query, opts.district, opts.city].filter(Boolean).join(" ").trim();
+  const websiteFilter = parseWebsiteFilter(opts.websiteFilter);
   const hits: PlaceHit[] = [];
   const seen = new Set<string>();
   let skipped = 0;
@@ -169,7 +172,7 @@ export async function searchPlaces(opts: {
     if (!res.ok) {
       const message = json.error?.message || `Places API ${res.status}`;
       if (shouldUseLegacy(message, res.status)) {
-        return searchPlacesLegacy(apiKey, opts, textQuery);
+        return searchPlacesLegacy(apiKey, opts, textQuery, websiteFilter);
       }
       throw new Error(placesHelp(message));
     }
@@ -182,7 +185,7 @@ export async function searchPlaces(opts: {
       let hit = mapPlace(raw, opts.regionCode);
       if (!hit || seen.has(hit.placeId)) continue;
 
-      if (!hit.phone) {
+      if (!hit.phone || !hit.website || websiteFilter !== "any") {
         const detailed = await fetchDetails(
           apiKey,
           hit.placeId,
@@ -192,15 +195,8 @@ export async function searchPlaces(opts: {
         if (detailed) hit = { ...hit, ...detailed, placeId: hit.placeId };
       }
 
-      if (opts.minRating > 0 && (hit.rating == null || hit.rating < opts.minRating)) {
-        skipped += 1;
-        continue;
-      }
-      if (opts.requirePhone && !hit.phone) {
-        skipped += 1;
-        continue;
-      }
-      if (hit.phone && !matchesPrefix(hit.phone, opts.phonePrefix)) {
+      const drop = skipHit(hit, opts, websiteFilter);
+      if (drop) {
         skipped += 1;
         continue;
       }
@@ -216,6 +212,18 @@ export async function searchPlaces(opts: {
   }
 
   return { hits, skipped };
+}
+
+function skipHit(
+  hit: PlaceHit,
+  opts: { minRating: number; requirePhone: boolean; phonePrefix: string },
+  websiteFilter: WebsiteFilter,
+): boolean {
+  if (opts.minRating > 0 && (hit.rating == null || hit.rating < opts.minRating)) return true;
+  if (opts.requirePhone && !hit.phone) return true;
+  if (hit.phone && !matchesPrefix(hit.phone, opts.phonePrefix)) return true;
+  if (!matchesWebsiteFilter(hit.website, websiteFilter)) return true;
+  return false;
 }
 
 function shouldUseLegacy(message: string, status: number) {
@@ -284,6 +292,7 @@ async function searchPlacesLegacy(
     onHit?: (hit: PlaceHit) => Promise<void> | void;
   },
   textQuery: string,
+  websiteFilter: WebsiteFilter,
 ): Promise<{ hits: PlaceHit[]; skipped: number }> {
   const hits: PlaceHit[] = [];
   const seen = new Set<string>();
@@ -327,15 +336,7 @@ async function searchPlacesLegacy(
       const detailed = await fetchLegacyDetails(apiKey, placeId, opts.languageCode ?? "tr", opts.regionCode);
       if (detailed) hit = { ...hit, ...detailed, placeId };
 
-      if (opts.minRating > 0 && (hit.rating == null || hit.rating < opts.minRating)) {
-        skipped += 1;
-        continue;
-      }
-      if (opts.requirePhone && !hit.phone) {
-        skipped += 1;
-        continue;
-      }
-      if (hit.phone && !matchesPrefix(hit.phone, opts.phonePrefix)) {
+      if (skipHit(hit, opts, websiteFilter)) {
         skipped += 1;
         continue;
       }

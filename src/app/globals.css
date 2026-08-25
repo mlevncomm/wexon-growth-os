@@ -282,6 +282,26 @@ button, input, select, textarea { font: inherit; color: inherit; }
   align-items: center;
   flex-wrap: wrap;
 }
+.kesif-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+.check-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 14px;
+  min-height: 44px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.web-link {
+  color: var(--teal);
+  font-weight: 700;
+  font-size: 13px;
+}
 .chip-row.wrap {
   flex-wrap: wrap;
   overflow: visible;

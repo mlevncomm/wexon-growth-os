@@ -5,6 +5,7 @@ import { englishQuery, parseQueries } from "./sectors";
 import { resolveSearchLocations } from "./search-scope";
 import { TENANT_SEEDS, type Vertical } from "./verticals";
 import { ctxForTenantId, runWithTenant, tenantId, tryTenantId } from "./tenant";
+import { parseWebsiteFilter } from "./website";
 
 const g = globalThis as unknown as { __gooleadsCampaigns?: Set<string> };
 
@@ -86,6 +87,7 @@ async function executeCampaign(id: string, ownerId: string, targetCount: number)
           minRating: campaign.minRating,
           requirePhone: campaign.requirePhone,
           phonePrefix: campaign.phonePrefix,
+          websiteFilter: parseWebsiteFilter(campaign.websiteFilter),
           regionCode: loc.regionCode,
           languageCode: loc.languageCode,
           onHit: async (hit) => {

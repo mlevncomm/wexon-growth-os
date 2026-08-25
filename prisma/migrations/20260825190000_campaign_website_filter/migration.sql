@@ -1,0 +1,1 @@
+ALTER TABLE "Campaign" ADD COLUMN IF NOT EXISTS "websiteFilter" TEXT NOT NULL DEFAULT 'any';
