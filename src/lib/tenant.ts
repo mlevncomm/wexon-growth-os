@@ -1,8 +1,10 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { NextResponse } from "next/server";
+import "server-only";
 import { isVercel } from "./platform";
 import { prisma } from "./prisma";
-import { authConfigured, readSession, type Session } from "./session";
+import { authConfigured } from "./session-token";
+import { readSession, type Session } from "./session";
 import type { UserRole, Vertical } from "./verticals";
 import { isVertical } from "./verticals";
 

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ChipStrip } from "@/components/ChipStrip";
 import { ConnectGuide } from "@/components/ConnectGuide";
 import { useToast } from "@/components/Toast";
-import { LLM_PROVIDERS } from "@/lib/llm";
+import { LLM_PROVIDERS } from "@/lib/llm-providers";
 
 type Settings = {
   googlePlacesApiKey: string;
