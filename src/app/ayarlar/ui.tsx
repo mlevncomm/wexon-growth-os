@@ -33,9 +33,26 @@ type Settings = {
   authConfigured?: boolean;
 };
 
+type SettingsForm = Pick<
+  Settings,
+  | "googlePlacesApiKey"
+  | "waCloudToken"
+  | "waPhoneNumberId"
+  | "delayMinSec"
+  | "delayMaxSec"
+  | "dailyCap"
+  | "llmApiKey"
+  | "llmBaseUrl"
+  | "llmModel"
+  | "llmProvider"
+  | "igAccessToken"
+  | "igUserId"
+  | "igWebhookVerifyToken"
+>;
+
 export default function AyarlarPage() {
   const toast = useToast();
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<SettingsForm>({
     googlePlacesApiKey: "",
     waCloudToken: "",
     waPhoneNumberId: "",
