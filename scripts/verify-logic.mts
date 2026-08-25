@@ -8,7 +8,7 @@ import { mergePlaybook, playbookIsActive, playbookToPrompt } from "../src/lib/pl
 import { copyAngles, defaultAngle, generateSalesCopy } from "../src/lib/copy-ai.ts";
 import { sectorGroupsFor } from "../src/lib/sectors.ts";
 import { TENANT_SEEDS } from "../src/lib/verticals.ts";
-import { isRetiredGroqKey, normalizeLlmConfig } from "../src/lib/llm-providers.ts";
+import { isRetiredGroqKey, isStaleGeminiModel, normalizeLlmConfig } from "../src/lib/llm-providers.ts";
 
 let failed = 0;
 function check(ok: boolean, label: string, detail?: unknown) {
@@ -133,7 +133,17 @@ const remapped = normalizeLlmConfig({
 check(remapped.llmApiKey === "", "groq key stripped");
 check(remapped.llmProvider === "gemini", "groq provider remapped");
 check(remapped.llmBaseUrl.includes("generativelanguage.googleapis.com"), "gemini url");
-check(remapped.llmModel === "gemini-2.5-flash", "gemini model");
+check(remapped.llmModel === "gemini-3.5-flash", "gemini model");
+check(isStaleGeminiModel("gemini-2.5-flash"), "2.5 flash stale");
+check(
+  normalizeLlmConfig({
+    llmApiKey: "AIzaSyTestKeyNotReal",
+    llmBaseUrl: "https://api.groq.com/openai/v1",
+    llmModel: "gemini-2.5-flash",
+    llmProvider: "gemini",
+  }).llmModel === "gemini-3.5-flash",
+  "stale gemini model bumped",
+);
 
 if (failed) {
   console.error(`FAILED ${failed}`);

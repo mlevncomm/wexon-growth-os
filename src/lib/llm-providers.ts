@@ -3,7 +3,7 @@ export const LLM_PROVIDERS = [
     id: "gemini",
     label: "Google Gemini",
     baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
-    model: "gemini-2.5-flash",
+    model: "gemini-3.5-flash",
     hint: "aistudio.google.com/apikey — AIza… ile başlayan Google AI Studio anahtarı",
   },
   {
@@ -31,8 +31,33 @@ export const LLM_PROVIDERS = [
 
 export const DEFAULT_LLM = LLM_PROVIDERS[0];
 
+/** Tried in order when Gemini returns 404 for a retired model id. */
+export const GEMINI_MODEL_FALLBACKS = [
+  "gemini-3.5-flash",
+  "gemini-3.6-flash",
+  "gemini-3.5-flash-lite",
+  "gemini-2.5-flash",
+  "gemini-2.0-flash",
+] as const;
+
 export function isRetiredGroqKey(key: string): boolean {
   return /^gsk_/i.test(key.trim());
+}
+
+export function isGeminiApiKey(key: string): boolean {
+  return /^AIza/i.test(key.trim());
+}
+
+export function isStaleGeminiModel(model: string): boolean {
+  return /^(gemini-2\.5-flash|gemini-1\.5-flash|gemini-pro)(-[a-z0-9]+)?$/i.test(model.trim());
+}
+
+export function isGeminiEndpoint(baseUrl: string, model: string, apiKey = ""): boolean {
+  return (
+    /generativelanguage\.googleapis\.com/i.test(baseUrl) ||
+    /^gemini/i.test(model.trim()) ||
+    isGeminiApiKey(apiKey)
+  );
 }
 
 export function normalizeLlmConfig(input: {
@@ -50,22 +75,30 @@ export function normalizeLlmConfig(input: {
   const provider = (input.llmProvider || "").trim();
   const baseUrl = (input.llmBaseUrl || "").trim();
   const groq = provider === "groq" || /api\.groq\.com/i.test(baseUrl);
-  if (groq || !provider) {
+  const geminiKey = isGeminiApiKey(key);
+  if (groq || !provider || geminiKey) {
+    const requested = (input.llmModel || "").trim();
     const keepModel =
-      input.llmModel &&
-      !/gpt-oss|llama-3|mixtral|groq/i.test(input.llmModel) &&
-      /gemini/i.test(input.llmModel);
+      Boolean(requested) &&
+      /gemini/i.test(requested) &&
+      !isStaleGeminiModel(requested) &&
+      !/gpt-oss|llama-3|mixtral|groq/i.test(requested);
     return {
       llmApiKey: key,
       llmProvider: DEFAULT_LLM.id,
       llmBaseUrl: DEFAULT_LLM.baseUrl,
-      llmModel: keepModel ? input.llmModel : DEFAULT_LLM.model,
+      llmModel: keepModel ? requested : DEFAULT_LLM.model,
     };
   }
+  const requested = (input.llmModel || "").trim();
+  const geminiHost = provider === "gemini" || /generativelanguage\.googleapis\.com/i.test(baseUrl);
   return {
     llmApiKey: key,
     llmProvider: provider,
-    llmBaseUrl: baseUrl || DEFAULT_LLM.baseUrl,
-    llmModel: (input.llmModel || "").trim() || DEFAULT_LLM.model,
+    llmBaseUrl: geminiHost ? DEFAULT_LLM.baseUrl : baseUrl || DEFAULT_LLM.baseUrl,
+    llmModel:
+      geminiHost && (!requested || isStaleGeminiModel(requested))
+        ? DEFAULT_LLM.model
+        : requested || DEFAULT_LLM.model,
   };
 }

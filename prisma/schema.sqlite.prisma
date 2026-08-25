@@ -192,7 +192,7 @@ model AppSettings {
   queueStopped         Boolean @default(false)
   llmApiKey            String  @default("")
   llmBaseUrl           String  @default("https://generativelanguage.googleapis.com/v1beta/openai")
-  llmModel             String  @default("gemini-2.5-flash")
+  llmModel             String  @default("gemini-3.5-flash")
   llmProvider          String  @default("gemini")
   igAccessToken        String  @default("")
   igUserId             String  @default("")

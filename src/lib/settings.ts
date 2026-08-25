@@ -43,10 +43,19 @@ const g = globalThis as unknown as {
 };
 
 const TTL_MS = 15_000;
+const CACHE_VER = "g35";
 
 function cache(): Map<string, { at: number; data: Settings }> {
   if (!g.__wexonSettings) g.__wexonSettings = new Map();
   return g.__wexonSettings;
+}
+
+function scopeId(explicit?: string): string {
+  return explicit ?? tenantId();
+}
+
+function cacheKey(id: string): string {
+  return `${CACHE_VER}:${id}`;
 }
 
 function mapSettings(row: SettingsRow | null): Settings {
@@ -73,23 +82,19 @@ function mapSettings(row: SettingsRow | null): Settings {
   };
 }
 
-function scopeId(explicit?: string): string {
-  return explicit ?? tenantId();
-}
-
 export function bustSettingsCache(id?: string) {
   const key = id ?? tryTenantId();
-  if (key) cache().delete(key);
+  if (key) cache().delete(cacheKey(key));
   else cache().clear();
 }
 
 export async function peekSettings(explicitTenantId?: string): Promise<Settings> {
   const id = scopeId(explicitTenantId);
-  const hit = cache().get(id);
+  const hit = cache().get(cacheKey(id));
   if (hit && Date.now() - hit.at < TTL_MS) return hit.data;
   const row = await prisma.appSettings.findUnique({ where: { tenantId: id } });
   const data = mapSettings(row);
-  cache().set(id, { at: Date.now(), data });
+  cache().set(cacheKey(id), { at: Date.now(), data });
   return data;
 }
 

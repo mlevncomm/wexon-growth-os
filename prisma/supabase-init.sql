@@ -111,7 +111,7 @@ CREATE TABLE IF NOT EXISTS "AppSettings" (
   "queueStopped" BOOLEAN NOT NULL DEFAULT false,
   "llmApiKey" TEXT NOT NULL DEFAULT '',
   "llmBaseUrl" TEXT NOT NULL DEFAULT 'https://generativelanguage.googleapis.com/v1beta/openai',
-  "llmModel" TEXT NOT NULL DEFAULT 'gemini-2.5-flash',
+  "llmModel" TEXT NOT NULL DEFAULT 'gemini-3.5-flash',
   "llmProvider" TEXT NOT NULL DEFAULT 'gemini',
   "igAccessToken" TEXT NOT NULL DEFAULT '',
   "igUserId" TEXT NOT NULL DEFAULT '',

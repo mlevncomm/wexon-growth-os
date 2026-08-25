@@ -1,5 +1,9 @@
 import { copyAngles, generateSalesCopy, type CopyAngle } from "./copy-ai";
-import { LLM_PROVIDERS } from "./llm-providers";
+import {
+  GEMINI_MODEL_FALLBACKS,
+  isGeminiEndpoint,
+  LLM_PROVIDERS,
+} from "./llm-providers";
 import { playbookToPrompt, type Playbook } from "./playbook";
 import { productLine, type Vertical } from "./verticals";
 
@@ -29,6 +33,20 @@ function extractText(json: ChatResponse): string {
     .join("\n");
 }
 
+function apiErrorMessage(json: unknown, status: number): string {
+  if (!json || typeof json !== "object") return `AI hata ${status}`;
+  const err = (json as { error?: unknown }).error;
+  if (typeof err === "string" && err.trim()) return err.trim();
+  if (err && typeof err === "object") {
+    const msg = (err as { message?: unknown }).message;
+    if (typeof msg === "string" && msg.trim()) return msg.trim();
+  }
+  if (status === 404) {
+    return "Gemini model bulunamadı (404). Sistem’de gemini-3.5-flash kaydedip Kontrol et’e basın.";
+  }
+  return `AI hata ${status}`;
+}
+
 async function chatCompletions(
   url: string,
   headers: Record<string, string>,
@@ -48,7 +66,7 @@ async function chatCompletions(
   }
   if (!res.ok) {
     if (parseCopyJson(extractText(json))) return json;
-    throw new Error(json.error?.message || `AI hata ${res.status}`);
+    throw new Error(apiErrorMessage(json, res.status));
   }
   return json;
 }
@@ -65,6 +83,82 @@ function llmHeaders(apiKey: string, baseUrl: string): Record<string, string> {
   return headers;
 }
 
+function geminiModels(preferred: string): string[] {
+  const first = preferred.replace(/^models\//, "").trim() || GEMINI_MODEL_FALLBACKS[0];
+  return [...new Set([first, ...GEMINI_MODEL_FALLBACKS])];
+}
+
+function extractGeminiText(json: {
+  candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+  promptFeedback?: { blockReason?: string };
+}): string {
+  const blocked = json.promptFeedback?.blockReason;
+  if (blocked) throw new Error(`Gemini güvenlik filtresi: ${blocked}`);
+  return (json.candidates ?? [])
+    .flatMap((c) => c.content?.parts ?? [])
+    .map((p) => p.text)
+    .filter((t): t is string => Boolean(t && t.trim()))
+    .join("\n")
+    .trim();
+}
+
+async function geminiGenerate(opts: {
+  apiKey: string;
+  model: string;
+  messages: ChatMessage[];
+  temperature?: number;
+  maxTokens?: number;
+  json?: boolean;
+}): Promise<string> {
+  const system = opts.messages
+    .filter((m) => m.role === "system")
+    .map((m) => m.content)
+    .join("\n")
+    .trim();
+  const contents = opts.messages
+    .filter((m) => m.role !== "system")
+    .map((m) => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.content }],
+    }));
+  const generationConfig: Record<string, unknown> = {
+    temperature: opts.temperature ?? 0.6,
+    maxOutputTokens: opts.maxTokens ?? 900,
+  };
+  if (opts.json) generationConfig.responseMimeType = "application/json";
+
+  let last = "Gemini yanıt vermedi";
+  for (const model of geminiModels(opts.model)) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(opts.apiKey)}`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: contents.length ? contents : [{ role: "user", parts: [{ text: "OK" }] }],
+        ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
+        generationConfig,
+      }),
+    });
+    const raw = await res.text();
+    let json: Parameters<typeof extractGeminiText>[0] & { error?: { message?: string } } = {};
+    try {
+      json = JSON.parse(raw) as typeof json;
+    } catch {
+      last = "Gemini yanıtı okunamadı";
+      continue;
+    }
+    if (!res.ok) {
+      last = apiErrorMessage(json, res.status);
+      if (res.status === 404 || /not found|not supported/i.test(last)) continue;
+      throw new Error(last);
+    }
+    const text = extractGeminiText(json);
+    if (text) return text;
+    last = "Gemini boş yanıt verdi";
+  }
+  throw new Error(last);
+}
+
 export async function llmChat(opts: {
   apiKey: string;
   baseUrl: string;
@@ -74,6 +168,9 @@ export async function llmChat(opts: {
   maxTokens?: number;
   json?: boolean;
 }): Promise<string> {
+  if (isGeminiEndpoint(opts.baseUrl, opts.model, opts.apiKey)) {
+    return geminiGenerate(opts);
+  }
   const base = opts.baseUrl.replace(/\/+$/, "");
   const url = `${base}/chat/completions`;
   const headers = llmHeaders(opts.apiKey, base);
