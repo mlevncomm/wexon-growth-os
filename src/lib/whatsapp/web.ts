@@ -242,6 +242,29 @@ async function makeAuthState(
   };
 }
 
+function fatalDisconnect(code: number | undefined): boolean {
+  return code === 401 || code === 403 || code === 411 || code === 440;
+}
+
+function makeSocket(
+  baileys: Awaited<ReturnType<typeof loadBaileys>>,
+  authState: { state: unknown },
+  version: [number, number, number] | undefined,
+): WaSocket {
+  return baileys.makeWASocket({
+    auth: authState.state as never,
+    ...(version ? { version } : {}),
+    logger: silentLogger as never,
+    browser: baileys.Browsers.ubuntu("Chrome"),
+    markOnlineOnConnect: false,
+    syncFullHistory: false,
+    shouldSyncHistoryMessage: () => false,
+    qrTimeout: 60_000,
+    connectTimeoutMs: 60_000,
+    keepAliveIntervalMs: 15_000,
+  }) as unknown as WaSocket;
+}
+
 async function openSocket(
   owner: string,
   pairId: string,
@@ -249,23 +272,19 @@ async function openSocket(
   mode: "pair" | "send",
 ): Promise<{ sock: WaSocket; untilReady: Promise<void> }> {
   const baileys = await loadBaileys();
-  const fetched = await baileys.fetchLatestBaileysVersion().catch(() => ({ version: undefined as [number, number, number] | undefined }));
+  const fetched = await baileys.fetchLatestBaileysVersion().catch(() => ({
+    version: undefined as [number, number, number] | undefined,
+  }));
   const authState = await makeAuthState(owner, baileys, existing);
-  const sock = baileys.makeWASocket({
-    auth: authState.state as never,
-    ...(fetched.version ? { version: fetched.version } : {}),
-    logger: silentLogger as never,
-    browser: baileys.Browsers.appropriate("Chrome"),
-    markOnlineOnConnect: false,
-    syncFullHistory: false,
-    shouldSyncHistoryMessage: () => false,
-    qrTimeout: 60_000,
-  }) as unknown as WaSocket;
-
-  lives().set(owner, { pairId, sock, ready: false });
+  const version = fetched.version;
 
   const untilReady = new Promise<void>((resolve, reject) => {
     let settled = false;
+    let attempts = 0;
+    let reconnecting = false;
+    let sock = makeSocket(baileys, authState, version);
+    lives().set(owner, { pairId, sock, ready: false });
+
     const finish = (ok: boolean, err?: string) => {
       if (settled) return;
       settled = true;
@@ -273,97 +292,120 @@ async function openSocket(
       else reject(new Error(err || "WhatsApp bağlanamadı"));
     };
 
-    sock.ev.on("creds.update", () => {
-      void authState.saveCreds().catch((err) => {
-        console.error("wa-web persist", err instanceof Error ? err.message : "unknown");
+    const attach = (current: WaSocket) => {
+      current.ev.on("creds.update", () => {
+        void authState.saveCreds().catch((err) => {
+          console.error("wa-web persist", err instanceof Error ? err.message : "unknown");
+        });
       });
-    });
 
-    sock.ev.on("connection.update", (update) => {
-      void (async () => {
-        if (!(await stillCurrent(owner, pairId))) return;
-        const info = update as {
-          connection?: string;
-          qr?: string;
-          lastDisconnect?: { error?: unknown };
-        };
-        if (info.qr && mode === "pair") {
-          const qrcode = await import("qrcode");
-          const qrDataUrl = await qrcode.toDataURL(info.qr);
+      current.ev.on("connection.update", (update) => {
+        void (async () => {
           if (!(await stillCurrent(owner, pairId))) return;
-          await patch(owner, {
-            waWebState: "qr",
-            waWebQr: qrDataUrl,
-            waWebError: "",
-          });
-        }
-        if (info.connection === "open") {
-          lives().set(owner, { pairId, sock, ready: true });
-          try {
-            await authState.flush();
-          } catch (err) {
-            const message = err instanceof Error ? err.message : "Oturum kaydedilemedi";
-            console.error("wa-web ready persist", message);
+          const info = update as {
+            connection?: string;
+            qr?: string;
+            lastDisconnect?: { error?: unknown };
+          };
+          if (info.qr && mode === "pair") {
+            const qrcode = await import("qrcode");
+            const qrDataUrl = await qrcode.toDataURL(info.qr);
+            if (!(await stillCurrent(owner, pairId))) return;
             await patch(owner, {
-              waWebState: "error",
-              waWebQr: "",
-              waWebError: "Oturum kaydedilemedi. Sistem yöneticisine AUTH_SECRET bildirin.",
-              waWebPairingUntil: null,
+              waWebState: "qr",
+              waWebQr: qrDataUrl,
+              waWebError: "",
             });
-            finish(false, message);
-            return;
           }
-          await patch(owner, {
-            waWebState: "ready",
-            waWebQr: "",
-            waWebError: "",
-            waWebPairingUntil: null,
-          });
-          finish(true);
-        }
-        if (info.connection === "close") {
-          const code = boomCode(info.lastDisconnect?.error);
-          const raw =
-            info.lastDisconnect?.error instanceof Error
-              ? info.lastDisconnect.error.message
-              : "";
-          console.error("wa-web close", code ?? "none", raw.slice(0, 180));
-          lives().delete(owner);
-          if (code === baileys.DisconnectReason.loggedOut || code === 401) {
+          if (info.connection === "open") {
+            reconnecting = false;
+            lives().set(owner, { pairId, sock: current, ready: true });
+            try {
+              await authState.flush();
+            } catch (err) {
+              const message = err instanceof Error ? err.message : "Oturum kaydedilemedi";
+              console.error("wa-web ready persist", message);
+              await patch(owner, {
+                waWebState: "error",
+                waWebQr: "",
+                waWebError: "Oturum kaydedilemedi. Sistem yöneticisine AUTH_SECRET bildirin.",
+                waWebPairingUntil: null,
+              });
+              finish(false, message);
+              return;
+            }
             await patch(owner, {
-              waWebState: "disconnected",
+              waWebState: "ready",
               waWebQr: "",
               waWebError: "",
-              waWebCreds: "",
-              waWebPairId: "",
               waWebPairingUntil: null,
             });
-            finish(false, friendlyDisconnect(code, "Oturum kapandı"));
-            return;
-          }
-          if (mode === "send") {
-            finish(false, friendlyDisconnect(code, "WhatsApp yeniden bağlanamadı."));
-            return;
-          }
-          const liveState = await row(owner);
-          if (liveState?.waWebState === "ready" && liveState.waWebCreds) {
             finish(true);
-            return;
           }
-          const message = friendlyDisconnect(code, "WhatsApp bağlantısı koptu. QR’ı tekrar açın.");
-          await patch(owner, {
-            waWebState: "error",
-            waWebQr: "",
-            waWebError: message,
-            waWebPairingUntil: null,
-          });
-          finish(false, message);
-        }
-      })().catch(() => undefined);
-    });
+          if (info.connection === "close") {
+            const code = boomCode(info.lastDisconnect?.error);
+            const raw =
+              info.lastDisconnect?.error instanceof Error
+                ? info.lastDisconnect.error.message
+                : "";
+            if (settled) return;
+            if (fatalDisconnect(code) || code === baileys.DisconnectReason.loggedOut) {
+              console.error("wa-web close fatal", code ?? "none", raw.slice(0, 180));
+              lives().delete(owner);
+              await patch(owner, {
+                waWebState: "disconnected",
+                waWebQr: "",
+                waWebError: friendlyDisconnect(code, "Oturum kapandı"),
+                waWebCreds: "",
+                waWebPairId: "",
+                waWebPairingUntil: null,
+              });
+              finish(false, friendlyDisconnect(code, "Oturum kapandı"));
+              return;
+            }
+            const liveState = await row(owner);
+            if (liveState?.waWebState === "ready" && liveState.waWebCreds) {
+              finish(true);
+              return;
+            }
+            if (settled || reconnecting) return;
+            attempts += 1;
+            if (attempts > 12) {
+              console.error("wa-web close", code ?? "none", raw.slice(0, 180));
+              lives().delete(owner);
+              const message = friendlyDisconnect(code, "WhatsApp bağlantısı koptu. QR’ı tekrar açın.");
+              await patch(owner, {
+                waWebState: "error",
+                waWebQr: "",
+                waWebError: message,
+                waWebPairingUntil: null,
+              });
+              finish(false, message);
+              return;
+            }
+            reconnecting = true;
+            console.warn("wa-web restart", code ?? "none", attempts);
+            await authState.flush().catch(() => undefined);
+            await new Promise((r) => setTimeout(r, 600 + attempts * 200));
+            if (settled || !(await stillCurrent(owner, pairId))) {
+              reconnecting = false;
+              return;
+            }
+            sock = makeSocket(baileys, authState, version);
+            lives().set(owner, { pairId, sock, ready: false });
+            attach(sock);
+            reconnecting = false;
+          }
+        })().catch((err) => {
+          console.error("wa-web update", err instanceof Error ? err.message : "unknown");
+        });
+      });
+    };
+
+    attach(sock);
   });
 
-  return { sock, untilReady };
+  return { sock: lives().get(owner)?.sock as WaSocket, untilReady };
 }
 
 async function runPairing(owner: string): Promise<void> {
