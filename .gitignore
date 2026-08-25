@@ -39,6 +39,9 @@ yarn-error.log*
 /prisma/dev.db-journal
 /prisma/tenant-verify.db
 /prisma/tenant-verify.db-journal
+/prisma/qr-local.db
+/prisma/qr-local.db-journal
+/prisma/prisma/
 /.wwebjs_auth
 /.wwebjs_auth_wexon
 /.wwebjs_cache

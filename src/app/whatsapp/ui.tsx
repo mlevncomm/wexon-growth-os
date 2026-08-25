@@ -191,11 +191,11 @@ export default function OutreachPage() {
       <div className="page-kicker">Kanal</div>
       <h1 className="page-title">Satış outreach</h1>
       <p className="page-copy">
-        Solda playbook’a uygun metni üretip kaydedin. Gönderim onay kuyruğundan çıkar; Cloud varsa o kullanılır.
+        Solda playbook’a uygun metni üretip kaydedin. Gönderim onay kuyruğundan çıkar. Meta Cloud kilitliyken bu PC’de WhatsApp Web QR’sı kullanılır.
       </p>
 
       <div className="notice" style={{ marginTop: 16 }}>
-        Cloud API varsa o asıl kanaldır (Sistem’e token yazın). Yoksa QR yedek kalır. Mesajlar önce onay bekler; kuyruk çekmecesinde Onayla / Düzenle / Reddet. Ticari iletide İYS onayı sizin sorumluluğunuzdadır.
+        Canlı site (Vercel) QR açamaz. Bu bilgisayarda Growth OS çalışırken sağdaki QR’ı, WhatsApp Business → Ayarlar → Cihazlar → Cihaz bağla ile okutun. Mesajlar yine onay kuyruğundan çıkar. Ticari iletide İYS onayı sizin sorumluluğunuzdadır.
       </div>
 
       {error ? <p className="error-box" style={{ marginTop: 14 }}>{error}</p> : null}
@@ -316,10 +316,14 @@ export default function OutreachPage() {
             </div>
             <p style={{ margin: 0, fontWeight: 700 }}>
               <span className={`dot${connected ? "" : localState === "error" ? " bad" : " warn"}`} />
-              {wa?.cloud ? "Cloud API asıl kanal — onay sonrası Cloud gider. QR yalnızca yedek." : statusLabel(localState)}
+              {wa?.cloud
+                ? "Cloud API asıl kanal — onay sonrası Cloud gider."
+                : wa?.serverless
+                  ? "Canlıda QR yok — bu PC’de localhost ile okutun"
+                  : statusLabel(localState)}
             </p>
             <p className="panel-note" style={{ marginTop: 8 }}>
-              QR bu kartta görünür. Instagram gelen kutusu ayrı ekranda; soğuk DM yok.
+              WhatsApp Business uygulaması da WhatsApp Web gibi bağlı cihaz kabul eder. Instagram gelen kutusu ayrı ekranda; soğuk DM yok.
             </p>
             {wa?.local.error ? <p className="error-box">{wa.local.error}</p> : null}
             {wa?.local.qrDataUrl ? (
@@ -335,7 +339,7 @@ export default function OutreachPage() {
             <div className="save-row">
               {wa?.serverless ? (
                 <p className="panel-note" style={{ margin: 0 }}>
-                  Canlı ortamda QR yok. Aşağıdaki Cloud kılavuzunu izleyin, token’ı Sistem’e yazın.
+                  wexon-growth-os.vercel.app üzerinde Chrome açılamaz. Bu PC’de projeyi çalıştırıp http://127.0.0.1:3000/whatsapp adresine girin; QR burada çıkar.
                 </p>
               ) : (
                 <>
@@ -366,23 +370,23 @@ export default function OutreachPage() {
       <div style={{ marginTop: 18 }}>
         <ConnectGuide
           kicker="WhatsApp Business"
-          title="Cloud nasıl bağlanır"
+          title="QR ile bağla (Cloud olmadan)"
           steps={[
             {
-              title: "Meta Business hesabı",
-              body: "business.facebook.com üzerinde şirket sayfası açın. WhatsApp Business Platform (Cloud API) ürününü ekleyin. Kişisel WhatsApp Web girişi canlıda kullanılmaz.",
+              title: "Bu bilgisayarda aç",
+              body: "Canlı Vercel QR üretmez. Growth OS’u bu PC’de çalıştırın (localhost:3000). Mesaj ekranında “QR oturumu aç”a basın; küçük bir Chrome penceresi ve QR çıkar.",
             },
             {
-              title: "Telefon numarası",
-              body: "Meta’da bir gönderim numarası ekleyin veya test numarasını kullanın. Phone number ID’yi kopyalayın (Graph: telefon kimliği, numaranın kendisi değil).",
+              title: "Telefonda WhatsApp Business",
+              body: "Yeşil WhatsApp Business uygulaması → Ayarlar → Cihazlar → Cihaz bağla. Ekrandaki QR’ı okutun. Normal WhatsApp da aynı menüden bağlanır; ikisini aynı anda karıştırmayın.",
             },
             {
-              title: "Kalıcı token",
-              body: "Sistem kullanıcısı (admin) oluşturup whatsapp_business_messaging izni verin. Kalıcı (never-expiring) token alın. Geçici test token’ı 24 saatte düşer.",
+              title: "PC açık kalsın",
+              body: "QR oturumu bu makinedeki Chrome profiline yazılır. Bilgisayar uykuya dalınca veya Kes’e basınca kanal düşer. Gönderim yine onay kuyruğundan çıkar; rastgele spam yok.",
             },
             {
-              title: "Sistem’e yapıştırın",
-              body: "Sistem ekranına Cloud token + phone number ID yazıp kaydedin. Yeşil Cloud rozeti görünce kuyruk onay sonrası resmi API ile gider. Vercel’de QR yedek çalışmaz. Adım adım Sistem → Vercel + Supabase kılavuzunda da durur.",
+              title: "Cloud sonra",
+              body: "Meta developer kilidi açılınca Sistem’e Cloud token yazılır; o zaman canlı site de gönderir. QR yedek kalır.",
             },
           ]}
         />
