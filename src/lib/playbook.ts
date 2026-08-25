@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import { tenantId } from "./tenant";
 
 export type Playbook = {
   tone: string;
@@ -46,10 +47,11 @@ export function mergePlaybook(current: Playbook, incoming: unknown): Playbook {
 }
 
 export async function getPlaybook(): Promise<Playbook> {
+  const id = tenantId();
   const row = await prisma.brandPlaybook.upsert({
-    where: { id: "default" },
+    where: { tenantId: id },
     update: {},
-    create: { id: "default" },
+    create: { tenantId: id },
   });
   return {
     tone: row.tone,
@@ -61,10 +63,11 @@ export async function getPlaybook(): Promise<Playbook> {
 }
 
 export async function savePlaybook(playbook: Playbook): Promise<Playbook> {
+  const id = tenantId();
   const row = await prisma.brandPlaybook.upsert({
-    where: { id: "default" },
+    where: { tenantId: id },
     update: playbook,
-    create: { id: "default", ...playbook },
+    create: { tenantId: id, ...playbook },
   });
   return {
     tone: row.tone,

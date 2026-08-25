@@ -1,16 +1,20 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import type { UserRole } from "./verticals";
 
 export const SESSION_COOKIE = "wexon_admin";
 const MAX_AGE_SEC = 60 * 60 * 24 * 14;
 
-type Session = { email: string; exp: number };
+export type Session = {
+  userId: string;
+  email: string;
+  tenantId: string | null;
+  role: UserRole;
+  exp: number;
+  impersonatorId?: string;
+};
 
 export function authConfigured(): boolean {
-  return (
-    (process.env.AUTH_SECRET ?? "").length >= 16 &&
-    Boolean(process.env.ADMIN_EMAIL) &&
-    Boolean(process.env.ADMIN_PASSWORD)
-  );
+  return (process.env.AUTH_SECRET ?? "").length >= 16;
 }
 
 function secret(): string {
@@ -23,8 +27,8 @@ function sign(payload: string): string {
   return createHmac("sha256", secret()).update(payload).digest("base64url");
 }
 
-export function encodeSession(email: string): string {
-  const body: Session = { email, exp: Date.now() + MAX_AGE_SEC * 1000 };
+export function encodeSession(session: Omit<Session, "exp">): string {
+  const body: Session = { ...session, exp: Date.now() + MAX_AGE_SEC * 1000 };
   const payload = Buffer.from(JSON.stringify(body)).toString("base64url");
   return `${payload}.${sign(payload)}`;
 }
@@ -39,8 +43,16 @@ export function decodeSession(token: string | undefined | null): Session | null 
     const b = Buffer.from(expected);
     if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
     const data = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as Session;
-    if (!data?.email || typeof data.exp !== "number" || data.exp < Date.now()) return null;
-    return data;
+    if (!data?.userId || !data?.email || typeof data.exp !== "number" || data.exp < Date.now()) return null;
+    if (data.role !== "platform" && data.role !== "member") return null;
+    return {
+      userId: data.userId,
+      email: data.email,
+      tenantId: data.tenantId ?? null,
+      role: data.role,
+      exp: data.exp,
+      impersonatorId: data.impersonatorId,
+    };
   } catch {
     return null;
   }

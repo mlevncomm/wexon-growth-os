@@ -1,6 +1,7 @@
 import { prisma } from "../prisma";
 import { isServerless } from "../platform";
 import { getSettings, updateSettings } from "../settings";
+import { tenantId } from "../tenant";
 import { cloudConfigured, sendCloudMessage } from "./cloud";
 
 type QueueGlobal = {
@@ -31,9 +32,13 @@ function todayStart(): Date {
   return new Date(`${y}-${m}-${d}T00:00:00+03:00`);
 }
 
+function tid(): string {
+  return tenantId();
+}
+
 export async function sentTodayCount(): Promise<number> {
   return prisma.outreachJob.count({
-    where: { status: "sent", sentAt: { gte: todayStart() } },
+    where: { tenantId: tid(), status: "sent", sentAt: { gte: todayStart() } },
   });
 }
 
@@ -61,6 +66,7 @@ async function sendMessage(phone: string, text: string): Promise<"cloud" | "loca
 }
 
 async function tick(): Promise<"idle" | "sent" | "wait" | "paused" | "capped"> {
+  const owner = tid();
   const settings = await getSettings();
   if (settings.queueStopped) return "paused";
   if (settings.queuePaused) return "paused";
@@ -73,6 +79,7 @@ async function tick(): Promise<"idle" | "sent" | "wait" | "paused" | "capped"> {
 
   const job = await prisma.outreachJob.findFirst({
     where: {
+      tenantId: owner,
       status: "queued",
       channel: "whatsapp",
       scheduledAt: { lte: new Date() },
@@ -175,8 +182,9 @@ export async function enqueueLeads(opts: {
   leadIds: string[];
   templateId: string;
 }): Promise<{ queued: number; skipped: number; pending: number }> {
-  const template = await prisma.template.findUnique({
-    where: { id: opts.templateId },
+  const owner = tid();
+  const template = await prisma.template.findFirst({
+    where: { id: opts.templateId, tenantId: owner },
   });
   if (!template) throw new Error("Şablon bulunamadı");
 
@@ -185,7 +193,7 @@ export async function enqueueLeads(opts: {
   let skipped = 0;
 
   for (const leadId of opts.leadIds) {
-    const lead = await prisma.lead.findUnique({ where: { id: leadId } });
+    const lead = await prisma.lead.findFirst({ where: { id: leadId, tenantId: owner } });
     if (!lead || !lead.phone) {
       skipped += 1;
       continue;
@@ -195,7 +203,7 @@ export async function enqueueLeads(opts: {
       continue;
     }
     const open = await prisma.outreachJob.findFirst({
-      where: { leadId, status: { in: ["pending", "queued", "sending"] } },
+      where: { tenantId: owner, leadId, status: { in: ["pending", "queued", "sending"] } },
     });
     if (open) {
       skipped += 1;
@@ -203,6 +211,7 @@ export async function enqueueLeads(opts: {
     }
     await prisma.outreachJob.create({
       data: {
+        tenantId: owner,
         leadId,
         templateId: template.id,
         message: renderTemplate(template.body, lead),
@@ -221,10 +230,11 @@ export async function moderateJobs(opts: {
   action: "approve" | "reject" | "edit";
   message?: string;
 }): Promise<{ updated: number }> {
+  const owner = tid();
   const ids = opts.ids.filter(Boolean);
   if (!ids.length) return { updated: 0 };
   const jobs = await prisma.outreachJob.findMany({
-    where: { id: { in: ids }, status: "pending" },
+    where: { id: { in: ids }, tenantId: owner, status: "pending" },
   });
   let updated = 0;
   const settings = await getSettings();
@@ -252,7 +262,7 @@ export async function moderateJobs(opts: {
       },
     });
     updated += 1;
-    }
+  }
   if (updated && (opts.action === "approve" || opts.action === "edit")) {
     await updateSettings({ queueStopped: false, queuePaused: false });
     ensureQueueLoop();
@@ -261,26 +271,27 @@ export async function moderateJobs(opts: {
 }
 
 export async function getQueueSnapshot() {
+  const owner = tid();
   const settings = await getSettings();
   const [queued, pending, sending, sentToday, failed, current, pendingJobs, lastFailed] = await Promise.all([
-    prisma.outreachJob.count({ where: { status: "queued" } }),
-    prisma.outreachJob.count({ where: { status: "pending" } }),
-    prisma.outreachJob.count({ where: { status: "sending" } }),
+    prisma.outreachJob.count({ where: { tenantId: owner, status: "queued" } }),
+    prisma.outreachJob.count({ where: { tenantId: owner, status: "pending" } }),
+    prisma.outreachJob.count({ where: { tenantId: owner, status: "sending" } }),
     sentTodayCount(),
-    prisma.outreachJob.count({ where: { status: "failed" } }),
+    prisma.outreachJob.count({ where: { tenantId: owner, status: "failed" } }),
     prisma.outreachJob.findFirst({
-      where: { status: { in: ["sending", "queued"] } },
+      where: { tenantId: owner, status: { in: ["sending", "queued"] } },
       orderBy: [{ status: "desc" }, { createdAt: "asc" }],
       include: { lead: true },
     }),
     prisma.outreachJob.findMany({
-      where: { status: "pending" },
+      where: { tenantId: owner, status: "pending" },
       orderBy: { createdAt: "asc" },
       take: 30,
       include: { lead: { select: { name: true, phone: true } } },
     }),
     prisma.outreachJob.findFirst({
-      where: { status: "failed", error: { not: null } },
+      where: { tenantId: owner, status: "failed", error: { not: null } },
       orderBy: { createdAt: "desc" },
       select: { error: true },
     }),

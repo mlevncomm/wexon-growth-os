@@ -23,8 +23,12 @@ export default function GirisPage() {
     if (saved) setEmail(saved);
     void fetch("/api/auth", { cache: "no-store" })
       .then((r) => r.json())
-      .then((j: { ok?: boolean }) => {
-        if (j.ok) router.replace(nextPath());
+      .then((j: { ok?: boolean; home?: string; role?: string }) => {
+        if (!j.ok) return;
+        const n = nextPath();
+        if (j.role === "member" && n.startsWith("/platform")) router.replace("/");
+        else if (j.role === "platform" && (n === "/" || n.startsWith("/platform"))) router.replace(j.home || "/platform");
+        else router.replace(n);
       })
       .catch(() => undefined);
   }, [router]);
@@ -42,7 +46,11 @@ export default function GirisPage() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Giriş olmadı");
       window.localStorage.setItem("wexon_admin_email", email.trim().toLowerCase());
-      router.replace(nextPath());
+      const home = typeof json.home === "string" ? json.home : "/";
+      const n = nextPath();
+      if (json.role === "member" && n.startsWith("/platform")) router.replace("/");
+      else if (json.role === "platform" && (n === "/" || n.startsWith("/platform"))) router.replace(home);
+      else router.replace(n === "/" ? home : n);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Giriş olmadı");
@@ -59,13 +67,13 @@ export default function GirisPage() {
           <div className={styles.brandInner}>
             <div className={styles.mark}>Wexon Growth OS</div>
             <div className={styles.brandCopy}>
-              <h1>Operatör paneline hoş geldiniz</h1>
-              <p>Giriş yapın, ardından WhatsApp ve Instagram kanallarını sırayla bağlayın.</p>
+              <h1>İşletme paneline hoş geldiniz</h1>
+              <p>Kendi listeniz, kuyruğunuz ve kanallarınız. Başka işletmenin verisi görünmez.</p>
             </div>
             <ol className={styles.steps}>
               <li className={styles.on}>
                 <span>1</span>
-                Admin girişi
+                Hesap girişi
               </li>
               <li>
                 <span>2</span>
@@ -82,8 +90,8 @@ export default function GirisPage() {
         <main className={styles.panel}>
           <form className={styles.form} onSubmit={(e) => void submit(e)}>
             <header className={styles.head}>
-              <h2>Admin girişi</h2>
-              <p>Yalnızca yetkili operatör. Şifre ortam değişkeninde durur.</p>
+              <h2>Giriş</h2>
+              <p>Yalnızca size verilen işletme hesabı. Üst yönetici /platform ekranını görür.</p>
             </header>
 
             {error ? <p className={styles.alert}>{error}</p> : null}
@@ -94,7 +102,7 @@ export default function GirisPage() {
                 type="email"
                 autoComplete="username"
                 autoFocus
-                placeholder="admin@sirketiniz.com"
+                placeholder="iris.p@example.org"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -128,7 +136,7 @@ export default function GirisPage() {
               {busy ? "Giriliyor…" : "Panele gir"}
             </button>
 
-            <p className={styles.foot}>Girişten sonra Sistem ekranından kanalları bağlarsınız.</p>
+            <p className={styles.foot}>Girişten sonra yalnızca kendi listeniz ve kanallarınız açılır.</p>
           </form>
         </main>
       </div>

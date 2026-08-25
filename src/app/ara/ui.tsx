@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { dialCodeFor, formatPhoneDisplay } from "@/lib/phone";
 import { REGIONS, TURKEY_ZONES, WORLD_GROUPS, WORLD_HUBS, hubFor } from "@/lib/regions";
-import { SECTOR_GROUPS } from "@/lib/sectors";
 import { ChipStrip } from "@/components/ChipStrip";
 import { useToast } from "@/components/Toast";
 
@@ -31,6 +30,7 @@ type Campaign = {
   leads?: Lead[];
 };
 type Scope = "city" | "zone" | "turkey" | "hub" | "worldGroup" | "world";
+type SectorGroup = { id: string; label: string; items: { label: string; query: string }[] };
 
 const PINNED_CITIES = ["İstanbul", "Ankara", "İzmir", "Bursa", "Antalya", "Adana", "Kocaeli", "Gaziantep"];
 const COUNT_PRESETS = [10, 20, 40, 60];
@@ -64,6 +64,7 @@ export default function AraPage() {
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [campaignId, setCampaignId] = useState<string | null>(null);
   const [recent, setRecent] = useState<Campaign[]>([]);
+  const [sectorGroups, setSectorGroups] = useState<SectorGroup[]>([]);
 
   const districts = useMemo(
     () => regions.find((r) => r.city === city)?.districts ?? [],
@@ -87,6 +88,23 @@ export default function AraPage() {
     if (!q) return WORLD_HUBS;
     return WORLD_HUBS.filter((h) => h.city.toLowerCase().includes(q));
   }, [hubFilter]);
+
+  useEffect(() => {
+    void fetch("/api/sectors", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((json: { groups?: SectorGroup[] }) => {
+        const groups = Array.isArray(json.groups) ? json.groups : [];
+        setSectorGroups(groups);
+        const allowed = new Set(groups.flatMap((g) => g.items.map((i) => i.query)));
+        const first = groups[0]?.items[0]?.query;
+        setSelectedQueries((prev) => {
+          const keep = prev.filter((q) => allowed.has(q));
+          if (keep.length) return keep;
+          return first ? [first] : [];
+        });
+      })
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     void fetch("/api/campaigns", { cache: "no-store" })
@@ -122,7 +140,7 @@ export default function AraPage() {
   }
 
   function toggleGroup(id: string) {
-    const items = SECTOR_GROUPS.find((g) => g.id === id)?.items ?? [];
+    const items = sectorGroups.find((g) => g.id === id)?.items ?? [];
     const keys = items.map((i) => i.query);
     setSelectedQueries((prev) => {
       const allOn = keys.every((k) => prev.includes(k));
@@ -361,7 +379,7 @@ export default function AraPage() {
           </button>
         </div>
         <div className="sector-groups">
-          {SECTOR_GROUPS.map((g) => {
+          {sectorGroups.map((g) => {
             const allOn = g.items.every((i) => selectedQueries.includes(i.query));
             return (
               <div key={g.id}>

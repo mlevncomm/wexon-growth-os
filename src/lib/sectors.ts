@@ -98,11 +98,61 @@ export const SECTOR_GROUPS: SectorGroup[] = [
   },
 ];
 
-const FLAT = SECTOR_GROUPS.flatMap((g) => g.items);
+const SOFTWARE_GROUPS: SectorGroup[] = [
+  {
+    id: "tech",
+    label: "Yazılım alıcısı",
+    items: [
+      { label: "Yazılım şirketi", query: "yazılım şirketi", en: "software company" },
+      { label: "Ajans", query: "reklam ajansı", en: "advertising agency" },
+      { label: "E-ticaret", query: "e-ticaret", en: "ecommerce store" },
+      { label: "Muhasebe", query: "muhasebe ofisi", en: "accounting office" },
+      { label: "Klinik yazılım", query: "özel klinik", en: "private clinic" },
+      { label: "Otel", query: "otel", en: "hotel" },
+      { label: "İnşaat", query: "inşaat şirketi", en: "construction company" },
+      { label: "Lojistik", query: "lojistik", en: "logistics company" },
+    ],
+  },
+  {
+    id: "work",
+    label: "Ofis & ticaret",
+    items: [
+      { label: "Ofis", query: "ofis", en: "office" },
+      { label: "Coworking", query: "coworking", en: "coworking space" },
+      { label: "Mağaza", query: "mağaza", en: "retail store" },
+      { label: "Fabrika", query: "fabrika", en: "factory" },
+    ],
+  },
+];
+
+const YKS_GROUPS: SectorGroup[] = [
+  {
+    id: "edu",
+    label: "Eğitim",
+    items: [
+      { label: "Dershane", query: "dershane", en: "exam prep school" },
+      { label: "Etüt", query: "etüt merkezi", en: "study center" },
+      { label: "Özel okul", query: "özel okul", en: "private school" },
+      { label: "Lise", query: "lise", en: "high school" },
+      { label: "Kurs", query: "dil kursu", en: "language school" },
+      { label: "Kreş", query: "kreş", en: "kindergarten" },
+      { label: "Üniversite", query: "üniversite", en: "university" },
+      { label: "Yurt", query: "öğrenci yurdu", en: "dormitory" },
+    ],
+  },
+];
+
+const ALL_FLAT = [...SECTOR_GROUPS, ...SOFTWARE_GROUPS, ...YKS_GROUPS].flatMap((g) => g.items);
+
+export function sectorGroupsFor(vertical: string): SectorGroup[] {
+  if (vertical === "software") return SOFTWARE_GROUPS;
+  if (vertical === "yks") return YKS_GROUPS;
+  return SECTOR_GROUPS;
+}
 
 export function englishQuery(query: string): string {
   const key = query.trim().toLowerCase();
-  const hit = FLAT.find((s) => s.query === key || s.label.toLowerCase() === key);
+  const hit = ALL_FLAT.find((s) => s.query === key || s.label.toLowerCase() === key);
   return hit?.en ?? query;
 }
 

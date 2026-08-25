@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import { tenantId, tryTenantId } from "./tenant";
 
 export type Settings = {
   googlePlacesApiKey: string;
@@ -37,18 +38,22 @@ type SettingsRow = {
 };
 
 const g = globalThis as unknown as {
-  __wexonSettings?: { at: number; data: Settings };
+  __wexonSettings?: Map<string, { at: number; data: Settings }>;
 };
 
 const TTL_MS = 15_000;
+
+function cache(): Map<string, { at: number; data: Settings }> {
+  if (!g.__wexonSettings) g.__wexonSettings = new Map();
+  return g.__wexonSettings;
+}
 
 function mapSettings(row: SettingsRow | null): Settings {
   return {
     googlePlacesApiKey:
       row?.googlePlacesApiKey || process.env.GOOGLE_PLACES_API_KEY || "",
-    waCloudToken: row?.waCloudToken || process.env.WHATSAPP_CLOUD_TOKEN || "",
-    waPhoneNumberId:
-      row?.waPhoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID || "",
+    waCloudToken: row?.waCloudToken || "",
+    waPhoneNumberId: row?.waPhoneNumberId || "",
     delayMinSec: row?.delayMinSec ?? 20,
     delayMaxSec: row?.delayMaxSec ?? 45,
     dailyCap: row?.dailyCap ?? 40,
@@ -58,37 +63,46 @@ function mapSettings(row: SettingsRow | null): Settings {
     llmBaseUrl: row?.llmBaseUrl || process.env.LLM_BASE_URL || "https://api.groq.com/openai/v1",
     llmModel: row?.llmModel || process.env.LLM_MODEL || "openai/gpt-oss-20b",
     llmProvider: row?.llmProvider || "groq",
-    igAccessToken: row?.igAccessToken || process.env.IG_ACCESS_TOKEN || "",
-    igUserId: row?.igUserId || process.env.IG_USER_ID || "",
-    igWebhookVerifyToken: row?.igWebhookVerifyToken || process.env.IG_WEBHOOK_VERIFY_TOKEN || "",
+    igAccessToken: row?.igAccessToken || "",
+    igUserId: row?.igUserId || "",
+    igWebhookVerifyToken: row?.igWebhookVerifyToken || "",
   };
 }
 
-export function bustSettingsCache() {
-  g.__wexonSettings = undefined;
+function scopeId(explicit?: string): string {
+  return explicit ?? tenantId();
 }
 
-export async function peekSettings(): Promise<Settings> {
-  const hit = g.__wexonSettings;
+export function bustSettingsCache(id?: string) {
+  const key = id ?? tryTenantId();
+  if (key) cache().delete(key);
+  else cache().clear();
+}
+
+export async function peekSettings(explicitTenantId?: string): Promise<Settings> {
+  const id = scopeId(explicitTenantId);
+  const hit = cache().get(id);
   if (hit && Date.now() - hit.at < TTL_MS) return hit.data;
-  const row = await prisma.appSettings.findUnique({ where: { id: "default" } });
+  const row = await prisma.appSettings.findUnique({ where: { tenantId: id } });
   const data = mapSettings(row);
-  g.__wexonSettings = { at: Date.now(), data };
+  cache().set(id, { at: Date.now(), data });
   return data;
 }
 
-export async function getSettings(): Promise<Settings> {
-  return peekSettings();
+export async function getSettings(explicitTenantId?: string): Promise<Settings> {
+  return peekSettings(explicitTenantId);
 }
 
 export async function updateSettings(
   patch: Partial<Settings>,
+  explicitTenantId?: string,
 ): Promise<Settings> {
+  const id = scopeId(explicitTenantId);
   await prisma.appSettings.upsert({
-    where: { id: "default" },
+    where: { tenantId: id },
     update: patch,
-    create: { id: "default", ...patch },
+    create: { tenantId: id, ...patch },
   });
-  bustSettingsCache();
-  return peekSettings();
+  bustSettingsCache(id);
+  return peekSettings(id);
 }

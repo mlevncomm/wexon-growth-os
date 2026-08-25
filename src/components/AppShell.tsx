@@ -73,12 +73,20 @@ function DockIco({ href }: { href: string }) {
   );
 }
 
+type Me = {
+  email?: string;
+  role?: string;
+  tenantName?: string | null;
+  impersonating?: boolean;
+};
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [queueOpen, setQueueOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const [stats, setStats] = useState<Stats | null>(null);
+  const [me, setMe] = useState<Me | null>(null);
   const [q, setQ] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
   const campaign = stats?.lastCampaign;
@@ -123,6 +131,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       document.removeEventListener("visibilitychange", onVis);
     };
   }, [scanning]);
+
+  useEffect(() => {
+    void fetch("/api/me", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((json: Me) => setMe(json))
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     const onOpen = () => setQueueOpen(true);
@@ -170,7 +185,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     router.push(`/musteriler?q=${encodeURIComponent(q.trim())}`);
   }
 
+  function stopImpersonate() {
+    void fetch("/api/platform", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "stop-impersonate" }),
+    }).then(() => {
+      window.location.href = "/platform";
+    });
+  }
+
   return (
+    <>
+      {me?.impersonating ? (
+        <div className="impersonate-bar">
+          <span>{me.tenantName || "İşletme"} olarak görüntülüyorsunuz</span>
+          <button type="button" onClick={stopImpersonate}>
+            Panele dön
+          </button>
+        </div>
+      ) : null}
     <div className={`os${queueOpen ? " queue-open" : ""}${navOpen ? " nav-open" : ""}`}>
       <NavRail
         queueOpen={queueOpen}
@@ -179,6 +213,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         places={Boolean(stats?.hasPlacesKey)}
         waCloud={Boolean(stats?.waCloud)}
         waLocal={stats?.waLocal ?? "disconnected"}
+        tenantName={me?.tenantName || "Wexon"}
+        email={me?.email || ""}
       />
       <div className="os-stage">
         <header className="os-top">
@@ -257,5 +293,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <button type="button" className="nav-backdrop" aria-label="Menüyü kapat" onClick={() => setNavOpen(false)} />
       <button type="button" className="queue-backdrop" aria-label="Kuyruğu kapat" onClick={() => setQueueOpen(false)} />
     </div>
+    </>
   );
 }

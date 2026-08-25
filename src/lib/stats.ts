@@ -1,5 +1,6 @@
 import { prisma } from "./prisma";
 import { peekSettings } from "./settings";
+import { tenantId, tryTenantId } from "./tenant";
 
 export type DashboardStats = {
   leadsTotal: number;
@@ -24,10 +25,15 @@ export type DashboardStats = {
 };
 
 const g = globalThis as unknown as {
-  __wexonStats?: { at: number; data: DashboardStats };
+  __wexonStats?: Map<string, { at: number; data: DashboardStats }>;
 };
 
 const TTL_MS = 3_000;
+
+function cache(): Map<string, { at: number; data: DashboardStats }> {
+  if (!g.__wexonStats) g.__wexonStats = new Map();
+  return g.__wexonStats;
+}
 
 function todayIstanbul(): Date {
   const now = new Date();
@@ -43,16 +49,18 @@ function todayIstanbul(): Date {
   return new Date(`${y}-${m}-${d}T00:00:00+03:00`);
 }
 
-export async function loadDashboardStats(force = false): Promise<DashboardStats> {
-  const hit = g.__wexonStats;
+export async function loadDashboardStats(force = false, explicitTenantId?: string): Promise<DashboardStats> {
+  const id = explicitTenantId ?? tenantId();
+  const hit = cache().get(id);
   if (!force && hit && Date.now() - hit.at < TTL_MS) return hit.data;
 
   const start = todayIstanbul();
   const postgres = /postgres/i.test(process.env.DATABASE_URL ?? "");
 
   const [settings, lastCampaign, counts] = await Promise.all([
-    peekSettings(),
+    peekSettings(id),
     prisma.campaign.findFirst({
+      where: { tenantId: id },
       orderBy: { createdAt: "desc" },
       select: {
         query: true,
@@ -76,13 +84,13 @@ export async function loadDashboardStats(force = false): Promise<DashboardStats>
           }>
         >`
           SELECT
-            (SELECT COUNT(*)::int FROM "Lead") AS "leadsTotal",
-            (SELECT COUNT(*)::int FROM "Lead" WHERE "createdAt" >= ${start}) AS "leadsToday",
-            (SELECT COUNT(*)::int FROM "Campaign" WHERE "createdAt" >= ${start}) AS "campaignsToday",
-            (SELECT COUNT(*)::int FROM "OutreachJob" WHERE status IN ('queued', 'sending', 'pending')) AS queued,
-            (SELECT COUNT(*)::int FROM "OutreachJob" WHERE status = 'sent' AND "sentAt" >= ${start}) AS "sentToday",
-            (SELECT COUNT(*)::int FROM "Lead" WHERE status = 'yeni') AS yeni,
-            (SELECT COUNT(*)::int FROM "Lead" WHERE status = 'yazildi') AS yazildi
+            (SELECT COUNT(*)::int FROM "Lead" WHERE "tenantId" = ${id}) AS "leadsTotal",
+            (SELECT COUNT(*)::int FROM "Lead" WHERE "tenantId" = ${id} AND "createdAt" >= ${start}) AS "leadsToday",
+            (SELECT COUNT(*)::int FROM "Campaign" WHERE "tenantId" = ${id} AND "createdAt" >= ${start}) AS "campaignsToday",
+            (SELECT COUNT(*)::int FROM "OutreachJob" WHERE "tenantId" = ${id} AND status IN ('queued', 'sending', 'pending')) AS queued,
+            (SELECT COUNT(*)::int FROM "OutreachJob" WHERE "tenantId" = ${id} AND status = 'sent' AND "sentAt" >= ${start}) AS "sentToday",
+            (SELECT COUNT(*)::int FROM "Lead" WHERE "tenantId" = ${id} AND status = 'yeni') AS yeni,
+            (SELECT COUNT(*)::int FROM "Lead" WHERE "tenantId" = ${id} AND status = 'yazildi') AS yazildi
         `.then((rows) => {
           const row = rows[0];
           return {
@@ -96,13 +104,13 @@ export async function loadDashboardStats(force = false): Promise<DashboardStats>
           };
         })
       : Promise.all([
-          prisma.lead.count(),
-          prisma.lead.count({ where: { createdAt: { gte: start } } }),
-          prisma.campaign.count({ where: { createdAt: { gte: start } } }),
-          prisma.outreachJob.count({ where: { status: { in: ["queued", "sending", "pending"] } } }),
-          prisma.outreachJob.count({ where: { status: "sent", sentAt: { gte: start } } }),
-          prisma.lead.count({ where: { status: "yeni" } }),
-          prisma.lead.count({ where: { status: "yazildi" } }),
+          prisma.lead.count({ where: { tenantId: id } }),
+          prisma.lead.count({ where: { tenantId: id, createdAt: { gte: start } } }),
+          prisma.campaign.count({ where: { tenantId: id, createdAt: { gte: start } } }),
+          prisma.outreachJob.count({ where: { tenantId: id, status: { in: ["queued", "sending", "pending"] } } }),
+          prisma.outreachJob.count({ where: { tenantId: id, status: "sent", sentAt: { gte: start } } }),
+          prisma.lead.count({ where: { tenantId: id, status: "yeni" } }),
+          prisma.lead.count({ where: { tenantId: id, status: "yazildi" } }),
         ]).then(([leadsTotal, leadsToday, campaignsToday, queued, sentToday, yeni, yazildi]) => ({
           leadsTotal,
           leadsToday,
@@ -130,10 +138,12 @@ export async function loadDashboardStats(force = false): Promise<DashboardStats>
   };
 
   const scanning = data.lastCampaign && (data.lastCampaign.status === "running" || data.lastCampaign.status === "queued");
-  g.__wexonStats = { at: scanning ? Date.now() - TTL_MS + 1_200 : Date.now(), data };
+  cache().set(id, { at: scanning ? Date.now() - TTL_MS + 1_200 : Date.now(), data });
   return data;
 }
 
-export function bustStatsCache() {
-  g.__wexonStats = undefined;
+export function bustStatsCache(id?: string) {
+  const key = id ?? tryTenantId();
+  if (key) cache().delete(key);
+  else cache().clear();
 }

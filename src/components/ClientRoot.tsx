@@ -7,7 +7,7 @@ import { ToastProvider } from "./Toast";
 
 export function ClientRoot({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  if (pathname.startsWith("/giris")) {
+  if (pathname.startsWith("/giris") || pathname === "/platform" || pathname.startsWith("/platform/")) {
     return <ToastProvider>{children}</ToastProvider>;
   }
   return <RuntimeShell>{children}</RuntimeShell>;

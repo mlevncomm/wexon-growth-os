@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { readJson } from "@/lib/http";
+import { hashPassword, verifyPassword } from "@/lib/password";
+import { prisma } from "@/lib/prisma";
+import { ensureTenants } from "@/lib/campaigns";
 import {
   authConfigured,
   credentialsMatch,
@@ -8,6 +11,7 @@ import {
   sessionCookie,
   SESSION_COOKIE,
 } from "@/lib/session";
+import type { UserRole } from "@/lib/verticals";
 
 export const dynamic = "force-dynamic";
 
@@ -25,12 +29,21 @@ function limited(ip: string): boolean {
   return row.n > 12;
 }
 
+function homeFor(role: UserRole, tenantId: string | null, impersonatorId?: string) {
+  if (role === "platform" && !impersonatorId && !tenantId) return "/platform";
+  return "/";
+}
+
 export async function GET() {
   const session = await readSession();
   return NextResponse.json({
     ok: Boolean(session),
     email: session?.email ?? null,
+    role: session?.role ?? null,
+    tenantId: session?.tenantId ?? null,
+    impersonating: Boolean(session?.impersonatorId),
     configured: authConfigured(),
+    home: session ? homeFor(session.role, session.tenantId, session.impersonatorId) : "/giris",
   });
 }
 
@@ -41,19 +54,57 @@ export async function POST(request: Request) {
   }
   if (!authConfigured()) {
     return NextResponse.json(
-      { error: "Admin bilgisi yok. AUTH_SECRET, ADMIN_EMAIL ve ADMIN_PASSWORD yazın." },
+      { error: "AUTH_SECRET eksik. Ortam değişkenine en az 16 karakter yazın." },
       { status: 400 },
     );
   }
   const body = await readJson<{ email?: string; password?: string }>(request);
-  const email = typeof body?.email === "string" ? body.email : "";
+  const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
   const password = typeof body?.password === "string" ? body.password : "";
-  if (!credentialsMatch(email, password)) {
+  if (!email || !password) {
+    return NextResponse.json({ error: "E-posta ve şifre gerekli." }, { status: 400 });
+  }
+
+  await ensureTenants();
+  let user = await prisma.user.findUnique({ where: { email } });
+  if (user) {
+    const ok = await verifyPassword(password, user.passwordHash);
+    if (!ok) {
+      return NextResponse.json({ error: "E-posta veya şifre hatalı." }, { status: 401 });
+    }
+  } else if (credentialsMatch(email, password)) {
+    user = await prisma.user.create({
+      data: {
+        email,
+        passwordHash: await hashPassword(password),
+        role: "platform",
+      },
+    });
+  } else {
     return NextResponse.json({ error: "E-posta veya şifre hatalı." }, { status: 401 });
   }
-  const res = NextResponse.json({ ok: true, email: email.trim().toLowerCase() });
-  const cookie = sessionCookie(encodeSession(email.trim().toLowerCase()));
-  res.cookies.set(cookie);
+
+  const role: UserRole = user.role === "platform" ? "platform" : "member";
+  if (role === "member") {
+    if (!user.tenantId) {
+      return NextResponse.json({ error: "Bu hesaba işletme bağlı değil." }, { status: 403 });
+    }
+    const tenant = await prisma.tenant.findUnique({ where: { id: user.tenantId } });
+    if (!tenant?.active) {
+      return NextResponse.json({ error: "İşletme kapalı." }, { status: 403 });
+    }
+  }
+
+  const tenantId = role === "member" ? user.tenantId : null;
+  const token = encodeSession({
+    userId: user.id,
+    email: user.email,
+    tenantId,
+    role,
+  });
+  const home = homeFor(role, tenantId);
+  const res = NextResponse.json({ ok: true, email: user.email, role, home });
+  res.cookies.set(sessionCookie(token));
   return res;
 }
 

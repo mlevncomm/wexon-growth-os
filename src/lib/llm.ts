@@ -1,5 +1,6 @@
-import { COPY_ANGLES, generateSalesCopy, type CopyAngle } from "./copy-ai";
+import { copyAngles, generateSalesCopy, type CopyAngle } from "./copy-ai";
 import { playbookToPrompt, type Playbook } from "./playbook";
+import { productLine, type Vertical } from "./verticals";
 
 export const LLM_PROVIDERS = [
   {
@@ -180,8 +181,8 @@ export function parseCopyLoose(raw: string): { name: string; body: string } | nu
   return { name: name || "AI şablon", body };
 }
 
-export function sanitizeCopy(input: { name: string; body: string }, angle: CopyAngle) {
-  const fallback = generateSalesCopy(angle);
+export function sanitizeCopy(input: { name: string; body: string }, angle: CopyAngle, vertical: Vertical = "water") {
+  const fallback = generateSalesCopy(angle, vertical);
   let name = input.name.replace(/\s+/g, " ").trim().slice(0, 80) || fallback.name;
   let body = input.body.replace(/\s+\n/g, "\n").trim();
   if (!body) body = fallback.body;
@@ -210,15 +211,15 @@ export function copyNeedsRewrite(body: string, playbook?: Playbook): boolean {
   return false;
 }
 
-function angleLabel(angle: CopyAngle): string {
-  return COPY_ANGLES.find((a) => a.id === angle)?.label ?? angle;
+function angleLabel(angle: CopyAngle, vertical: Vertical = "water"): string {
+  return copyAngles(vertical).find((a) => a.id === angle)?.label ?? angle;
 }
 
-function buildPrompt(angle: CopyAngle, brief: string, playbook?: Playbook): string {
+function buildPrompt(angle: CopyAngle, brief: string, playbook?: Playbook, vertical: Vertical = "water"): string {
   const extra = brief.trim() ? `Ek istek: ${brief.trim().slice(0, 400)}` : "";
   const book = playbookToPrompt(playbook ?? { tone: "", rules: "", forbidden: "", offer: "", cta: "" });
-  return `WhatsApp B2B satış mesajı yaz. Ürün: su arıtma cihazı (restoran, otel, kafe, klinik, ofis).
-Rakip filtre satıcısına yazma. Açı: ${angleLabel(angle)}.
+  return `WhatsApp B2B satış mesajı yaz. Ürün: ${productLine(vertical)}.
+Rakibe yazma. Açı: ${angleLabel(angle, vertical)}.
 Türkçe, 2-3 cümle, profesyonel ve nazik. {ad} ve {ilçe} yer tutucuları aynen kalsın.
 İYS, onay, izin varmış gibi yazma. Fiyat uydurma. CTA: keşif randevusu veya kısa görüşme.
 ${book}
@@ -244,7 +245,9 @@ export async function generateLlmCopy(opts: {
   angle: CopyAngle;
   brief?: string;
   playbook?: Playbook;
+  vertical?: Vertical;
 }): Promise<{ name: string; body: string }> {
+  const vertical = opts.vertical ?? "water";
   const first = await llmChat({
     apiKey: opts.apiKey,
     baseUrl: opts.baseUrl,
@@ -252,12 +255,12 @@ export async function generateLlmCopy(opts: {
     json: true,
     messages: [
       { role: "system", content: "Cevabın tek bir JSON nesnesi olsun. Başka metin yazma." },
-      { role: "user", content: buildPrompt(opts.angle, opts.brief ?? "", opts.playbook) },
+      { role: "user", content: buildPrompt(opts.angle, opts.brief ?? "", opts.playbook, vertical) },
     ],
   });
   let parsed = parseCopyJson(first) ?? parseCopyLoose(first);
   if (!parsed) throw new Error("AI şablon JSON üretmedi");
-  let copy = sanitizeCopy(parsed, opts.angle);
+  let copy = sanitizeCopy(parsed, opts.angle, vertical);
   if (!copyNeedsRewrite(copy.body, opts.playbook)) return copy;
 
   const second = await llmChat({
@@ -272,7 +275,7 @@ export async function generateLlmCopy(opts: {
     ],
   });
   parsed = parseCopyJson(second) ?? parseCopyLoose(second);
-  if (parsed) copy = sanitizeCopy(parsed, opts.angle);
+  if (parsed) copy = sanitizeCopy(parsed, opts.angle, vertical);
   return copy;
 }
 
@@ -283,9 +286,11 @@ export async function generateLlmReply(opts: {
   inbound: string;
   username?: string;
   playbook?: Playbook;
+  vertical?: Vertical;
 }): Promise<string> {
   const book = playbookToPrompt(opts.playbook ?? { tone: "", rules: "", forbidden: "", offer: "", cta: "" });
   const who = opts.username ? `Gönderen: ${opts.username}` : "";
+  const product = productLine(opts.vertical ?? "water");
   const text = await llmChat({
     apiKey: opts.apiKey,
     baseUrl: opts.baseUrl,
@@ -296,7 +301,7 @@ export async function generateLlmReply(opts: {
       { role: "system", content: "Cevabın tek bir JSON nesnesi olsun. Başka metin yazma." },
       {
         role: "user",
-        content: `Instagram DM yanıt taslağı yaz. Ürün: su arıtma cihazı, B2B.
+        content: `Instagram DM yanıt taslağı yaz. Ürün: ${product}.
 Gelen mesajı nazikçe cevapla; soğuk satış spamı yapma. 2-3 cümle, Türkçe.
 İYS/onay iddiası yok. Keşif veya net soru ile bitir.
 ${book}
@@ -310,7 +315,7 @@ Gelen: ${opts.inbound.slice(0, 800)}
   const body = typeof parsed?.body === "string" ? parsed.body.trim() : "";
   if (body) return body.slice(0, 900);
   const fallback = text.replace(/[{}"']/g, " ").replace(/\s+/g, " ").trim();
-  return (fallback || "Merhaba, mesajınız için teşekkürler. Uygun bir saatte su arıtma ihtiyacınızı konuşabilir miyiz?").slice(0, 900);
+  return (fallback || "Merhaba, mesajınız için teşekkürler. Uygun bir saatte ihtiyacınızı konuşabilir miyiz?").slice(0, 900);
 }
 
 export async function pingLlm(opts: {

@@ -8,6 +8,7 @@ import {
   SESSION_COOKIE,
 } from "./session-token";
 
+export type { Session } from "./session-token";
 export {
   authConfigured,
   credentialsMatch,

@@ -2,9 +2,12 @@ import { generateLlmCopy, llmChat, parseJsonObject } from "./llm";
 import { prisma } from "./prisma";
 import { getPlaybook, mergePlaybook, playbookIsActive, savePlaybook, type Playbook } from "./playbook";
 import { getSettings } from "./settings";
+import { currentTenant, tenantId } from "./tenant";
+import { coachSystemPrompt } from "./verticals";
 
 export async function listCoachMessages() {
   return prisma.coachMessage.findMany({
+    where: { tenantId: tenantId() },
     orderBy: { createdAt: "asc" },
     take: 80,
   });
@@ -30,7 +33,7 @@ export async function coachSnapshot() {
 }
 
 export async function resetCoach(resetPlaybook = false) {
-  await prisma.coachMessage.deleteMany();
+  await prisma.coachMessage.deleteMany({ where: { tenantId: tenantId() } });
   if (resetPlaybook) {
     await savePlaybook({ tone: "", rules: "", forbidden: "", offer: "", cta: "" });
   }
@@ -41,18 +44,19 @@ export async function coachTurn(userText: string) {
   const text = userText.trim().slice(0, 2000);
   if (!text) throw new Error("Mesaj boş");
 
-  await prisma.coachMessage.create({ data: { role: "user", body: text } });
+  await prisma.coachMessage.create({ data: { tenantId: tenantId(), role: "user", body: text } });
   const settings = await getSettings();
   const current = await getPlaybook();
 
   if (!settings.llmApiKey) {
     const reply =
       "AI anahtarı yok. Sistem ekranına Groq (veya başka) anahtar yazın; sonra ton, yasak kelime ve CTA’yı buradan öğretebilirsiniz.";
-    await prisma.coachMessage.create({ data: { role: "assistant", body: reply } });
+    await prisma.coachMessage.create({ data: { tenantId: tenantId(), role: "assistant", body: reply } });
     return coachSnapshot();
   }
 
   const history = await prisma.coachMessage.findMany({
+    where: { tenantId: tenantId() },
     orderBy: { createdAt: "desc" },
     take: 16,
   });
@@ -69,8 +73,7 @@ export async function coachTurn(userText: string) {
       messages: [
         {
           role: "system",
-          content:
-            "Wexon su arıtma B2B marka koçusun. Kullanıcı Türkçe konuşur. Kuralları öğren, playbook’u güncelle, kısa onayla.",
+          content: coachSystemPrompt(currentTenant().vertical),
         },
         {
           role: "user",
@@ -91,11 +94,11 @@ Değişmeyen alanlara "_keep" yaz.
       "Not aldım. Şablon üretiminde bu kurallar kullanılacak.";
     const next = mergePlaybook(current, parsed?.playbook);
     await savePlaybook(next);
-    await prisma.coachMessage.create({ data: { role: "assistant", body: reply.slice(0, 2000) } });
+    await prisma.coachMessage.create({ data: { tenantId: tenantId(), role: "assistant", body: reply.slice(0, 2000) } });
   } catch (err) {
     const message = err instanceof Error ? err.message : "AI yanıt vermedi";
     await prisma.coachMessage.create({
-      data: { role: "assistant", body: `Kaydedemedim: ${message}` },
+      data: { tenantId: tenantId(), role: "assistant", body: `Kaydedemedim: ${message}` },
     });
   }
   return coachSnapshot();
@@ -114,5 +117,6 @@ export async function copyWithPlaybook(opts: {
     angle: opts.angle,
     brief: opts.brief,
     playbook,
+    vertical: currentTenant().vertical,
   });
 }

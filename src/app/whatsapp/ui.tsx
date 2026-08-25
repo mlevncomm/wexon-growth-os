@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
-import { COPY_ANGLES, generateSalesCopy, type CopyAngle } from "@/lib/copy-ai";
 import { renderTemplate } from "@/lib/templates";
 import { ChipStrip } from "@/components/ChipStrip";
 import { ConnectGuide } from "@/components/ConnectGuide";
 import { useToast } from "@/components/Toast";
 
+type CopyAngle = { id: string; label: string };
 type Template = { id: string; name: string; body: string };
 type WaInfo = {
   cloud: boolean;
@@ -14,7 +14,6 @@ type WaInfo = {
   local: { state: string; qrDataUrl: string | null; error: string | null };
 };
 
-const starter = generateSalesCopy("kirec");
 const SAMPLE = {
   name: "Moda Restoran",
   address: "Caferağa",
@@ -34,9 +33,10 @@ function statusLabel(state: string) {
 export default function OutreachPage() {
   const toast = useToast();
   const [templates, setTemplates] = useState<Template[]>([]);
-  const [name, setName] = useState(starter.name);
-  const [body, setBody] = useState(starter.body);
-  const [angle, setAngle] = useState<CopyAngle>("kirec");
+  const [angles, setAngles] = useState<CopyAngle[]>([]);
+  const [name, setName] = useState("");
+  const [body, setBody] = useState("");
+  const [angle, setAngle] = useState("");
   const [wa, setWa] = useState<WaInfo | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -63,6 +63,8 @@ export default function OutreachPage() {
     setWa(w);
     setHasLlm(Boolean(c?.hasLlm));
     setPlaybookActive(Boolean(c?.playbookActive));
+    if (Array.isArray(c?.angles)) setAngles(c.angles);
+    if (!angle && typeof c?.defaultAngle === "string") setAngle(c.defaultAngle);
     setLoading(false);
     if (w?.local?.state === "qr" || w?.local?.state === "ready") setConnecting(false);
   }
@@ -85,7 +87,7 @@ export default function OutreachPage() {
     };
   }, [wa?.serverless, wa?.local.state, connecting]);
 
-  async function applyAngle(next: CopyAngle) {
+  async function applyAngle(next: string) {
     setAngle(next);
     setCopyBusy(true);
     try {
@@ -100,11 +102,8 @@ export default function OutreachPage() {
       setBody(json.body);
       setCopySource(json.source === "ai" ? "ai" : "local");
       if (json.warning) toast.push(json.warning, "bad");
-    } catch {
-      const local = generateSalesCopy(next);
-      setName(local.name);
-      setBody(local.body);
-      setCopySource("local");
+    } catch (err) {
+      toast.push(err instanceof Error ? err.message : "Metin üretilemedi", "bad");
     } finally {
       setCopyBusy(false);
     }
@@ -229,7 +228,7 @@ export default function OutreachPage() {
             <div className="field">
               <span>Açı</span>
               <ChipStrip>
-                {COPY_ANGLES.map((a) => (
+                {angles.map((a) => (
                   <button
                     key={a.id}
                     type="button"

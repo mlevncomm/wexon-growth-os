@@ -3,103 +3,94 @@ import { badRequest, readJson } from "@/lib/http";
 import { getSettings, updateSettings } from "@/lib/settings";
 import { bustStatsCache } from "@/lib/stats";
 import { deployHints } from "@/lib/platform";
-import { denyIfGuest } from "@/lib/session";
+import { withTenant } from "@/lib/tenant";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
-  const denied = await denyIfGuest();
-  if (denied) return denied;
-  const settings = await getSettings();
-  const deploy = deployHints();
-  return NextResponse.json({
-    ...settings,
-    googlePlacesApiKey: settings.googlePlacesApiKey ? mask(settings.googlePlacesApiKey) : "",
-    waCloudToken: settings.waCloudToken ? mask(settings.waCloudToken) : "",
-    llmApiKey: settings.llmApiKey ? mask(settings.llmApiKey) : "",
-    igAccessToken: settings.igAccessToken ? mask(settings.igAccessToken) : "",
-    igWebhookVerifyToken: settings.igWebhookVerifyToken ? mask(settings.igWebhookVerifyToken) : "",
-    hasPlacesKey: Boolean(settings.googlePlacesApiKey),
-    hasCloudToken: Boolean(settings.waCloudToken),
-    hasPhoneNumberId: Boolean(settings.waPhoneNumberId),
-    hasLlmKey: Boolean(settings.llmApiKey),
-    hasIgToken: Boolean(settings.igAccessToken),
-    hasIgUserId: Boolean(settings.igUserId),
-    ...deploy,
+function payload() {
+  return getSettings().then(async (settings) => {
+    const deploy = deployHints();
+    return {
+      ...settings,
+      googlePlacesApiKey: settings.googlePlacesApiKey ? mask(settings.googlePlacesApiKey) : "",
+      waCloudToken: settings.waCloudToken ? mask(settings.waCloudToken) : "",
+      llmApiKey: settings.llmApiKey ? mask(settings.llmApiKey) : "",
+      igAccessToken: settings.igAccessToken ? mask(settings.igAccessToken) : "",
+      igWebhookVerifyToken: settings.igWebhookVerifyToken ? mask(settings.igWebhookVerifyToken) : "",
+      hasPlacesKey: Boolean(settings.googlePlacesApiKey),
+      hasCloudToken: Boolean(settings.waCloudToken),
+      hasPhoneNumberId: Boolean(settings.waPhoneNumberId),
+      hasLlmKey: Boolean(settings.llmApiKey),
+      hasIgToken: Boolean(settings.igAccessToken),
+      hasIgUserId: Boolean(settings.igUserId),
+      ...deploy,
+    };
   });
 }
 
+export async function GET() {
+  return withTenant(async () => NextResponse.json(await payload()));
+}
+
 export async function PUT(request: Request) {
-  const denied = await denyIfGuest();
-  if (denied) return denied;
-  const body = await readJson<Record<string, unknown>>(request);
-  if (!body) return badRequest("Geçersiz istek.");
-  const patch: Parameters<typeof updateSettings>[0] = {};
+  return withTenant(async (ctx) => {
+    const body = await readJson<Record<string, unknown>>(request);
+    if (!body) return badRequest("Geçersiz istek.");
+    const patch: Parameters<typeof updateSettings>[0] = {};
 
-  if (typeof body.googlePlacesApiKey === "string" && !isMasked(body.googlePlacesApiKey)) {
-    patch.googlePlacesApiKey = body.googlePlacesApiKey.trim();
-  }
-  if (typeof body.waCloudToken === "string" && !isMasked(body.waCloudToken)) {
-    patch.waCloudToken = body.waCloudToken.trim();
-  }
-  if (typeof body.waPhoneNumberId === "string") {
-    patch.waPhoneNumberId = body.waPhoneNumberId.trim();
-  }
-  if (typeof body.llmApiKey === "string" && !isMasked(body.llmApiKey)) {
-    patch.llmApiKey = body.llmApiKey.trim();
-  }
-  if (typeof body.llmBaseUrl === "string") {
-    patch.llmBaseUrl = body.llmBaseUrl.trim().replace(/\/+$/, "");
-  }
-  if (typeof body.llmModel === "string") {
-    patch.llmModel = body.llmModel.trim();
-  }
-  if (typeof body.llmProvider === "string") {
-    patch.llmProvider = body.llmProvider.trim().slice(0, 32);
-  }
-  if (typeof body.igAccessToken === "string" && !isMasked(body.igAccessToken)) {
-    patch.igAccessToken = body.igAccessToken.trim();
-  }
-  if (typeof body.igUserId === "string") {
-    patch.igUserId = body.igUserId.trim();
-  }
-  if (typeof body.igWebhookVerifyToken === "string" && !isMasked(body.igWebhookVerifyToken)) {
-    patch.igWebhookVerifyToken = body.igWebhookVerifyToken.trim();
-  }
-  if (typeof body.delayMinSec === "number") {
-    patch.delayMinSec = Math.max(8, Math.min(120, body.delayMinSec));
-  }
-  if (typeof body.delayMaxSec === "number") {
-    patch.delayMaxSec = Math.max(8, Math.min(180, body.delayMaxSec));
-  }
-  if (typeof body.dailyCap === "number") {
-    patch.dailyCap = Math.max(1, Math.min(200, body.dailyCap));
-  }
+    if (typeof body.googlePlacesApiKey === "string" && !isMasked(body.googlePlacesApiKey)) {
+      patch.googlePlacesApiKey = body.googlePlacesApiKey.trim();
+    }
+    if (typeof body.waCloudToken === "string" && !isMasked(body.waCloudToken)) {
+      patch.waCloudToken = body.waCloudToken.trim();
+    }
+    if (typeof body.waPhoneNumberId === "string") {
+      patch.waPhoneNumberId = body.waPhoneNumberId.trim();
+    }
+    if (typeof body.llmApiKey === "string" && !isMasked(body.llmApiKey)) {
+      patch.llmApiKey = body.llmApiKey.trim();
+    }
+    if (typeof body.llmBaseUrl === "string") {
+      patch.llmBaseUrl = body.llmBaseUrl.trim().replace(/\/+$/, "");
+    }
+    if (typeof body.llmModel === "string") {
+      patch.llmModel = body.llmModel.trim();
+    }
+    if (typeof body.llmProvider === "string") {
+      patch.llmProvider = body.llmProvider.trim().slice(0, 32);
+    }
+    if (typeof body.igAccessToken === "string" && !isMasked(body.igAccessToken)) {
+      patch.igAccessToken = body.igAccessToken.trim();
+    }
+    if (typeof body.igUserId === "string") {
+      patch.igUserId = body.igUserId.trim();
+    }
+    if (typeof body.igWebhookVerifyToken === "string" && !isMasked(body.igWebhookVerifyToken)) {
+      patch.igWebhookVerifyToken = body.igWebhookVerifyToken.trim();
+    }
+    if (typeof body.delayMinSec === "number") {
+      patch.delayMinSec = Math.max(8, Math.min(120, body.delayMinSec));
+    }
+    if (typeof body.delayMaxSec === "number") {
+      patch.delayMaxSec = Math.max(8, Math.min(180, body.delayMaxSec));
+    }
+    if (typeof body.dailyCap === "number") {
+      patch.dailyCap = Math.max(1, Math.min(200, body.dailyCap));
+    }
 
-  if (
-    patch.delayMinSec != null &&
-    patch.delayMaxSec != null &&
-    patch.delayMinSec > patch.delayMaxSec
-  ) {
-    const tmp = patch.delayMinSec;
-    patch.delayMinSec = patch.delayMaxSec;
-    patch.delayMaxSec = tmp;
-  }
+    if (
+      patch.delayMinSec != null &&
+      patch.delayMaxSec != null &&
+      patch.delayMinSec > patch.delayMaxSec
+    ) {
+      const tmp = patch.delayMinSec;
+      patch.delayMinSec = patch.delayMaxSec;
+      patch.delayMaxSec = tmp;
+    }
 
-  const settings = await updateSettings(patch);
-  bustStatsCache();
-  return NextResponse.json({
-    ...settings,
-    googlePlacesApiKey: settings.googlePlacesApiKey ? mask(settings.googlePlacesApiKey) : "",
-    waCloudToken: settings.waCloudToken ? mask(settings.waCloudToken) : "",
-    llmApiKey: settings.llmApiKey ? mask(settings.llmApiKey) : "",
-    igAccessToken: settings.igAccessToken ? mask(settings.igAccessToken) : "",
-    igWebhookVerifyToken: settings.igWebhookVerifyToken ? mask(settings.igWebhookVerifyToken) : "",
-    hasPlacesKey: Boolean(settings.googlePlacesApiKey),
-    hasCloudToken: Boolean(settings.waCloudToken),
-    hasLlmKey: Boolean(settings.llmApiKey),
-    hasIgToken: Boolean(settings.igAccessToken),
-    hasIgUserId: Boolean(settings.igUserId),
+    await updateSettings(patch);
+    bustStatsCache(ctx.tenantId);
+    return NextResponse.json(await payload());
   });
 }
 

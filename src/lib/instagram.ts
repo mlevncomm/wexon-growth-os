@@ -2,6 +2,7 @@ import { prisma } from "./prisma";
 import { generateLlmReply } from "./llm";
 import { getPlaybook } from "./playbook";
 import { getSettings } from "./settings";
+import { currentTenant, tenantId } from "./tenant";
 
 const GRAPH = "https://graph.facebook.com/v21.0";
 
@@ -64,22 +65,28 @@ export async function upsertInbound(opts: {
 }): Promise<{ id: string; draft: string }> {
   const id = opts.igsid;
   const at = opts.at ?? new Date();
-  const thread = await prisma.igThread.upsert({
-    where: { id },
-    update: {
-      igsid: opts.igsid,
-      username: opts.username ?? undefined,
-      lastText: opts.text.slice(0, 500),
-      lastAt: at,
-    },
-    create: {
-      id,
-      igsid: opts.igsid,
-      username: opts.username ?? "",
-      lastText: opts.text.slice(0, 500),
-      lastAt: at,
-    },
+  const owner = tenantId();
+  const existing = await prisma.igThread.findUnique({
+    where: { tenantId_igsid: { tenantId: owner, igsid: id } },
   });
+  const thread = existing
+    ? await prisma.igThread.update({
+        where: { id: existing.id },
+        data: {
+          username: opts.username ?? undefined,
+          lastText: opts.text.slice(0, 500),
+          lastAt: at,
+        },
+      })
+    : await prisma.igThread.create({
+        data: {
+          tenantId: owner,
+          igsid: id,
+          username: opts.username ?? "",
+          lastText: opts.text.slice(0, 500),
+          lastAt: at,
+        },
+      });
   await prisma.igMessage.create({
     data: { threadId: thread.id, direction: "in", body: opts.text.slice(0, 2000), createdAt: at },
   });
@@ -95,6 +102,7 @@ export async function upsertInbound(opts: {
         inbound: opts.text,
         username: opts.username || thread.username,
         playbook: await getPlaybook(),
+        vertical: currentTenant().vertical,
       });
       await prisma.igThread.update({ where: { id: thread.id }, data: { draft } });
     } catch {
@@ -123,7 +131,7 @@ export async function refreshIgInbox(): Promise<{ threads: Awaited<ReturnType<ty
       const text = last?.message?.trim() || "";
       const at = last?.created_time ? new Date(last.created_time) : conv.updated_time ? new Date(conv.updated_time) : new Date();
       await prisma.igThread.upsert({
-        where: { id: igsid },
+        where: { tenantId_igsid: { tenantId: tenantId(), igsid } },
         update: {
           igsid,
           username: peer?.username || peer?.name || undefined,
@@ -131,7 +139,7 @@ export async function refreshIgInbox(): Promise<{ threads: Awaited<ReturnType<ty
           lastAt: at,
         },
         create: {
-          id: igsid,
+          tenantId: tenantId(),
           igsid,
           username: peer?.username || peer?.name || "",
           lastText: text.slice(0, 500),
@@ -139,12 +147,16 @@ export async function refreshIgInbox(): Promise<{ threads: Awaited<ReturnType<ty
         },
       });
       if (text) {
+        const thread = await prisma.igThread.findUnique({
+          where: { tenantId_igsid: { tenantId: tenantId(), igsid } },
+        });
+        if (!thread) continue;
         const exists = await prisma.igMessage.findFirst({
-          where: { threadId: igsid, body: text, direction: "in" },
+          where: { threadId: thread.id, body: text, direction: "in" },
         });
         if (!exists) {
           await prisma.igMessage.create({
-            data: { threadId: igsid, direction: "in", body: text.slice(0, 2000), createdAt: at },
+            data: { threadId: thread.id, direction: "in", body: text.slice(0, 2000), createdAt: at },
           });
         }
       }
@@ -158,6 +170,7 @@ export async function refreshIgInbox(): Promise<{ threads: Awaited<ReturnType<ty
 
 export async function listLocalThreads() {
   const rows = await prisma.igThread.findMany({
+    where: { tenantId: tenantId() },
     orderBy: [{ lastAt: "desc" }, { updatedAt: "desc" }],
     take: 40,
     include: { messages: { orderBy: { createdAt: "desc" }, take: 12 } },
@@ -177,14 +190,16 @@ export async function listLocalThreads() {
 }
 
 export async function saveDraft(threadId: string, draft: string) {
+  const row = await prisma.igThread.findFirst({ where: { id: threadId, tenantId: tenantId() } });
+  if (!row) throw new Error("Konuşma bulunamadı");
   await prisma.igThread.update({
-    where: { id: threadId },
+    where: { id: row.id },
     data: { draft: draft.slice(0, 2000) },
   });
 }
 
 export async function approveAndSend(threadId: string, text: string) {
-  const thread = await prisma.igThread.findUnique({ where: { id: threadId } });
+  const thread = await prisma.igThread.findFirst({ where: { id: threadId, tenantId: tenantId() } });
   if (!thread) throw new Error("Konuşma bulunamadı");
   const igsid = thread.igsid || thread.id;
   const body = text.trim();
@@ -200,8 +215,8 @@ export async function approveAndSend(threadId: string, text: string) {
 }
 
 export async function draftForThread(threadId: string, inbound?: string): Promise<string> {
-  const thread = await prisma.igThread.findUnique({
-    where: { id: threadId },
+  const thread = await prisma.igThread.findFirst({
+    where: { id: threadId, tenantId: tenantId() },
     include: { messages: { orderBy: { createdAt: "desc" }, take: 1 } },
   });
   if (!thread) throw new Error("Konuşma bulunamadı");
@@ -216,7 +231,59 @@ export async function draftForThread(threadId: string, inbound?: string): Promis
     inbound: lastIn,
     username: thread.username,
     playbook: await getPlaybook(),
+    vertical: currentTenant().vertical,
   });
   await prisma.igThread.update({ where: { id: thread.id }, data: { draft } });
   return draft;
 }
+
+export async function recordOutbound(opts: { igsid: string; text: string; username?: string }) {
+  const owner = tenantId();
+  const text = opts.text.trim();
+  if (!opts.igsid || !text) throw new Error("IGSID ve metin gerekli");
+  await sendIgMessage(opts.igsid, text);
+  const existing = await prisma.igThread.findUnique({
+    where: { tenantId_igsid: { tenantId: owner, igsid: opts.igsid } },
+  });
+  const thread = existing
+    ? await prisma.igThread.update({
+        where: { id: existing.id },
+        data: {
+          username: opts.username ?? undefined,
+          lastText: text.slice(0, 500),
+          lastAt: new Date(),
+          draft: "",
+        },
+      })
+    : await prisma.igThread.create({
+        data: {
+          tenantId: owner,
+          igsid: opts.igsid,
+          username: opts.username ?? "",
+          lastText: text.slice(0, 500),
+          lastAt: new Date(),
+        },
+      });
+  await prisma.igMessage.create({
+    data: { threadId: thread.id, direction: "out", body: text.slice(0, 2000) },
+  });
+}
+
+export async function findTenantIdByVerifyToken(token: string): Promise<string | null> {
+  if (!token) return null;
+  const row = await prisma.appSettings.findFirst({
+    where: { igWebhookVerifyToken: token },
+    select: { tenantId: true },
+  });
+  return row?.tenantId ?? null;
+}
+
+export async function findTenantIdByIgUser(igUserId: string): Promise<string | null> {
+  if (!igUserId) return null;
+  const row = await prisma.appSettings.findFirst({
+    where: { igUserId },
+    select: { tenantId: true },
+  });
+  return row?.tenantId ?? null;
+}
+

@@ -92,6 +92,8 @@ export function NavRail({
   places = false,
   waCloud = false,
   waLocal = "disconnected",
+  tenantName = "Wexon",
+  email = "",
 }: {
   queueOpen: boolean;
   onQueueToggle: () => void;
@@ -99,17 +101,20 @@ export function NavRail({
   places?: boolean;
   waCloud?: boolean;
   waLocal?: string;
+  tenantName?: string;
+  email?: string;
 }) {
   const pathname = usePathname();
   const waOn = waCloud || waLocal === "ready";
   const live = waOn || waLocal === "qr" || waLocal === "starting";
   const line = operatorLine({ places, waCloud, waLocal });
+  const initial = (tenantName.trim()[0] || "W").toLocaleUpperCase("tr");
   return (
     <nav className="os-rail" aria-label="Modüller">
       <div className="brand">
-        <div className="brand-initial" aria-hidden>W</div>
+        <div className="brand-initial" aria-hidden>{initial}</div>
         <div className="brand-name">
-          <strong>Wexon</strong>
+          <strong>{tenantName}</strong>
           <span>Growth OS</span>
         </div>
       </div>
@@ -192,11 +197,11 @@ export function NavRail({
         </button>
         <Link href="/ayarlar" className="rail-row" onClick={onNavigate}>
           <span className={`op-ava${live ? " on" : waLocal === "error" ? " bad" : ""}`}>
-            W
+            {initial}
             <i className={`op-dot${waOn ? "" : waLocal === "error" ? " bad" : live ? " warn" : " off"}`} />
           </span>
           <span className="rail-copy">
-            <b>Admin</b>
+            <b>{email ? email.split("@")[0] : "Operatör"}</b>
             <em>{line}</em>
           </span>
         </Link>
