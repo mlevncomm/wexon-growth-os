@@ -62,17 +62,21 @@ function asState(value: string | null | undefined): WaWebStatus["state"] {
 }
 
 async function row(owner: string) {
-  return prisma.appSettings.findUnique({
-    where: { tenantId: owner },
-    select: {
-      waWebState: true,
-      waWebQr: true,
-      waWebError: true,
-      waWebCreds: true,
-      waWebPairId: true,
-      waWebPairingUntil: true,
-    },
-  });
+  try {
+    return await prisma.appSettings.findUnique({
+      where: { tenantId: owner },
+      select: {
+        waWebState: true,
+        waWebQr: true,
+        waWebError: true,
+        waWebCreds: true,
+        waWebPairId: true,
+        waWebPairingUntil: true,
+      },
+    });
+  } catch {
+    return null;
+  }
 }
 
 async function patch(

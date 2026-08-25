@@ -1,5 +1,5 @@
 import { after, NextResponse } from "next/server";
-import { ensureSeed, runCampaign, startCampaignInBackground } from "@/lib/campaigns";
+import { ensureSeed, rememberWebsiteFilter, runCampaign, startCampaignInBackground } from "@/lib/campaigns";
 import { badRequest, readJson } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
 import { hubFor, worldGroupFor, zoneFor } from "@/lib/regions";
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
 
     const query = (body.query ?? "").trim();
     const queries = Array.isArray(body.queries)
-      ? body.queries.map((q) => String(q).trim()).filter(Boolean)
+      ? body.queries.map((q) => String(q).trim()).filter(Boolean).slice(0, 6)
       : [];
     const combined = (queries.length ? queries.join(" | ") : query).trim();
     const scope = body.scope ?? "city";
@@ -98,20 +98,27 @@ export async function POST(request: Request) {
     }
 
     const targetCount = Math.min(60, Math.max(1, Number(body.targetCount) || 20));
-    const campaign = await prisma.campaign.create({
-      data: {
-        tenantId: ctx.tenantId,
-        query: combined,
-        city,
-        district: scope === "city" || scope === "hub" ? (body.district ?? "").trim() : "",
-        targetCount,
-        minRating: Number(body.minRating) || 0,
-        requirePhone: body.requirePhone !== false,
-        phonePrefix: (body.phonePrefix ?? "").trim(),
-        websiteFilter: parseWebsiteFilter(body.websiteFilter),
-        status: "queued",
-      },
-    });
+    const websiteFilter = parseWebsiteFilter(body.websiteFilter);
+    const baseData = {
+      tenantId: ctx.tenantId,
+      query: combined,
+      city,
+      district: scope === "city" || scope === "hub" ? (body.district ?? "").trim() : "",
+      targetCount,
+      minRating: Number(body.minRating) || 0,
+      requirePhone: body.requirePhone !== false,
+      phonePrefix: (body.phonePrefix ?? "").trim(),
+      status: "queued" as const,
+    };
+    let campaign;
+    try {
+      campaign = await prisma.campaign.create({
+        data: { ...baseData, websiteFilter },
+      });
+    } catch {
+      campaign = await prisma.campaign.create({ data: baseData });
+    }
+    rememberWebsiteFilter(campaign.id, websiteFilter);
 
     bustStatsCache(ctx.tenantId);
     if (isServerless()) {

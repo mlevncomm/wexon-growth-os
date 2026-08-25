@@ -5,13 +5,25 @@ import { englishQuery, parseQueries } from "./sectors";
 import { resolveSearchLocations } from "./search-scope";
 import { TENANT_SEEDS, type Vertical } from "./verticals";
 import { ctxForTenantId, runWithTenant, tenantId, tryTenantId } from "./tenant";
-import { parseWebsiteFilter } from "./website";
+import { parseWebsiteFilter, type WebsiteFilter } from "./website";
 
-const g = globalThis as unknown as { __gooleadsCampaigns?: Set<string> };
+const g = globalThis as unknown as {
+  __gooleadsCampaigns?: Set<string>;
+  __wexonWebFilter?: Map<string, WebsiteFilter>;
+};
 
 function running(): Set<string> {
   if (!g.__gooleadsCampaigns) g.__gooleadsCampaigns = new Set();
   return g.__gooleadsCampaigns;
+}
+
+export function rememberWebsiteFilter(id: string, filter: WebsiteFilter) {
+  if (!g.__wexonWebFilter) g.__wexonWebFilter = new Map();
+  g.__wexonWebFilter.set(id, filter);
+}
+
+function websiteFilterFor(id: string, stored?: string | null): WebsiteFilter {
+  return parseWebsiteFilter(g.__wexonWebFilter?.get(id) ?? stored);
 }
 
 export function startCampaignInBackground(id: string): void {
@@ -87,7 +99,7 @@ async function executeCampaign(id: string, ownerId: string, targetCount: number)
           minRating: campaign.minRating,
           requirePhone: campaign.requirePhone,
           phonePrefix: campaign.phonePrefix,
-          websiteFilter: parseWebsiteFilter(campaign.websiteFilter),
+          websiteFilter: websiteFilterFor(id, (campaign as { websiteFilter?: string }).websiteFilter),
           regionCode: loc.regionCode,
           languageCode: loc.languageCode,
           onHit: async (hit) => {

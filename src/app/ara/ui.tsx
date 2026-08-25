@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { dialCodeFor, formatPhoneDisplay } from "@/lib/phone";
 import { REGIONS, TURKEY_ZONES, WORLD_GROUPS, WORLD_HUBS, hubFor } from "@/lib/regions";
 import { ChipStrip } from "@/components/ChipStrip";
@@ -83,6 +83,8 @@ export default function AraPage() {
   const [sectorGroups, setSectorGroups] = useState<SectorGroup[]>([]);
   const [sectorPresets, setSectorPresets] = useState<SectorPreset[]>([]);
   const [sectorFilter, setSectorFilter] = useState("");
+  const [catalogOpen, setCatalogOpen] = useState(false);
+  const bootedRecent = useRef(false);
 
   const districts = useMemo(
     () => regions.find((r) => r.city === city)?.districts ?? [],
@@ -136,7 +138,13 @@ export default function AraPage() {
     void fetch("/api/campaigns", { cache: "no-store" })
       .then((r) => r.json())
       .then((rows: Campaign[]) => {
-        if (Array.isArray(rows)) setRecent(rows);
+        if (!Array.isArray(rows)) return;
+        setRecent(rows);
+        if (!bootedRecent.current && rows[0]?.id) {
+          bootedRecent.current = true;
+          setCampaignId(rows[0].id);
+          if (rows[0].status === "queued" || rows[0].status === "running") setBusy(true);
+        }
       })
       .catch(() => undefined);
   }, [campaign?.status, campaignId]);
@@ -215,34 +223,59 @@ export default function AraPage() {
       setError("En az bir sektör veya kelime seçin.");
       return;
     }
+    const scanQueries = queries.slice(0, 6);
+    if (queries.length > 6) {
+      toast.push("Aynı anda en fazla 6 sektör. İlk 6 gidiyor.");
+    }
     setBusy(true);
     setCampaign(null);
-    const res = await fetch("/api/campaigns", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        queries,
-        city: scope === "city" ? city : scope === "hub" ? hub : undefined,
-        district: scope === "city" ? district : "",
-        scope,
-        zone: scope === "zone" ? zone : undefined,
-        worldGroup: scope === "worldGroup" ? worldGroup : undefined,
-        targetCount,
-        minRating,
-        requirePhone,
-        phonePrefix: trPhone ? phonePrefix : "",
-        websiteFilter,
-      }),
-    });
-    const json = await res.json();
+    let res: Response;
+    try {
+      res = await fetch("/api/campaigns", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          queries: scanQueries,
+          city: scope === "city" ? city : scope === "hub" ? hub : undefined,
+          district: scope === "city" ? district : "",
+          scope,
+          zone: scope === "zone" ? zone : undefined,
+          worldGroup: scope === "worldGroup" ? worldGroup : undefined,
+          targetCount,
+          minRating,
+          requirePhone,
+          phonePrefix: trPhone ? phonePrefix : "",
+          websiteFilter,
+        }),
+      });
+    } catch {
+      setBusy(false);
+      setError("Ağa ulaşılamadı.");
+      toast.push("Ağa ulaşılamadı.", "bad");
+      return;
+    }
+    let json: Campaign = {
+      id: "",
+      status: "error",
+      foundCount: 0,
+      skippedCount: 0,
+      targetCount,
+      error: `Keşif başlatılamadı.`,
+    };
+    try {
+      json = (await res.json()) as Campaign;
+    } catch {
+      json = { ...json, error: `Keşif başlatılamadı (${res.status}).` };
+    }
     if (!res.ok) {
       setBusy(false);
-      setError(json.error || "Keşif başlatılamadı");
-      toast.push(json.error || "Keşif başlatılamadı", "bad");
+      const msg = json.error || `Keşif başlatılamadı (${res.status})`;
+      setError(msg);
+      toast.push(msg, "bad");
       return;
     }
     setCampaign(json);
-    setCampaignId(json.id);
+    setCampaignId(json.id || null);
   }
 
   async function stopSearch() {
@@ -492,7 +525,7 @@ export default function AraPage() {
           </p>
         )}
         <div className="sector-groups" style={{ marginTop: 14 }}>
-          {visibleSectorGroups.map((g) => {
+          {(catalogOpen || sectorFilter.trim() ? visibleSectorGroups : []).map((g) => {
             const allOn = g.items.length > 0 && g.items.every((i) => selectedQueries.includes(i.query));
             const onCount = g.items.filter((i) => selectedQueries.includes(i.query)).length;
             return (
@@ -524,6 +557,16 @@ export default function AraPage() {
             );
           })}
         </div>
+        {!sectorFilter.trim() ? (
+          <button
+            type="button"
+            className="btn btn-ghost"
+            style={{ marginTop: 12 }}
+            onClick={() => setCatalogOpen((v) => !v)}
+          >
+            {catalogOpen ? "Listeyi gizle" : "Tüm sektörler"}
+          </button>
+        ) : null}
         {sectorFilter.trim() && visibleSectorGroups.length === 0 ? (
           <p className="muted" style={{ marginTop: 12, fontSize: 13 }}>
             Eşleşen etiket yok. Aşağıya kendi kelimeni yaz.
@@ -597,7 +640,7 @@ export default function AraPage() {
             <input
               value={phonePrefix}
               onChange={(e) => setPhonePrefix(e.target.value)}
-              placeholder={trPhone ? "0532" : activeDial ? `+${activeDial}` : "ülke kodu otomatik"}
+              placeholder={trPhone ? "boş bırak (0532 daraltır)" : activeDial ? `+${activeDial}` : "ülke kodu otomatik"}
               disabled={!trPhone}
             />
           </label>

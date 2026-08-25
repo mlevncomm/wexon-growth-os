@@ -153,17 +153,7 @@ const SOFTWARE_PRESETS: SectorPreset[] = [
     label: "Sitesi yok",
     hint: "Web satışı — haritada site görünmeyen KOBİ",
     websiteFilter: "without",
-    queries: [
-      "restoran",
-      "kafe",
-      "kuaför",
-      "güzellik salonu",
-      "diş kliniği",
-      "emlak ofisi",
-      "muhasebe ofisi",
-      "oto servis",
-      "mağaza",
-    ],
+    queries: ["restoran", "kuaför", "muhasebe ofisi", "emlak ofisi"],
   },
   {
     id: "yenileme",
