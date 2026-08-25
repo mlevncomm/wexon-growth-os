@@ -59,7 +59,7 @@ export function generateSalesCopy(angle: CopyAngle, vertical: Vertical = "water"
       case "takip":
         return {
           name: "Yazılım — takip",
-          body: "Merhaba {ad}, {ilçe} için yazılım keşif notunu hazırladık. Kapsam ve süre tek sayfada. Size uyan bir gün var mı?",
+          body: "Merhaba {ad}, {ilçe} işletmenizde site ve form aynı akışta değilse teklif kaçıyor. Vitrin + WhatsApp satırını netleştiriyoruz. Size uyan bir gün var mı?",
         };
       default:
         return {
@@ -88,7 +88,7 @@ export function generateSalesCopy(angle: CopyAngle, vertical: Vertical = "water"
       case "takip":
         return {
           name: "YKS — takip",
-          body: "Merhaba {ad}, {ilçe} için kurs keşif notunu hazırladık. Deneme takvimi ve koçluk tek sayfada. Size uyan bir gün var mı?",
+          body: "Merhaba {ad}, {ilçe} öğrencilerinde deneme analizi ve koçluk fark yaratır. Akarsu programını kısaca özetleyeyim. Size uyan bir gün var mı?",
         };
       default:
         return {
@@ -121,7 +121,7 @@ export function generateSalesCopy(angle: CopyAngle, vertical: Vertical = "water"
     default:
       return {
         name: "Su arıtma — takip",
-        body: "Merhaba {ad}, {ilçe} için su arıtma keşif notunu hazırladık. Filtre ömrü ve kurulum bedelini tek sayfada özetleyebilirim. Size uyan bir gün var mı?",
+        body: "Merhaba {ad}, {ilçe} işletmesinde kireç ve damacana maliyeti birikir. Kurulum ve filtre planını kısaca özetleyebilirim. Size uyan bir gün var mı?",
       };
   }
 }

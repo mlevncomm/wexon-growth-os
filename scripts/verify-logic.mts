@@ -53,6 +53,24 @@ const msg = renderTemplate("Merhaba {ad} / {ilçe}", {
 });
 check(msg === "Merhaba Test Klinik / Kadıköy", "template", msg);
 
+const emptyLoc = renderTemplate("Merhaba {ad}, {ilçe} salonunda randevu.", {
+  name: "Nuri",
+  address: "",
+  district: "",
+  city: "",
+  phone: "",
+});
+check(emptyLoc === "Merhaba Nuri, salonunda randevu.", "template empty ilce", emptyLoc);
+
+const cityFallback = renderTemplate("Merhaba {ad}, {ilçe} salonunda.", {
+  name: "Nuri",
+  address: "",
+  district: "",
+  city: "İstanbul",
+  phone: "",
+});
+check(cityFallback === "Merhaba Nuri, İstanbul salonunda.", "template city fallback", cityFallback);
+
 check(englishQuery("restoran") === "restaurant", "en restoran");
 check(englishQuery("klinik") === "clinic", "en klinik");
 check(englishQuery("custom xyz") === "custom xyz", "en passthrough");

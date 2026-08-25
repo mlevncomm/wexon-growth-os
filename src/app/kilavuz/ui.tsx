@@ -71,7 +71,7 @@ const MODULES = [
     kicker: "Satış",
     title: "Müşteriler",
     points: [
-      "Filtrele → seç → Onaya al. Tüm listeyi onaya almak da var.",
+      "Filtrele → seç → Onaya al. Varsayılan şablon sektör + site (yeni site / yenileme); anahtar gerekmez.",
       "Yazıldı / ilgilenmiyor kuyruğa tekrar girmez.",
       "Silince place kaydı da gider; demo karışmasın diye sonraki keşif aynı mankeni yeniden getirebilir.",
     ],

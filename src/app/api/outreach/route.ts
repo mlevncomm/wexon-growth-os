@@ -29,10 +29,7 @@ export async function POST(request: Request) {
       status?: string;
     }>(request);
     if (!body) return badRequest("Geçersiz istek.");
-    const templateId = body.templateId ?? "";
-    if (!templateId) {
-      return NextResponse.json({ error: "Şablon seçin." }, { status: 400 });
-    }
+    const templateId = (body.templateId ?? "").trim() || "auto";
 
     let leadIds = body.leadIds ?? [];
     if (body.allMatching) {
@@ -63,7 +60,7 @@ export async function POST(request: Request) {
 
     if (!leadIds.length) {
       return NextResponse.json(
-        { error: "Şablon ve en az bir müşteri seçin." },
+        { error: "En az bir müşteri seçin." },
         { status: 400 },
       );
     }

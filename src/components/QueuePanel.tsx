@@ -133,6 +133,7 @@ export function QueuePanel({ onClose, open = false }: { onClose?: () => void; op
             : snap?.serverless
               ? "Cloud yok — canlı gönderim yok. QR Vercel’de çalışmaz."
               : "Kanal: QR yedek (Cloud yok)"}
+          {pending > 0 ? " Her kart sektör ve siteye göre yazıldı." : ""}
         </div>
       </div>
       {pending > 0 ? (

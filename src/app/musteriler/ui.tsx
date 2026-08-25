@@ -32,7 +32,7 @@ export default function MusterilerPage() {
   const [status, setStatus] = useState("");
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [templates, setTemplates] = useState<Template[]>([]);
-  const [templateId, setTemplateId] = useState("");
+  const [templateId, setTemplateId] = useState("auto");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -63,7 +63,6 @@ export default function MusterilerPage() {
       .then((r) => r.json())
       .then((rows: Template[]) => {
         setTemplates(rows);
-        if (rows[0]) setTemplateId(rows[0].id);
       })
       .catch(() => undefined);
   }, []);
@@ -180,8 +179,8 @@ export default function MusterilerPage() {
       <div className="page-kicker">CRM</div>
       <h1 className="page-title">Müşteriler</h1>
       <p className="page-copy">
-        Alıcı listesi. Silinen işletme keşifte yeniden bulunur; böylece demo veya eski tarama karışmaz.
-        Kuyruğa yalnızca telefonu olan, daha önce yazılmamış kayıtlar girer.
+        Alıcı listesi. Onaya al varsayılanı sektör + site: kuaföre randevu sitesi, restoranına rezervasyon,
+        sitesi olana yenileme. Sabit “keşif notu” yok. Kuyruğa yalnızca telefonu olan, yazılmamış kayıtlar girer.
       </p>
 
       <div className="toolbar">
@@ -218,6 +217,7 @@ export default function MusterilerPage() {
         <label className="field">
           <span>Şablon</span>
           <select value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
+            <option value="auto">Otomatik — sektör + site</option>
             {templates.map((t) => (
               <option key={t.id} value={t.id}>{t.name}</option>
             ))}

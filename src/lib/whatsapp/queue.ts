@@ -1,7 +1,9 @@
+import { composePitch, AUTO_TEMPLATE_ID, AUTO_TEMPLATE_MARKER } from "../pitch";
 import { prisma } from "../prisma";
 import { isServerless } from "../platform";
 import { getSettings, updateSettings } from "../settings";
-import { tenantId } from "../tenant";
+import { currentTenant, tenantId } from "../tenant";
+import type { Vertical } from "../verticals";
 import { cloudConfigured, sendCloudMessage } from "./cloud";
 
 type QueueGlobal = {
@@ -174,22 +176,78 @@ export async function processQueueTick(opts?: { serverless?: boolean; maxJobs?: 
   return results;
 }
 
+function wantsAuto(templateId: string, body?: string): boolean {
+  if (!templateId || templateId === AUTO_TEMPLATE_ID) return true;
+  return (body ?? "").trim() === AUTO_TEMPLATE_MARKER;
+}
+
+function isGenericDraft(message: string): boolean {
+  const t = message.toLocaleLowerCase("tr");
+  return t.includes("keşif notunu hazırladık") || t.includes("kapsam ve süre tek sayfada");
+}
+
+function pitchFromLead(
+  vertical: Vertical,
+  lead: {
+    name: string;
+    district: string;
+    city: string;
+    address: string;
+    phone: string;
+    website: string;
+    notes: string;
+    campaign?: { query: string } | null;
+  },
+) {
+  return composePitch(vertical, {
+    name: lead.name,
+    district: lead.district,
+    city: lead.city,
+    address: lead.address,
+    phone: lead.phone,
+    website: lead.website,
+    notes: lead.notes,
+    campaignQuery: lead.campaign?.query ?? "",
+  });
+}
+
+async function refreshGenericDrafts(owner: string, vertical: Vertical): Promise<void> {
+  const jobs = await prisma.outreachJob.findMany({
+    where: { tenantId: owner, status: "pending" },
+    include: { lead: { include: { campaign: { select: { query: true } } } } },
+    take: 80,
+  });
+  for (const job of jobs) {
+    if (!isGenericDraft(job.message)) continue;
+    const next = pitchFromLead(vertical, job.lead).body;
+    if (!next || next === job.message) continue;
+    await prisma.outreachJob.update({ where: { id: job.id }, data: { message: next } });
+  }
+}
+
 export async function enqueueLeads(opts: {
   leadIds: string[];
-  templateId: string;
+  templateId?: string;
 }): Promise<{ queued: number; skipped: number; pending: number }> {
   const owner = tid();
-  const template = await prisma.template.findFirst({
-    where: { id: opts.templateId, tenantId: owner },
-  });
-  if (!template) throw new Error("Şablon bulunamadı");
+  const vertical = currentTenant().vertical;
+  const rawId = (opts.templateId ?? "").trim();
+  const template =
+    rawId && rawId !== AUTO_TEMPLATE_ID
+      ? await prisma.template.findFirst({ where: { id: rawId, tenantId: owner } })
+      : null;
+  if (rawId && rawId !== AUTO_TEMPLATE_ID && !template) throw new Error("Şablon bulunamadı");
+  const useAuto = wantsAuto(rawId, template?.body);
 
   const { renderTemplate } = await import("../templates");
   let queued = 0;
   let skipped = 0;
 
   for (const leadId of opts.leadIds) {
-    const lead = await prisma.lead.findFirst({ where: { id: leadId, tenantId: owner } });
+    const lead = await prisma.lead.findFirst({
+      where: { id: leadId, tenantId: owner },
+      include: { campaign: { select: { query: true } } },
+    });
     if (!lead || !lead.phone) {
       skipped += 1;
       continue;
@@ -205,12 +263,18 @@ export async function enqueueLeads(opts: {
       skipped += 1;
       continue;
     }
+    const pitch = pitchFromLead(vertical, lead);
+    const message = useAuto
+      ? pitch.body
+      : renderTemplate(template!.body, lead)
+          .replaceAll("{sektor}", pitch.sector)
+          .replaceAll("{teklif}", pitch.offer);
     await prisma.outreachJob.create({
       data: {
         tenantId: owner,
         leadId,
-        templateId: template.id,
-        message: renderTemplate(template.body, lead),
+        templateId: useAuto ? null : template!.id,
+        message,
         status: "pending",
         channel: "whatsapp",
       },
@@ -269,6 +333,11 @@ export async function moderateJobs(opts: {
 export async function getQueueSnapshot() {
   const owner = tid();
   const settings = await getSettings();
+  try {
+    await refreshGenericDrafts(owner, currentTenant().vertical);
+  } catch {
+    // taslak yenileme kuyruğu göstermeyi durdurmasın
+  }
   const [queued, pending, sending, sentToday, failed, current, pendingJobs, lastFailed] = await Promise.all([
     prisma.outreachJob.count({ where: { tenantId: owner, status: "queued" } }),
     prisma.outreachJob.count({ where: { tenantId: owner, status: "pending" } }),
