@@ -63,7 +63,7 @@ const MODULES = [
     points: [
       "İstanbul + Kadıköy + restoran ile başlayın. Hedefi 10–20 tutun.",
       "Telefonu olmayanları alma açık kalsın. Önek (0532) daraltır.",
-      "Hata görürseniz Places API (New) ve Places API’nin Cloud Console’da açık olduğuna bakın.",
+      "Hata görürseniz Cloud Console’da Places API (eski) açık olsun. Sistem’e AIza anahtarı yazın; New API kapalıysa uygulama eskiye düşer.",
     ],
   },
   {

@@ -63,17 +63,22 @@ async function placesFetch(
   apiKey: string,
   init?: RequestInit,
 ): Promise<Response> {
+  const key = normalizePlacesKey(apiKey);
   return fetch(url, {
     ...init,
     headers: {
       "Content-Type": "application/json",
-      "X-Goog-Api-Key": apiKey,
+      "X-Goog-Api-Key": key,
       "X-Goog-FieldMask":
         (init?.headers as Record<string, string> | undefined)?.["X-Goog-FieldMask"] ??
         SEARCH_MASK,
       ...(init?.headers ?? {}),
     },
   });
+}
+
+function normalizePlacesKey(raw: string): string {
+  return raw.trim().replace(/^Bearer\s+/i, "");
 }
 
 function mapPlace(
@@ -130,7 +135,7 @@ export async function searchPlaces(opts: {
   onHit?: (hit: PlaceHit) => Promise<void> | void;
 }): Promise<{ hits: PlaceHit[]; skipped: number }> {
   const settings = await getSettings();
-  const apiKey = settings.googlePlacesApiKey;
+  const apiKey = normalizePlacesKey(settings.googlePlacesApiKey);
   if (!apiKey) {
     throw new Error("Google Places API anahtarı yok. Ayarlar ekranından ekleyin.");
   }
@@ -155,7 +160,12 @@ export async function searchPlaces(opts: {
       apiKey,
       { method: "POST", body: JSON.stringify(body) },
     );
-    const json = (await res.json()) as PlacesSearchResponse;
+    let json: PlacesSearchResponse = {};
+    try {
+      json = (await res.json()) as PlacesSearchResponse;
+    } catch {
+      json = { error: { message: `Places API ${res.status}` } };
+    }
     if (!res.ok) {
       const message = json.error?.message || `Places API ${res.status}`;
       if (shouldUseLegacy(message, res.status)) {
@@ -210,17 +220,23 @@ export async function searchPlaces(opts: {
 
 function shouldUseLegacy(message: string, status: number) {
   return (
+    status === 401 ||
     status === 403 ||
     status === 404 ||
-    /has not been used|PERMISSION_DENIED|Places API \(New\)|SERVICE_DISABLED/i.test(message)
+    /has not been used|PERMISSION_DENIED|Places API \(New\)|SERVICE_DISABLED|UNAUTHENTICATED|OAuth2|API keys are not supported|Expected OAuth2/i.test(
+      message,
+    )
   );
 }
 
 function placesHelp(detail: string) {
-  return (
-    "Google Places kapalı veya anahtar yetkisiz. Cloud Console’da hem Places API (New) hem Places API’yi açıp birkaç dakika bekleyin. " +
-    detail
-  );
+  if (/OAuth2|API keys are not supported|UNAUTHENTICATED/i.test(detail)) {
+    return "Places (New) bu anahtarı reddetti; eski Places API de kapalı. Cloud Console’da Places API ve Places API (New) ikisini açıp birkaç dakika bekleyin, AIza anahtarını Sistem’e kaydedin.";
+  }
+  if (/REQUEST_DENIED|not been used|not activated|SERVICE_DISABLED/i.test(detail)) {
+    return "Places API kapalı veya anahtar bu proje için yetkisiz. Cloud Console’da Places API’yi açın, AIza anahtarını Sistem’e kaydedin, birkaç dakika bekleyin.";
+  }
+  return "Google Places kapalı veya anahtar yetkisiz. Cloud Console’da hem Places API hem Places API (New) açıp AIza anahtarını Sistem’e yazın.";
 }
 
 type LegacySearch = {

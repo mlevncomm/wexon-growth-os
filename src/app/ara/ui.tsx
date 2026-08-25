@@ -31,6 +31,7 @@ type Campaign = {
 };
 type Scope = "city" | "zone" | "turkey" | "hub" | "worldGroup" | "world";
 type SectorGroup = { id: string; label: string; items: { label: string; query: string }[] };
+type SectorPreset = { id: string; label: string; hint: string; queries: string[] };
 
 const PINNED_CITIES = ["İstanbul", "Ankara", "İzmir", "Bursa", "Antalya", "Adana", "Kocaeli", "Gaziantep"];
 const COUNT_PRESETS = [10, 20, 40, 60];
@@ -65,6 +66,8 @@ export default function AraPage() {
   const [campaignId, setCampaignId] = useState<string | null>(null);
   const [recent, setRecent] = useState<Campaign[]>([]);
   const [sectorGroups, setSectorGroups] = useState<SectorGroup[]>([]);
+  const [sectorPresets, setSectorPresets] = useState<SectorPreset[]>([]);
+  const [sectorFilter, setSectorFilter] = useState("");
 
   const districts = useMemo(
     () => regions.find((r) => r.city === city)?.districts ?? [],
@@ -92,14 +95,20 @@ export default function AraPage() {
   useEffect(() => {
     void fetch("/api/sectors", { cache: "no-store" })
       .then((r) => r.json())
-      .then((json: { groups?: SectorGroup[] }) => {
+      .then((json: { vertical?: string; groups?: SectorGroup[]; presets?: SectorPreset[] }) => {
         const groups = Array.isArray(json.groups) ? json.groups : [];
+        const presets = Array.isArray(json.presets) ? json.presets : [];
         setSectorGroups(groups);
+        setSectorPresets(presets);
         const allowed = new Set(groups.flatMap((g) => g.items.map((i) => i.query)));
         const first = groups[0]?.items[0]?.query;
+        const seeded = json.vertical === "software" || json.vertical === "yks";
         setSelectedQueries((prev) => {
+          const pack = presets[0]?.queries.filter((q) => allowed.has(q)) ?? [];
+          if (seeded && pack.length && prev.length === 1 && prev[0] === "restoran") return pack;
           const keep = prev.filter((q) => allowed.has(q));
           if (keep.length) return keep;
+          if (pack.length) return pack;
           return first ? [first] : [];
         });
       })
@@ -133,6 +142,20 @@ export default function AraPage() {
     };
   }, [campaignId]);
 
+  const visibleSectorGroups = useMemo(() => {
+    const q = sectorFilter.trim().toLocaleLowerCase("tr");
+    if (!q) return sectorGroups;
+    return sectorGroups
+      .map((g) => ({
+        ...g,
+        items: g.items.filter(
+          (i) =>
+            i.label.toLocaleLowerCase("tr").includes(q) || i.query.toLocaleLowerCase("tr").includes(q),
+        ),
+      }))
+      .filter((g) => g.items.length);
+  }, [sectorGroups, sectorFilter]);
+
   function toggleQuery(query: string) {
     setSelectedQueries((prev) =>
       prev.includes(query) ? prev.filter((q) => q !== query) : [...prev, query],
@@ -140,7 +163,7 @@ export default function AraPage() {
   }
 
   function toggleGroup(id: string) {
-    const items = sectorGroups.find((g) => g.id === id)?.items ?? [];
+    const items = visibleSectorGroups.find((g) => g.id === id)?.items ?? [];
     const keys = items.map((i) => i.query);
     setSelectedQueries((prev) => {
       const allOn = keys.every((k) => prev.includes(k));
@@ -149,11 +172,21 @@ export default function AraPage() {
     });
   }
 
+  function applyPreset(preset: SectorPreset) {
+    setSelectedQueries(preset.queries);
+    setSectorFilter("");
+  }
+
   const queries = useMemo(() => {
     const extra = customQuery.trim();
     const list = extra ? [...selectedQueries, extra] : selectedQueries;
     return [...new Set(list.map((q) => q.trim()).filter(Boolean))];
   }, [selectedQueries, customQuery]);
+
+  const queryLabel = useMemo(() => {
+    const map = new Map(sectorGroups.flatMap((g) => g.items.map((i) => [i.query, i.label] as const)));
+    return (query: string) => map.get(query) ?? query;
+  }, [sectorGroups]);
 
   const trPhone = scope === "city" || scope === "zone" || scope === "turkey";
   const activeDial = trPhone ? "90" : scope === "hub" ? dialCodeFor(hubFor(hub)?.regionCode) : null;
@@ -372,19 +405,69 @@ export default function AraPage() {
         <div className="panel-head" style={{ marginBottom: 8 }}>
           <div>
             <div className="page-kicker">Alıcı sektör</div>
-            <h2 style={{ margin: "4px 0 0", fontSize: 18 }}>Birden fazla seçin</h2>
+            <h2 style={{ margin: "4px 0 0", fontSize: 18 }}>
+              {selectedQueries.length ? `${selectedQueries.length} sektör seçili` : "Kimleri tarayacaksınız?"}
+            </h2>
           </div>
-          <button type="button" className="btn btn-ghost" onClick={() => setSelectedQueries([])}>
+          <button type="button" className="btn btn-ghost" onClick={() => setSelectedQueries([])} disabled={!selectedQueries.length}>
             Temizle
           </button>
         </div>
-        <div className="sector-groups">
-          {sectorGroups.map((g) => {
-            const allOn = g.items.every((i) => selectedQueries.includes(i.query));
+        {sectorPresets.length ? (
+          <div className="field" style={{ marginBottom: 12 }}>
+            <span>Hazır paket</span>
+            <ChipStrip wrap>
+              {sectorPresets.map((p) => {
+                const on = p.queries.length > 0 && p.queries.every((q) => selectedQueries.includes(q));
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className={`chip${on ? " on" : ""}`}
+                    title={p.hint}
+                    onClick={() => applyPreset(p)}
+                  >
+                    {p.label}
+                  </button>
+                );
+              })}
+            </ChipStrip>
+          </div>
+        ) : null}
+        <label className="field">
+          <span>Sektör ara</span>
+          <input
+            value={sectorFilter}
+            onChange={(e) => setSectorFilter(e.target.value)}
+            placeholder="ör. klinik, ajans, otel"
+          />
+        </label>
+        {selectedQueries.length ? (
+          <div className="sector-selected">
+            {selectedQueries.map((q) => (
+              <button key={q} type="button" className="chip on" onClick={() => toggleQuery(q)}>
+                {queryLabel(q)} ×
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="muted" style={{ margin: "10px 0 0", fontSize: 13 }}>
+            Paket seçin veya aşağıdaki etiketlerden ekleyin. Ek kelime ayrı durur.
+          </p>
+        )}
+        <div className="sector-groups" style={{ marginTop: 14 }}>
+          {visibleSectorGroups.map((g) => {
+            const allOn = g.items.length > 0 && g.items.every((i) => selectedQueries.includes(i.query));
+            const onCount = g.items.filter((i) => selectedQueries.includes(i.query)).length;
             return (
-              <div key={g.id}>
+              <div key={g.id} className={`sector-group${onCount ? " is-on" : ""}`}>
                 <div className="sector-group-head">
-                  <strong>{g.label}</strong>
+                  <strong>
+                    {g.label}
+                    <span className="muted" style={{ fontWeight: 600, marginLeft: 8 }}>
+                      {onCount}/{g.items.length}
+                    </span>
+                  </strong>
                   <button type="button" onClick={() => toggleGroup(g.id)}>
                     {allOn ? "Grubu kaldır" : "Grubun tümü"}
                   </button>
@@ -405,8 +488,13 @@ export default function AraPage() {
             );
           })}
         </div>
+        {sectorFilter.trim() && visibleSectorGroups.length === 0 ? (
+          <p className="muted" style={{ marginTop: 12, fontSize: 13 }}>
+            Eşleşen sektör yok. Aşağıya ek kelime yazabilirsiniz.
+          </p>
+        ) : null}
         <p className="muted" style={{ marginTop: 12, fontSize: 13 }}>
-          {queries.length ? `${queries.length} tarama kelimesi: ${queries.join(" · ")}` : "Sektör seçin veya aşağıya kelime yazın."}
+          {queries.length ? `Tarama: ${queries.map(queryLabel).join(" · ")}` : "Sektör seçin veya aşağıya kelime yazın."}
         </p>
       </div>
 

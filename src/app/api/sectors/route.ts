@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sectorGroupsFor } from "@/lib/sectors";
+import { sectorGroupsFor, sectorPresetsFor } from "@/lib/sectors";
 import { withTenant } from "@/lib/tenant";
 
 export const dynamic = "force-dynamic";
@@ -9,6 +9,7 @@ export async function GET() {
     return NextResponse.json({
       vertical: ctx.vertical,
       groups: sectorGroupsFor(ctx.vertical),
+      presets: sectorPresetsFor(ctx.vertical),
     });
   });
 }

@@ -834,7 +834,15 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .field input:focus, .field select:focus, .field textarea:focus, .coach-form input:focus, .pending-item textarea:focus { border-color: var(--teal); }
 .status-select { min-height: 36px; padding: 6px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
 
-.sector-groups { display: grid; gap: 14px; }
+.sector-groups { display: grid; gap: 10px; }
+.sector-group {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #f8fafb;
+}
+.sector-group.is-on { border-color: color-mix(in srgb, var(--teal) 35%, var(--line)); }
+.sector-selected { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
 .sector-group-head {
   display: flex;
   align-items: center;

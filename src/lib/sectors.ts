@@ -101,27 +101,121 @@ export const SECTOR_GROUPS: SectorGroup[] = [
 const SOFTWARE_GROUPS: SectorGroup[] = [
   {
     id: "tech",
-    label: "Yazılım alıcısı",
+    label: "Yazılım & ajans",
     items: [
       { label: "Yazılım şirketi", query: "yazılım şirketi", en: "software company" },
       { label: "Ajans", query: "reklam ajansı", en: "advertising agency" },
+      { label: "Dijital pazarlama", query: "dijital pazarlama ajansı", en: "digital marketing agency" },
+      { label: "Web tasarım", query: "web tasarım", en: "web design agency" },
       { label: "E-ticaret", query: "e-ticaret", en: "ecommerce store" },
+      { label: "Start-up", query: "teknoloji startup", en: "tech startup" },
+    ],
+  },
+  {
+    id: "pro",
+    label: "Profesyonel hizmet",
+    items: [
       { label: "Muhasebe", query: "muhasebe ofisi", en: "accounting office" },
-      { label: "Klinik yazılım", query: "özel klinik", en: "private clinic" },
+      { label: "Mali müşavir", query: "mali müşavir", en: "certified public accountant" },
+      { label: "Avukat", query: "avukatlık bürosu", en: "law firm" },
+      { label: "Emlak", query: "emlak ofisi", en: "real estate agency" },
+      { label: "Sigorta", query: "sigorta acentesi", en: "insurance agency" },
+      { label: "Danışmanlık", query: "yönetim danışmanlığı", en: "management consulting" },
+    ],
+  },
+  {
+    id: "local",
+    label: "Yerel işletme",
+    items: [
+      { label: "Restoran", query: "restoran", en: "restaurant" },
+      { label: "Kafe", query: "kafe", en: "cafe" },
       { label: "Otel", query: "otel", en: "hotel" },
+      { label: "Klinik", query: "özel klinik", en: "private clinic" },
+      { label: "Diş", query: "diş kliniği", en: "dental clinic" },
+      { label: "Kuaför", query: "kuaför", en: "hair salon" },
+      { label: "Oto servis", query: "oto servis", en: "auto repair shop" },
+    ],
+  },
+  {
+    id: "trade",
+    label: "Ticaret & saha",
+    items: [
       { label: "İnşaat", query: "inşaat şirketi", en: "construction company" },
       { label: "Lojistik", query: "lojistik", en: "logistics company" },
+      { label: "Mağaza", query: "mağaza", en: "retail store" },
+      { label: "Fabrika", query: "fabrika", en: "factory" },
+      { label: "Toptan", query: "toptan satış", en: "wholesaler" },
+      { label: "İthalat", query: "ithalat ihracat", en: "import export company" },
     ],
   },
   {
     id: "work",
-    label: "Ofis & ticaret",
+    label: "Ofis",
     items: [
       { label: "Ofis", query: "ofis", en: "office" },
       { label: "Coworking", query: "coworking", en: "coworking space" },
-      { label: "Mağaza", query: "mağaza", en: "retail store" },
-      { label: "Fabrika", query: "fabrika", en: "factory" },
+      { label: "Plaza", query: "plaza ofis", en: "office building" },
+      { label: "Call center", query: "çağrı merkezi", en: "call center" },
     ],
+  },
+];
+
+export type SectorPreset = { id: string; label: string; hint: string; queries: string[] };
+
+const SOFTWARE_PRESETS: SectorPreset[] = [
+  {
+    id: "kobi-web",
+    label: "KOBİ web",
+    hint: "Site / reklam alıcısı",
+    queries: ["reklam ajansı", "e-ticaret", "muhasebe ofisi", "özel klinik", "otel", "emlak ofisi"],
+  },
+  {
+    id: "lokal",
+    label: "Yerel hizmet",
+    hint: "Restoran, klinik, mağaza",
+    queries: ["restoran", "kafe", "kuaför", "mağaza", "oto servis", "diş kliniği"],
+  },
+  {
+    id: "kurumsal",
+    label: "Kurumsal yazılım",
+    hint: "Ajans ve saha firması",
+    queries: ["yazılım şirketi", "inşaat şirketi", "lojistik", "fabrika", "muhasebe ofisi", "yönetim danışmanlığı"],
+  },
+];
+
+const WATER_PRESETS: SectorPreset[] = [
+  {
+    id: "mutfak",
+    label: "Mutfak",
+    hint: "Restoran ve otel",
+    queries: ["restoran", "lokanta", "otel restoran", "catering", "kafe"],
+  },
+  {
+    id: "saglik",
+    label: "Sağlık",
+    hint: "Klinik ve hastane",
+    queries: ["klinik", "hastane", "diş kliniği", "tıp merkezi", "eczane"],
+  },
+  {
+    id: "konaklama",
+    label: "Konaklama",
+    hint: "Otel ve tesis",
+    queries: ["otel", "apart otel", "spa", "yüzme havuzu"],
+  },
+];
+
+const YKS_PRESETS: SectorPreset[] = [
+  {
+    id: "okul",
+    label: "Okul ağı",
+    hint: "Özel okul ve lise",
+    queries: ["özel okul", "lise", "dershane", "öğrenci yurdu"],
+  },
+  {
+    id: "kurs",
+    label: "Kurs",
+    hint: "Etüt ve dil",
+    queries: ["dershane", "etüt merkezi", "dil kursu", "kreş"],
   },
 ];
 
@@ -148,6 +242,12 @@ export function sectorGroupsFor(vertical: string): SectorGroup[] {
   if (vertical === "software") return SOFTWARE_GROUPS;
   if (vertical === "yks") return YKS_GROUPS;
   return SECTOR_GROUPS;
+}
+
+export function sectorPresetsFor(vertical: string): SectorPreset[] {
+  if (vertical === "software") return SOFTWARE_PRESETS;
+  if (vertical === "yks") return YKS_PRESETS;
+  return WATER_PRESETS;
 }
 
 export function englishQuery(query: string): string {
