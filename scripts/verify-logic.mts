@@ -5,6 +5,9 @@ import { resolveSearchLocations } from "../src/lib/search-scope.ts";
 import { TURKEY_ZONES, WORLD_GROUPS, WORLD_HUBS, REGIONS, zoneFor, worldGroupFor } from "../src/lib/regions.ts";
 import { parseCopyJson, sanitizeCopy, copyNeedsRewrite } from "../src/lib/llm.ts";
 import { mergePlaybook, playbookIsActive, playbookToPrompt } from "../src/lib/playbook.ts";
+import { copyAngles, defaultAngle, generateSalesCopy } from "../src/lib/copy-ai.ts";
+import { sectorGroupsFor } from "../src/lib/sectors.ts";
+import { TENANT_SEEDS } from "../src/lib/verticals.ts";
 
 let failed = 0;
 function check(ok: boolean, label: string, detail?: unknown) {
@@ -108,6 +111,15 @@ check(playbookIsActive(merged), "playbook active");
 check(playbookToPrompt(merged).includes("Yasak"), "playbook prompt");
 check(copyNeedsRewrite("Merhaba, ucuz cihaz!!!", merged), "rewrite spam");
 check(!copyNeedsRewrite("Merhaba {ad}, {ilçe} için keşif ayarlayabilir miyiz?", merged), "rewrite ok");
+
+check(TENANT_SEEDS.map((t) => t.slug).join(",") === "aquails,wexon-dev,akarsu-akademi", "tenant seeds");
+check(copyAngles("water")[0].id === "kirec" && defaultAngle("water") === "kirec", "water angles");
+check(copyAngles("software")[0].id === "web" && generateSalesCopy("web", "software").name.includes("Yazılım"), "software copy");
+check(copyAngles("yks")[0].id === "deneme" && generateSalesCopy("veli", "yks").body.includes("veli"), "yks copy");
+check(sectorGroupsFor("water")[0]?.id === "food", "water sectors");
+check(sectorGroupsFor("software").some((g) => g.items.some((i) => /yazılım|web|e-ticaret/i.test(i.label + i.query))), "software sectors");
+check(sectorGroupsFor("yks").some((g) => g.items.some((i) => /okul|dershane|kurs/i.test(i.label + i.query))), "yks sectors");
+check(JSON.stringify(sectorGroupsFor("water")) !== JSON.stringify(sectorGroupsFor("yks")), "verticals not mixed");
 
 if (failed) {
   console.error(`FAILED ${failed}`);

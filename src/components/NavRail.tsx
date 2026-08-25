@@ -62,6 +62,14 @@ function Ico({ href }: { href: string }) {
       </svg>
     );
   }
+  if (href === "/platform") {
+    return (
+      <svg {...p}>
+        <rect x="4.5" y="5.5" width="6.2" height="13" rx="1.6" />
+        <rect x="13.3" y="5.5" width="6.2" height="8" rx="1.6" />
+      </svg>
+    );
+  }
   return (
     <svg {...p}>
       <circle cx="12" cy="12" r="3.1" />
@@ -94,6 +102,7 @@ export function NavRail({
   waLocal = "disconnected",
   tenantName = "Wexon",
   email = "",
+  variant = "app",
 }: {
   queueOpen: boolean;
   onQueueToggle: () => void;
@@ -103,12 +112,15 @@ export function NavRail({
   waLocal?: string;
   tenantName?: string;
   email?: string;
+  variant?: "app" | "platform";
 }) {
   const pathname = usePathname();
+  const platform = variant === "platform";
   const waOn = waCloud || waLocal === "ready";
   const live = waOn || waLocal === "qr" || waLocal === "starting";
-  const line = operatorLine({ places, waCloud, waLocal });
+  const line = platform ? "Üst yönetici" : operatorLine({ places, waCloud, waLocal });
   const initial = (tenantName.trim()[0] || "W").toLocaleUpperCase("tr");
+  const links = platform ? ([{ href: "/platform", label: "Profiller" }] as const) : MAIN;
   return (
     <nav className="os-rail" aria-label="Modüller">
       <div className="brand">
@@ -119,8 +131,8 @@ export function NavRail({
         </div>
       </div>
 
-      <div className="nav-group">Satış</div>
-      {MAIN.map((m) => (
+      <div className="nav-group">{platform ? "Yönetim" : "Satış"}</div>
+      {links.map((m) => (
         <Link
           key={m.href}
           href={m.href}
@@ -134,6 +146,8 @@ export function NavRail({
         </Link>
       ))}
 
+      {platform ? null : (
+        <>
       <div className="nav-group">Araçlar</div>
       <Link
         href="/instagram"
@@ -173,8 +187,11 @@ export function NavRail({
         </div>
         <span className="nav-label">Sistem</span>
       </Link>
+        </>
+      )}
 
       <div className="rail-foot">
+        {platform ? null : (
         <button
           type="button"
           className={`rail-row${queueOpen ? " is-on" : ""}`}
@@ -195,6 +212,19 @@ export function NavRail({
             <i />
           </span>
         </button>
+        )}
+        {platform ? (
+          <div className="rail-row" style={{ cursor: "default" }}>
+            <span className="op-ava">
+              {initial}
+              <i className="op-dot" />
+            </span>
+            <span className="rail-copy">
+              <b>{email ? email.split("@")[0] : "Operatör"}</b>
+              <em>{line}</em>
+            </span>
+          </div>
+        ) : (
         <Link href="/ayarlar" className="rail-row" onClick={onNavigate}>
           <span className={`op-ava${live ? " on" : waLocal === "error" ? " bad" : ""}`}>
             {initial}
@@ -205,6 +235,7 @@ export function NavRail({
             <em>{line}</em>
           </span>
         </Link>
+        )}
         <button
           className="rail-row rail-logout"
           type="button"

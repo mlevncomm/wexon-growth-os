@@ -27,7 +27,7 @@ export const preferredRegion = ["fra1"];
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="tr" className={`${jakarta.variable} h-full antialiased`} suppressHydrationWarning>
-      <body className="min-h-full" suppressHydrationWarning>
+      <body className={`${jakarta.className} min-h-full`} suppressHydrationWarning>
         <ClientRoot>{children}</ClientRoot>
       </body>
     </html>

@@ -22,9 +22,10 @@ export function startCampaignInBackground(id: string): void {
 
 export async function resumeStaleCampaign(): Promise<string | null> {
   const id = tryTenantId();
+  if (!id) return null;
   const camp = await prisma.campaign.findFirst({
     where: {
-      ...(id ? { tenantId: id } : {}),
+      tenantId: id,
       OR: [
         { status: "queued" },
         { status: "running", updatedAt: { lt: new Date(Date.now() - 90_000) } },

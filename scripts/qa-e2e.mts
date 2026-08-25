@@ -175,9 +175,12 @@ async function templatesAndCopy() {
 
 async function leadCycle() {
   const { prisma } = await import("../src/lib/prisma.ts");
+  const { ensureTenants } = await import("../src/lib/campaigns.ts");
+  await ensureTenants();
   const placeId = `qa-${Date.now()}`;
   const lead = await prisma.lead.create({
     data: {
+      tenantId: "tnt_aquails",
       placeId,
       name: "QA Moda Restoran",
       address: "Caferağa",
