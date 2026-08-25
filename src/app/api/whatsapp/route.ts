@@ -1,9 +1,9 @@
-import { after, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { badRequest, readJson } from "@/lib/http";
 import { isServerless } from "@/lib/platform";
 import { withTenant } from "@/lib/tenant";
 import { cloudConfigured } from "@/lib/whatsapp/cloud";
-import { beginWebPairing, destroyWebSession, getWebStatus, waitForQr } from "@/lib/whatsapp/web";
+import { beginWebPairing, destroyWebSession, getWebStatus } from "@/lib/whatsapp/web";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,9 +26,9 @@ export async function POST(request: Request) {
   return withTenant(async (ctx) => {
     const body = await readJson<{ action?: string }>(request);
     if (body?.action === "connect") {
-      const job = beginWebPairing(ctx.tenantId);
-      after(() => job.catch(() => undefined));
-      await waitForQr(ctx.tenantId, 25_000);
+      // Socket must stay in this request until the phone scan finishes.
+      // Returning after the QR is drawn kills the WhatsApp connection on Vercel.
+      await beginWebPairing(ctx.tenantId);
       return NextResponse.json(await payload());
     }
     if (body?.action === "disconnect") {

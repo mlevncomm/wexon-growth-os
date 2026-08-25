@@ -25,7 +25,7 @@ const SAMPLE = {
 function statusLabel(state: string) {
   if (state === "ready") return "WhatsApp Web bağlı";
   if (state === "qr") return "QR bekleniyor";
-  if (state === "starting") return "Tarayıcı açılıyor";
+  if (state === "starting") return "QR hazırlanıyor";
   if (state === "error") return "Bağlantı hatası";
   return "Bağlı değil";
 }
@@ -66,7 +66,7 @@ export default function OutreachPage() {
     if (Array.isArray(c?.angles)) setAngles(c.angles);
     if (!angle && typeof c?.defaultAngle === "string") setAngle(c.defaultAngle);
     setLoading(false);
-    if (wa?.local.state === "qr" || wa?.local.state === "ready" || wa?.local.state === "error") setConnecting(false);
+    if (w?.local?.state === "ready" || w?.local?.state === "error") setConnecting(false);
   }
 
   useEffect(() => {
@@ -146,26 +146,33 @@ export default function OutreachPage() {
   async function connectQr() {
     setError("");
     setConnecting(true);
-    const res = await fetch("/api/whatsapp", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "connect" }),
-    });
-    const json = await res.json();
-    if (!res.ok) {
+    toast.push("QR çıkınca hemen okutun. Bu sekmeyi kapatmayın.");
+    try {
+      const res = await fetch("/api/whatsapp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "connect" }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error || "QR başlatılamadı");
+        toast.push("QR başlatılamadı", "bad");
+        return;
+      }
+      setWa(json);
+      if (json.local?.state === "error") {
+        toast.push(json.local.error || "Bağlanamadı", "bad");
+      } else if (json.local?.state === "ready") {
+        toast.push("WhatsApp bağlı");
+      } else if (json.local?.state === "qr") {
+        toast.push("QR süresi doldu, tekrar açın", "bad");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "QR başlatılamadı");
+      toast.push("QR bağlantısı koptu, tekrar deneyin", "bad");
+    } finally {
       setConnecting(false);
-      setError(json.error || "QR başlatılamadı");
-      toast.push("QR başlatılamadı", "bad");
-      return;
-    }
-    setWa(json);
-    if (json.local?.state === "error") {
-      setConnecting(false);
-      toast.push(json.local.error || "Bağlanamadı", "bad");
-    } else if (json.local?.state === "qr") {
-      toast.push("QR hazır, telefonla okutun");
-    } else if (json.local?.state === "ready") {
-      toast.push("WhatsApp bağlı");
+      await refresh();
     }
   }
 
@@ -192,7 +199,7 @@ export default function OutreachPage() {
       </p>
 
       <div className="notice" style={{ marginTop: 16 }}>
-        Bu sitede “QR oturumu aç”a basın. WhatsApp Business → Ayarlar → Cihazlar → Cihaz bağla ile okutun. Oturum canlı sunucuya yazılır; localhost gerekmez. Mesajlar yine onay kuyruğundan çıkar. Ticari iletide İYS onayı sizin sorumluluğunuzdadır.
+        Bu sitede “QR oturumu aç”a basın. Kod görünür görünmez WhatsApp Business → Ayarlar → Cihazlar → Cihaz bağla ile okutun. Okuttuktan sonra rozet yeşile dönene kadar sekmeyi kapatmayın.
       </div>
 
       {error ? <p className="error-box" style={{ marginTop: 14 }}>{error}</p> : null}
@@ -331,11 +338,16 @@ export default function OutreachPage() {
                 style={{ marginTop: 12, background: "white", padding: 10, borderRadius: 16, border: "1px solid var(--line)" }}
               />
             ) : null}
+            {localState === "qr" || connecting ? (
+              <p className="panel-note" style={{ marginTop: 10 }}>
+                QR görünür görünmez okutun. Kod yaklaşık her dakika yenilenir; eski kodu okutmayın. Yeşil olana kadar bu sekmeyi kapatmayın.
+              </p>
+            ) : null}
             <div className="save-row">
               <button
                 className="btn btn-wexon"
                 type="button"
-                disabled={connected}
+                disabled={connected || connecting}
                 onClick={() => void connectQr()}
               >
                 {connecting || localState === "starting"

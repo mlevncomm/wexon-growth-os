@@ -274,7 +274,9 @@ async function openSocket(
     };
 
     sock.ev.on("creds.update", () => {
-      void authState.saveCreds().catch(() => undefined);
+      void authState.saveCreds().catch((err) => {
+        console.error("wa-web persist", err instanceof Error ? err.message : "unknown");
+      });
     });
 
     sock.ev.on("connection.update", (update) => {
@@ -297,7 +299,20 @@ async function openSocket(
         }
         if (info.connection === "open") {
           lives().set(owner, { pairId, sock, ready: true });
-          await authState.flush();
+          try {
+            await authState.flush();
+          } catch (err) {
+            const message = err instanceof Error ? err.message : "Oturum kaydedilemedi";
+            console.error("wa-web ready persist", message);
+            await patch(owner, {
+              waWebState: "error",
+              waWebQr: "",
+              waWebError: "Oturum kaydedilemedi. Sistem yöneticisine AUTH_SECRET bildirin.",
+              waWebPairingUntil: null,
+            });
+            finish(false, message);
+            return;
+          }
           await patch(owner, {
             waWebState: "ready",
             waWebQr: "",
@@ -308,6 +323,11 @@ async function openSocket(
         }
         if (info.connection === "close") {
           const code = boomCode(info.lastDisconnect?.error);
+          const raw =
+            info.lastDisconnect?.error instanceof Error
+              ? info.lastDisconnect.error.message
+              : "";
+          console.error("wa-web close", code ?? "none", raw.slice(0, 180));
           lives().delete(owner);
           if (code === baileys.DisconnectReason.loggedOut || code === 401) {
             await patch(owner, {
