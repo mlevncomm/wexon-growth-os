@@ -7,7 +7,7 @@ import { ctxForTenantId, runWithTenant } from "@/lib/tenant";
 import { processQueueTick } from "@/lib/whatsapp/queue";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 180;
 export const runtime = "nodejs";
 
 async function tickAll() {

@@ -194,7 +194,13 @@ model AppSettings {
   llmBaseUrl           String  @default("https://generativelanguage.googleapis.com/v1beta/openai")
   llmModel             String  @default("gemini-3.5-flash")
   llmProvider          String  @default("gemini")
-  igAccessToken        String  @default("")
-  igUserId             String  @default("")
-  igWebhookVerifyToken String  @default("")
+  igAccessToken        String    @default("")
+  igUserId             String    @default("")
+  igWebhookVerifyToken String    @default("")
+  waWebState           String    @default("disconnected")
+  waWebQr              String    @default("")
+  waWebError           String    @default("")
+  waWebCreds           String    @default("")
+  waWebPairId          String    @default("")
+  waWebPairingUntil    DateTime?
 }

@@ -6,7 +6,9 @@ import { bustStatsCache } from "@/lib/stats";
 import { runWithTenant, withTenant } from "@/lib/tenant";
 import { ensureQueueLoop, processQueueTick } from "@/lib/whatsapp/queue";
 
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 180;
 
 export async function POST(request: Request) {
   return withTenant(async (ctx) => {

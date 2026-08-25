@@ -81,7 +81,7 @@ const MODULES = [
     kicker: "Kanal",
     title: "Mesaj",
     points: [
-      "Canlıda QR yok. Cloud bağlanınca yeşil rozet çıkar.",
+      "Bu sitede QR okutun. Cloud varsa o gider; yoksa QR oturumu asıl kanaldır.",
       "Hazır metin anahtarsız çalışır. AI için Sistem’e Google Gemini yazın.",
       "Koç playbook’u doluysa AI o kurallara uyar.",
     ],

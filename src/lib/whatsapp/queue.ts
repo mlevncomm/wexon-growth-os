@@ -53,15 +53,11 @@ async function sendMessage(phone: string, text: string): Promise<"cloud" | "loca
     await sendCloudMessage(phone, text);
     return "cloud";
   }
-  if (isServerless()) {
-    throw new Error("Vercel’de QR yok. Sistem’e WhatsApp Cloud token yazın.");
+  const { sendWebMessage, webReady } = await import("./web");
+  if (!(await webReady())) {
+    throw new Error("WhatsApp bağlı değil. Mesaj ekranında QR’ı okutun.");
   }
-  const { getLocalStatus, sendLocalMessage } = await import("./local");
-  const local = getLocalStatus();
-  if (local.state !== "ready") {
-    throw new Error("WhatsApp bağlı değil. Cloud API girin veya QR okutun.");
-  }
-  await sendLocalMessage(phone, text);
+  await sendWebMessage(phone, text);
   return "local";
 }
 

@@ -66,7 +66,7 @@ export default function OutreachPage() {
     if (Array.isArray(c?.angles)) setAngles(c.angles);
     if (!angle && typeof c?.defaultAngle === "string") setAngle(c.defaultAngle);
     setLoading(false);
-    if (w?.local?.state === "qr" || w?.local?.state === "ready") setConnecting(false);
+    if (wa?.local.state === "qr" || wa?.local.state === "ready" || wa?.local.state === "error") setConnecting(false);
   }
 
   useEffect(() => {
@@ -76,16 +76,13 @@ export default function OutreachPage() {
         setLoading(false);
       });
     }, 0);
-    if (wa?.serverless) {
-      return () => window.clearTimeout(boot);
-    }
     const live = wa?.local.state === "starting" || wa?.local.state === "qr" || connecting;
     const t = window.setInterval(() => void refresh(), live ? 1500 : 4000);
     return () => {
       window.clearTimeout(boot);
       window.clearInterval(t);
     };
-  }, [wa?.serverless, wa?.local.state, connecting]);
+  }, [wa?.local.state, connecting]);
 
   async function applyAngle(next: string) {
     setAngle(next);
@@ -191,11 +188,11 @@ export default function OutreachPage() {
       <div className="page-kicker">Kanal</div>
       <h1 className="page-title">Satış outreach</h1>
       <p className="page-copy">
-        Solda playbook’a uygun metni üretip kaydedin. Gönderim onay kuyruğundan çıkar. Meta Cloud kilitliyken bu PC’de WhatsApp Web QR’sı kullanılır.
+        Solda playbook’a uygun metni üretip kaydedin. Gönderim onay kuyruğundan çıkar. WhatsApp’ı bu sitede QR ile bağlayın; oturum işletme kaydına yazılır.
       </p>
 
       <div className="notice" style={{ marginTop: 16 }}>
-        Canlı site (Vercel) QR açamaz. Bu bilgisayarda Growth OS çalışırken sağdaki QR’ı, WhatsApp Business → Ayarlar → Cihazlar → Cihaz bağla ile okutun. Mesajlar yine onay kuyruğundan çıkar. Ticari iletide İYS onayı sizin sorumluluğunuzdadır.
+        Bu sitede “QR oturumu aç”a basın. WhatsApp Business → Ayarlar → Cihazlar → Cihaz bağla ile okutun. Oturum canlı sunucuya yazılır; localhost gerekmez. Mesajlar yine onay kuyruğundan çıkar. Ticari iletide İYS onayı sizin sorumluluğunuzdadır.
       </div>
 
       {error ? <p className="error-box" style={{ marginTop: 14 }}>{error}</p> : null}
@@ -318,9 +315,7 @@ export default function OutreachPage() {
               <span className={`dot${connected ? "" : localState === "error" ? " bad" : " warn"}`} />
               {wa?.cloud
                 ? "Cloud API asıl kanal — onay sonrası Cloud gider."
-                : wa?.serverless
-                  ? "Canlıda QR yok — bu PC’de localhost ile okutun"
-                  : statusLabel(localState)}
+                : statusLabel(localState)}
             </p>
             <p className="panel-note" style={{ marginTop: 8 }}>
               WhatsApp Business uygulaması da WhatsApp Web gibi bağlı cihaz kabul eder. Instagram gelen kutusu ayrı ekranda; soğuk DM yok.
@@ -337,12 +332,6 @@ export default function OutreachPage() {
               />
             ) : null}
             <div className="save-row">
-              {wa?.serverless ? (
-                <p className="panel-note" style={{ margin: 0 }}>
-                  wexon-growth-os.vercel.app üzerinde Chrome açılamaz. Bu PC’de projeyi çalıştırıp http://127.0.0.1:3000/whatsapp adresine girin; QR burada çıkar.
-                </p>
-              ) : (
-                <>
               <button
                 className="btn btn-wexon"
                 type="button"
@@ -350,7 +339,7 @@ export default function OutreachPage() {
                 onClick={() => void connectQr()}
               >
                 {connecting || localState === "starting"
-                  ? "Yeniden dene"
+                  ? "QR bekleniyor"
                   : localState === "qr"
                     ? "QR yenile"
                     : "QR oturumu aç"}
@@ -360,8 +349,6 @@ export default function OutreachPage() {
                   Kes
                 </button>
               ) : null}
-                </>
-              )}
             </div>
           </section>
         </div>
@@ -370,23 +357,23 @@ export default function OutreachPage() {
       <div style={{ marginTop: 18 }}>
         <ConnectGuide
           kicker="WhatsApp Business"
-          title="QR ile bağla (Cloud olmadan)"
+          title="QR ile bağla"
           steps={[
             {
-              title: "Bu bilgisayarda aç",
-              body: "Canlı Vercel QR üretmez. Growth OS’u bu PC’de çalıştırın (localhost:3000). Mesaj ekranında “QR oturumu aç”a basın; küçük bir Chrome penceresi ve QR çıkar.",
+              title: "Bu sitede QR aç",
+              body: "Mesaj ekranında “QR oturumu aç”a basın. Kod bu sayfada çıkar; localhost veya ayrı bir PC oturumu gerekmez.",
             },
             {
               title: "Telefonda WhatsApp Business",
               body: "Yeşil WhatsApp Business uygulaması → Ayarlar → Cihazlar → Cihaz bağla. Ekrandaki QR’ı okutun. Normal WhatsApp da aynı menüden bağlanır; ikisini aynı anda karıştırmayın.",
             },
             {
-              title: "PC açık kalsın",
-              body: "QR oturumu bu makinedeki Chrome profiline yazılır. Bilgisayar uykuya dalınca veya Kes’e basınca kanal düşer. Gönderim yine onay kuyruğundan çıkar; rastgele spam yok.",
+              title: "Oturum canlıda kalır",
+              body: "Bağlandıktan sonra oturum bu işletmenin kaydına yazılır. Gönderim onay kuyruğundan çıkar; rastgele spam yok. Kes’e basınca kanal düşer.",
             },
             {
-              title: "Cloud sonra",
-              body: "Meta developer kilidi açılınca Sistem’e Cloud token yazılır; o zaman canlı site de gönderir. QR yedek kalır.",
+              title: "Cloud isteğe bağlı",
+              body: "Meta developer kilidi açılırsa Sistem’e Cloud token da yazılabilir. QR oturumu Cloud yokken asıl kanaldır.",
             },
           ]}
         />

@@ -5,6 +5,9 @@ const nextConfig: NextConfig = {
   serverExternalPackages: [
     "@prisma/client",
     "whatsapp-web.js",
+    "@whiskeysockets/baileys",
+    "whatsapp-rust-bridge",
+    "libsignal",
     "qrcode",
     "exceljs",
     "puppeteer",

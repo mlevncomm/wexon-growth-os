@@ -554,7 +554,7 @@ export default function AyarlarPage() {
             </span>
           </div>
           <p className="panel-note">
-            Canlı veritabanı Supabase Postgres’tir. Vercel’de WhatsApp QR ve dosya veritabanı çalışmaz.
+            Canlı veritabanı Supabase Postgres’tir. WhatsApp QR oturumu da bu veritabanına yazılır.
             {deploy.authConfigured ? " Admin girişi tanımlı." : " Admin için AUTH_SECRET + e-posta + şifre yazın."}
           </p>
         </section>

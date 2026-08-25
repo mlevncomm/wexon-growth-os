@@ -137,6 +137,13 @@ export async function loadDashboardStats(force = false, explicitTenantId?: strin
     waLocal: "disconnected",
   };
 
+  const waRow = await prisma.appSettings.findUnique({
+    where: { tenantId: id },
+    select: { waWebState: true },
+  });
+  if (waRow?.waWebState === "ready") data.waLocal = "ready";
+  else if (waRow?.waWebState === "qr" || waRow?.waWebState === "starting") data.waLocal = waRow.waWebState;
+
   const scanning = data.lastCampaign && (data.lastCampaign.status === "running" || data.lastCampaign.status === "queued");
   cache().set(id, { at: scanning ? Date.now() - TTL_MS + 1_200 : Date.now(), data });
   return data;
