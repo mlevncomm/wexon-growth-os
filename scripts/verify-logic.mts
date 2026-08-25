@@ -8,6 +8,7 @@ import { mergePlaybook, playbookIsActive, playbookToPrompt } from "../src/lib/pl
 import { copyAngles, defaultAngle, generateSalesCopy } from "../src/lib/copy-ai.ts";
 import { sectorGroupsFor } from "../src/lib/sectors.ts";
 import { TENANT_SEEDS } from "../src/lib/verticals.ts";
+import { isRetiredGroqKey, normalizeLlmConfig } from "../src/lib/llm-providers.ts";
 
 let failed = 0;
 function check(ok: boolean, label: string, detail?: unknown) {
@@ -120,6 +121,19 @@ check(sectorGroupsFor("water")[0]?.id === "food", "water sectors");
 check(sectorGroupsFor("software").some((g) => g.items.some((i) => /yazılım|web|e-ticaret/i.test(i.label + i.query))), "software sectors");
 check(sectorGroupsFor("yks").some((g) => g.items.some((i) => /okul|dershane|kurs/i.test(i.label + i.query))), "yks sectors");
 check(JSON.stringify(sectorGroupsFor("water")) !== JSON.stringify(sectorGroupsFor("yks")), "verticals not mixed");
+
+check(isRetiredGroqKey("gsk_abc"), "groq key retired");
+check(!isRetiredGroqKey("AIzaSyTest"), "gemini key kept");
+const remapped = normalizeLlmConfig({
+  llmApiKey: "gsk_old",
+  llmBaseUrl: "https://api.groq.com/openai/v1",
+  llmModel: "openai/gpt-oss-20b",
+  llmProvider: "groq",
+});
+check(remapped.llmApiKey === "", "groq key stripped");
+check(remapped.llmProvider === "gemini", "groq provider remapped");
+check(remapped.llmBaseUrl.includes("generativelanguage.googleapis.com"), "gemini url");
+check(remapped.llmModel === "gemini-2.5-flash", "gemini model");
 
 if (failed) {
   console.error(`FAILED ${failed}`);

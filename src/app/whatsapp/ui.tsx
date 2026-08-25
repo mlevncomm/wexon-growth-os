@@ -222,7 +222,7 @@ export default function OutreachPage() {
             </div>
             <p className="panel-note">
               Açı seçin veya AI’ya not yazın. {`{ad}`} ve {`{ilçe}`} gönderimde dolar.
-              {hasLlm ? " Sistem’deki model playbook ile yazar." : " Ücretsiz AI için Sistem’e Groq anahtarı yazın."}
+              {hasLlm ? " Sistem’deki Gemini playbook ile yazar." : " AI için Sistem’e Google Gemini anahtarı yazın."}
               {playbookActive ? " Koç’ta öğretilen kurallar uygulanır." : " Koç ekranından markayı öğretebilirsiniz."}
             </p>
             <div className="field">

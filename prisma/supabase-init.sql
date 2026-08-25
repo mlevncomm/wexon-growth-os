@@ -110,9 +110,9 @@ CREATE TABLE IF NOT EXISTS "AppSettings" (
   "queuePaused" BOOLEAN NOT NULL DEFAULT false,
   "queueStopped" BOOLEAN NOT NULL DEFAULT false,
   "llmApiKey" TEXT NOT NULL DEFAULT '',
-  "llmBaseUrl" TEXT NOT NULL DEFAULT 'https://api.groq.com/openai/v1',
-  "llmModel" TEXT NOT NULL DEFAULT 'openai/gpt-oss-20b',
-  "llmProvider" TEXT NOT NULL DEFAULT 'groq',
+  "llmBaseUrl" TEXT NOT NULL DEFAULT 'https://generativelanguage.googleapis.com/v1beta/openai',
+  "llmModel" TEXT NOT NULL DEFAULT 'gemini-2.5-flash',
+  "llmProvider" TEXT NOT NULL DEFAULT 'gemini',
   "igAccessToken" TEXT NOT NULL DEFAULT '',
   "igUserId" TEXT NOT NULL DEFAULT '',
   "igWebhookVerifyToken" TEXT NOT NULL DEFAULT ''

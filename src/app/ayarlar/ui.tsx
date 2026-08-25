@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ChipStrip } from "@/components/ChipStrip";
 import { ConnectGuide } from "@/components/ConnectGuide";
 import { useToast } from "@/components/Toast";
-import { LLM_PROVIDERS } from "@/lib/llm-providers";
+import { DEFAULT_LLM, LLM_PROVIDERS, normalizeLlmConfig } from "@/lib/llm-providers";
 
 type Settings = {
   googlePlacesApiKey: string;
@@ -43,9 +43,9 @@ export default function AyarlarPage() {
     delayMaxSec: 45,
     dailyCap: 40,
     llmApiKey: "",
-    llmBaseUrl: "https://api.groq.com/openai/v1",
-    llmModel: "openai/gpt-oss-20b",
-    llmProvider: "groq",
+    llmBaseUrl: DEFAULT_LLM.baseUrl,
+    llmModel: DEFAULT_LLM.model,
+    llmProvider: DEFAULT_LLM.id,
     igAccessToken: "",
     igUserId: "",
     igWebhookVerifyToken: "",
@@ -67,12 +67,20 @@ export default function AyarlarPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [llmBusy, setLlmBusy] = useState(false);
+  const [llmCheck, setLlmCheck] = useState<"idle" | "ok" | "bad">("idle");
+  const [llmCheckMsg, setLlmCheckMsg] = useState("");
 
   useEffect(() => {
     const boot = window.setTimeout(() => {
       fetch("/api/settings")
         .then((r) => r.json())
         .then((s: Settings) => {
+          const llm = normalizeLlmConfig({
+            llmApiKey: s.llmApiKey ?? "",
+            llmBaseUrl: s.llmBaseUrl,
+            llmModel: s.llmModel,
+            llmProvider: s.llmProvider,
+          });
           setForm({
             googlePlacesApiKey: s.googlePlacesApiKey,
             waCloudToken: s.waCloudToken,
@@ -80,10 +88,7 @@ export default function AyarlarPage() {
             delayMinSec: s.delayMinSec,
             delayMaxSec: s.delayMaxSec,
             dailyCap: s.dailyCap,
-            llmApiKey: s.llmApiKey ?? "",
-            llmBaseUrl: s.llmBaseUrl || "https://api.groq.com/openai/v1",
-            llmModel: s.llmModel || "openai/gpt-oss-20b",
-            llmProvider: s.llmProvider || "groq",
+            ...llm,
             igAccessToken: s.igAccessToken ?? "",
             igUserId: s.igUserId ?? "",
             igWebhookVerifyToken: s.igWebhookVerifyToken ?? "",
@@ -158,6 +163,8 @@ export default function AyarlarPage() {
 
   async function testLlm() {
     setLlmBusy(true);
+    setLlmCheck("idle");
+    setLlmCheckMsg("");
     try {
       const saved = await save();
       if (!saved) return;
@@ -167,10 +174,15 @@ export default function AyarlarPage() {
         body: JSON.stringify({ ping: true }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Bağlantı yok");
-      toast.push("AI bağlandı, şablon üretebilir");
+      if (!res.ok) throw new Error(json.error || "Gemini yanıt vermedi");
+      setLlmCheck("ok");
+      setLlmCheckMsg("Gemini bağlandı. Koç ve mesaj şablonları bu anahtarı kullanır.");
+      toast.push("Gemini çalışıyor");
     } catch (err) {
-      toast.push(err instanceof Error ? err.message : "AI bağlanamadı", "bad");
+      const message = err instanceof Error ? err.message : "Gemini bağlanamadı";
+      setLlmCheck("bad");
+      setLlmCheckMsg(message);
+      toast.push(message, "bad");
     } finally {
       setLlmBusy(false);
     }
@@ -183,7 +195,7 @@ export default function AyarlarPage() {
       <div className="page-kicker">Sistem</div>
       <h1 className="page-title">Anahtarlar ve tavan</h1>
       <p className="page-copy">
-        Canlıda anahtarlar Supabase’e yazılır. Places için Cloud Console’da Places API (New) ve Places API açık olsun. Maskeli alanı değiştirmezseniz eski sır korunur.
+        Her işletme kendi anahtarını buraya yazar; Aquails, Wexon.dev ve Akarsu karışmaz. Aşağıdaki kılavuzdan alın, yapıştırın, kaydedin. Maskeli alanı değiştirmezseniz eski sır korunur.
       </p>
 
       {error ? <p className="error-box" style={{ marginTop: 16 }}>{error}</p> : null}
@@ -195,6 +207,40 @@ export default function AyarlarPage() {
         </div>
       ) : (
         <>
+        <div style={{ marginBottom: 14 }}>
+          <ConnectGuide
+            id="anahtar-kilavuzu"
+            kicker="Kılavuz"
+            title="Kendi anahtarınızı alın"
+            note="Wexon size Gemini, Places veya WhatsApp vermez. Google / Meta hesabınızdan ücretsiz veya kendi kotanızla alın. Başka işletmenin anahtarını yapıştırmayın."
+            steps={[
+              {
+                title: "Google Gemini (Koç ve metin)",
+                body: "Google hesabıyla AI Studio’ya girin. Create API key → anahtarı kopyalayın (AIza…). Bu sayfada Google Gemini alanına yapıştırıp kaydedin, sonra Kontrol et’e basın. Kart istemez; ücretsiz kota vardır.",
+                href: "https://aistudio.google.com/apikey",
+                linkLabel: "AI Studio’da anahtar al",
+              },
+              {
+                title: "Google Places (Keşif)",
+                body: "Google Cloud Console’da proje açın. Places API (New) ve Places API’yi etkinleştirin. Credentials → API key. AIza… anahtarını yukarıdaki Google Places alanına yazın. Anahtar yetmez: iki API de açık olmalı.",
+                href: "https://console.cloud.google.com/apis/library/places.googleapis.com",
+                linkLabel: "Places API’yi aç",
+              },
+              {
+                title: "WhatsApp Cloud (canlı gönderim)",
+                body: "Meta Business’ta kendi şirket sayfanız ve WhatsApp Business Platform (Cloud API) gerekir. Sistem kullanıcısından kalıcı token + Phone number ID (numaranın kendisi değil) alın. Bu hesaba özeldir; Vercel’de QR çalışmaz.",
+                href: "https://business.facebook.com",
+                linkLabel: "Meta Business’ı aç",
+              },
+              {
+                title: "Instagram (gelen DM)",
+                body: "Kişisel şifre yok. Instagram Professional + Meta uygulama token ve user ID. Webhook için canlı HTTPS şart.",
+                href: "https://developers.facebook.com",
+                linkLabel: "Meta Developers",
+              },
+            ]}
+          />
+        </div>
         <div className="settings-grid">
           <section className="card panel">
             <div className="panel-head">
@@ -310,14 +356,18 @@ export default function AyarlarPage() {
           <div className="panel-head">
             <div>
               <div className="page-kicker">Yapay zeka</div>
-              <h2>Mesaj şablonu motoru</h2>
+              <h2>Google Gemini</h2>
             </div>
             <span className={`pill ${flags.hasLlmKey ? "ok" : "mute"}`}>
-              {flags.hasLlmKey ? "Bağlı" : "Hazır metin"}
+              {flags.hasLlmKey ? "Kayıtlı" : "Anahtar yok"}
             </span>
           </div>
           <p className="panel-note">
-            Ücretsiz için Groq önerilir. OpenAI, Gemini veya OpenRouter da olur; hepsi OpenAI uyumlu uç kullanır. Anahtar yoksa açı seçince hazır metin gelir.
+            Koç ve akıllı metin Google Gemini kullanır. Anahtarı{" "}
+            <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">
+              Google AI Studio
+            </a>{" "}
+            adresinden alın (AIza…). Anahtar yoksa Mesaj ekranı hazır metinle çalışır.
           </p>
           <div className="field">
             <span>Sağlayıcı</span>
@@ -338,11 +388,15 @@ export default function AyarlarPage() {
           <div className="key-stack" style={{ marginTop: 14 }}>
             <div className="key-block">
               <label className="field">
-                <span>API anahtarı</span>
+                <span>Google Gemini anahtarı</span>
                 <input
                   value={form.llmApiKey}
-                  onChange={(e) => setForm({ ...form, llmApiKey: e.target.value })}
-                  placeholder="gsk_… / sk-… / AIza…"
+                  onChange={(e) => {
+                    setLlmCheck("idle");
+                    setLlmCheckMsg("");
+                    setForm({ ...form, llmApiKey: e.target.value });
+                  }}
+                  placeholder="AIza…"
                   autoComplete="off"
                 />
               </label>
@@ -353,7 +407,7 @@ export default function AyarlarPage() {
                 <input
                   value={form.llmBaseUrl}
                   onChange={(e) => setForm({ ...form, llmBaseUrl: e.target.value, llmProvider: "custom" })}
-                  placeholder="https://api.groq.com/openai/v1"
+                  placeholder={DEFAULT_LLM.baseUrl}
                   autoComplete="off"
                 />
               </label>
@@ -364,7 +418,7 @@ export default function AyarlarPage() {
                 <input
                   value={form.llmModel}
                   onChange={(e) => setForm({ ...form, llmModel: e.target.value })}
-                  placeholder="openai/gpt-oss-20b"
+                  placeholder={DEFAULT_LLM.model}
                   autoComplete="off"
                 />
               </label>
@@ -372,12 +426,35 @@ export default function AyarlarPage() {
           </div>
           <div className="save-row">
             <button className="btn btn-wexon" type="button" onClick={() => void save()}>
-              AI ayarını kaydet
-            </button>
-            <button className="btn btn-ghost" type="button" disabled={llmBusy} onClick={() => void testLlm()}>
-              {llmBusy ? "Deniyor…" : "Bağlantıyı dene"}
+              Gemini’yi kaydet
             </button>
           </div>
+          {flags.hasLlmKey || form.llmApiKey.trim().length > 8 ? (
+            <div className="key-block" style={{ marginTop: 14 }}>
+              <div className="muted" style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                Kontrol et
+              </div>
+              <p className="panel-note" style={{ marginTop: 6 }}>
+                Kaydettikten sonra Google’a kısa bir ping atar. Koç ancak bu geçince yazar.
+              </p>
+              <div className="save-row" style={{ marginTop: 10 }}>
+                <button className="btn btn-wexon" type="button" disabled={llmBusy} onClick={() => void testLlm()}>
+                  {llmBusy ? "Kontrol ediliyor…" : "Kontrol et"}
+                </button>
+                {llmCheck === "ok" ? <span className="pill ok">Çalışıyor</span> : null}
+                {llmCheck === "bad" ? <span className="pill bad">Hata</span> : null}
+              </div>
+              {llmCheckMsg ? (
+                <p className={llmCheck === "bad" ? "error-box" : "panel-note"} style={{ marginTop: 10 }}>
+                  {llmCheckMsg}
+                </p>
+              ) : null}
+            </div>
+          ) : (
+            <p className="panel-note" style={{ marginTop: 12 }}>
+              Anahtarı yapıştırıp kaydedin. Kontrol et alanı ondan sonra açılır.
+            </p>
+          )}
         </section>
 
         <section className="card panel" style={{ marginTop: 14 }}>
@@ -466,8 +543,8 @@ export default function AyarlarPage() {
         </section>
         <div style={{ marginTop: 14 }}>
           <ConnectGuide
-            kicker="Bağlantı sırası"
-            title="Eksik parça kalmasın"
+            kicker="Yayınlayan için"
+            title="Sunucu env (ortak anahtar değil)"
             copyValue={deploy.instagramWebhookUrl}
             steps={[
               {
@@ -476,7 +553,7 @@ export default function AyarlarPage() {
               },
               {
                 title: "Vercel env",
-                body: `Aynı isimleri Production/Preview/Development’a yazın: DATABASE_URL, DIRECT_URL, AUTH_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD, APP_URL, CRON_SECRET, GOOGLE_PLACES_API_KEY, LLM_API_KEY, WHATSAPP_CLOUD_TOKEN, WHATSAPP_PHONE_NUMBER_ID, IG_ACCESS_TOKEN, IG_USER_ID, IG_WEBHOOK_VERIFY_TOKEN. APP_URL = ${deploy.appUrl || "https://projeniz.vercel.app"}`,
+                body: `Yalnızca sunucu sırları: DATABASE_URL, DIRECT_URL, AUTH_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD, APP_URL, CRON_SECRET. Gemini, Places, WhatsApp ve Instagram anahtarlarını buraya yazmayın — her işletme Sistem ekranına kendi anahtarını yapıştırır. APP_URL = ${deploy.appUrl || "https://projeniz.vercel.app"}`,
               },
               {
                 title: "Admin girişi",

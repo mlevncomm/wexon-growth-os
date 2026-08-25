@@ -17,7 +17,7 @@ const STEPS = [
     n: "01",
     href: "/ayarlar",
     title: "Sistemi bağla",
-    body: "Places anahtarı keşif için şart. Canlı WhatsApp için Cloud token + phone number ID. AI koç ve akıllı metin için Groq. Instagram DM ayrı token ister.",
+    body: "Places anahtarı keşif için şart. Canlı WhatsApp için Cloud token + phone number ID. AI koç ve akıllı metin için Google Gemini. Instagram DM ayrı token ister.",
   },
   {
     n: "02",
@@ -82,7 +82,7 @@ const MODULES = [
     title: "Mesaj",
     points: [
       "Canlıda QR yok. Cloud bağlanınca yeşil rozet çıkar.",
-      "Hazır metin anahtarsız çalışır. AI için Sistem’e Groq yazın.",
+      "Hazır metin anahtarsız çalışır. AI için Sistem’e Google Gemini yazın.",
       "Koç playbook’u doluysa AI o kurallara uyar.",
     ],
   },
@@ -93,7 +93,7 @@ const MODULES = [
     points: [
       "Türkçe konuşun: ton, yasak kelime, fiyat, CTA.",
       "Öğrenilenler kalıcı playbook olur. Fine-tune yok.",
-      "Anahtar yoksa koç size Sistem’e Groq yazmanızı söyler.",
+      "Anahtar yoksa koç Sistem’e Gemini yazmanızı söyler. Kayıttan sonra Kontrol et ile deneyin.",
     ],
   },
   {
@@ -111,9 +111,9 @@ const MODULES = [
     kicker: "Araçlar",
     title: "Sistem",
     points: [
+      "Her işletme kendi Gemini / Places / WhatsApp anahtarını Sistem kılavuzundan alır; paylaşılmaz.",
       "Maskeli alanı değiştirmezseniz eski sır korunur.",
       "Günlük tavan ve 20–45 sn aralık spam görünümünü keser.",
-      "Vercel Hobby cron günde birdir. Dakikalık kuyruk için Pro veya harici cron.",
     ],
   },
 ] as const;
@@ -155,7 +155,7 @@ export default function KilavuzPage() {
       <div className="manual-status">
         <Status ok={Boolean(ready?.places)} label="Places" href="/ayarlar" />
         <Status ok={Boolean(ready?.cloud)} label="WhatsApp Cloud" href="/ayarlar" />
-        <Status ok={Boolean(ready?.llm)} label="AI / Groq" href="/ayarlar" />
+        <Status ok={Boolean(ready?.llm)} label="AI / Gemini" href="/ayarlar" />
         <Status ok={Boolean(ready?.ig)} label="Instagram" href="/instagram" />
         <Status ok={leads > 0} label={leads ? `${leads} müşteri` : "Keşif yok"} href="/ara" />
         <Status ok={queued > 0} label={queued ? `${queued} kuyruk` : "Kuyruk boş"} href="/?queue=1" />

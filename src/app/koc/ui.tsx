@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useToast } from "@/components/Toast";
 
@@ -21,6 +22,8 @@ export default function KocPage() {
   const [hasLlm, setHasLlm] = useState(false);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
+  const [check, setCheck] = useState<"idle" | "busy" | "ok" | "bad">("idle");
+  const [checkMsg, setCheckMsg] = useState("");
   const bottom = useRef<HTMLDivElement>(null);
 
   function apply(json: {
@@ -72,6 +75,28 @@ export default function KocPage() {
     }
   }
 
+  async function kontrolEt() {
+    setCheck("busy");
+    setCheckMsg("");
+    try {
+      const res = await fetch("/api/copy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ping: true }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Gemini yanıt vermedi");
+      setCheck("ok");
+      setCheckMsg("Gemini bağlandı. Koça yazabilirsiniz.");
+      toast.push("Gemini çalışıyor");
+    } catch (err) {
+      setCheck("bad");
+      const message = err instanceof Error ? err.message : "Gemini bağlanamadı";
+      setCheckMsg(message);
+      toast.push(message, "bad");
+    }
+  }
+
   async function reset(playbookToo: boolean) {
     const res = await fetch(`/api/coach${playbookToo ? "?playbook=1" : ""}`, { method: "DELETE" });
     const json = await res.json();
@@ -94,8 +119,41 @@ export default function KocPage() {
               <div className="page-kicker">Sohbet</div>
               <h2>Öğret</h2>
             </div>
-            <span className={`pill ${hasLlm ? "ok" : "warn"}`}>{hasLlm ? "AI bağlı" : "Anahtar yok"}</span>
+            <span className={`pill ${hasLlm ? "ok" : "warn"}`}>{hasLlm ? "Gemini" : "Anahtar yok"}</span>
           </div>
+          {!hasLlm ? (
+            <div className="notice" style={{ marginBottom: 12 }}>
+              Google Gemini anahtarı yok.{" "}
+              <Link href="/ayarlar#anahtar-kilavuzu">Sistem kılavuzundan</Link>{" "}
+              kendi Gemini anahtarınızı alın, yapıştırıp kaydedin. Kayıttan sonra burada Kontrol et çıkar.
+            </div>
+          ) : (
+            <div className="key-block" style={{ marginBottom: 12 }}>
+              <div className="muted" style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                Gemini anahtarı
+              </div>
+              <p className="panel-note" style={{ marginTop: 6 }}>
+                Kayıtlı anahtarın Google’a ulaşıp ulaşmadığını deneyin. Geçmezse Sistem’de yeni AIza… yapıştırın.
+              </p>
+              <div className="save-row" style={{ marginTop: 10 }}>
+                <button
+                  className="btn btn-wexon"
+                  type="button"
+                  disabled={check === "busy"}
+                  onClick={() => void kontrolEt()}
+                >
+                  {check === "busy" ? "Kontrol ediliyor…" : "Kontrol et"}
+                </button>
+                {check === "ok" ? <span className="pill ok">Çalışıyor</span> : null}
+                {check === "bad" ? <span className="pill bad">Hata</span> : null}
+              </div>
+              {checkMsg ? (
+                <p className={check === "bad" ? "error-box" : "panel-note"} style={{ marginTop: 10 }}>
+                  {checkMsg}
+                </p>
+              ) : null}
+            </div>
+          )}
           <div className="coach-thread">
             {messages.length === 0 ? (
               <p className="panel-note">Örnek: Kısa ol, “ucuz” deme, keşif randevusu iste.</p>

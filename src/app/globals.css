@@ -1172,6 +1172,12 @@ table.data tbody tr:hover { background: #f7fbf9; }
   line-height: 1.5;
   font-weight: 500;
 }
+.guide-steps li a {
+  color: var(--teal);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
 .dot {
   width: 8px;
   height: 8px;

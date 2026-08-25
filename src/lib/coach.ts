@@ -50,7 +50,7 @@ export async function coachTurn(userText: string) {
 
   if (!settings.llmApiKey) {
     const reply =
-      "AI anahtarı yok. Sistem ekranına Groq (veya başka) anahtar yazın; sonra ton, yasak kelime ve CTA’yı buradan öğretebilirsiniz.";
+      "Google Gemini anahtarı yok. Sistem ekranına Google AI Studio anahtarını (AIza…) yazıp kaydedin; sonra Kontrol et ile deneyin. Ton, yasak kelime ve CTA’yı buradan öğretirsiniz.";
     await prisma.coachMessage.create({ data: { tenantId: tenantId(), role: "assistant", body: reply } });
     return coachSnapshot();
   }

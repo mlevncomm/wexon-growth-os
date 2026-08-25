@@ -1,3 +1,4 @@
+import { DEFAULT_LLM, normalizeLlmConfig } from "./llm-providers";
 import { prisma } from "./prisma";
 import { tenantId, tryTenantId } from "./tenant";
 
@@ -49,6 +50,12 @@ function cache(): Map<string, { at: number; data: Settings }> {
 }
 
 function mapSettings(row: SettingsRow | null): Settings {
+  const llm = normalizeLlmConfig({
+    llmApiKey: row?.llmApiKey || process.env.LLM_API_KEY || process.env.GEMINI_API_KEY || "",
+    llmBaseUrl: row?.llmBaseUrl || process.env.LLM_BASE_URL || DEFAULT_LLM.baseUrl,
+    llmModel: row?.llmModel || process.env.LLM_MODEL || DEFAULT_LLM.model,
+    llmProvider: row?.llmProvider || process.env.LLM_PROVIDER || DEFAULT_LLM.id,
+  });
   return {
     googlePlacesApiKey:
       row?.googlePlacesApiKey || process.env.GOOGLE_PLACES_API_KEY || "",
@@ -59,10 +66,7 @@ function mapSettings(row: SettingsRow | null): Settings {
     dailyCap: row?.dailyCap ?? 40,
     queuePaused: row?.queuePaused ?? false,
     queueStopped: row?.queueStopped ?? false,
-    llmApiKey: row?.llmApiKey || process.env.LLM_API_KEY || process.env.GROQ_API_KEY || "",
-    llmBaseUrl: row?.llmBaseUrl || process.env.LLM_BASE_URL || "https://api.groq.com/openai/v1",
-    llmModel: row?.llmModel || process.env.LLM_MODEL || "openai/gpt-oss-20b",
-    llmProvider: row?.llmProvider || "groq",
+    ...llm,
     igAccessToken: row?.igAccessToken || "",
     igUserId: row?.igUserId || "",
     igWebhookVerifyToken: row?.igWebhookVerifyToken || "",

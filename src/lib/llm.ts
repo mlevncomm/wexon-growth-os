@@ -291,7 +291,7 @@ export async function pingLlm(opts: {
     apiKey: opts.apiKey,
     baseUrl: opts.baseUrl,
     model: opts.model,
-    maxTokens: 8,
+    maxTokens: 32,
     messages: [{ role: "user", content: "Sadece OK yaz." }],
   });
 }

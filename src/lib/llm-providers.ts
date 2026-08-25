@@ -1,17 +1,10 @@
 export const LLM_PROVIDERS = [
   {
-    id: "groq",
-    label: "Groq (ücretsiz)",
-    baseUrl: "https://api.groq.com/openai/v1",
-    model: "openai/gpt-oss-20b",
-    hint: "console.groq.com — kart gerekmez, OpenAI uyumlu",
-  },
-  {
     id: "gemini",
-    label: "Gemini (ücretsiz kota)",
+    label: "Google Gemini",
     baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
-    model: "gemini-2.0-flash",
-    hint: "aistudio.google.com — Google AI Studio anahtarı",
+    model: "gemini-2.5-flash",
+    hint: "aistudio.google.com/apikey — AIza… ile başlayan Google AI Studio anahtarı",
   },
   {
     id: "openai",
@@ -35,3 +28,44 @@ export const LLM_PROVIDERS = [
     hint: "Ollama, LM Studio, vLLM veya başka OpenAI uyumlu uç",
   },
 ] as const;
+
+export const DEFAULT_LLM = LLM_PROVIDERS[0];
+
+export function isRetiredGroqKey(key: string): boolean {
+  return /^gsk_/i.test(key.trim());
+}
+
+export function normalizeLlmConfig(input: {
+  llmApiKey?: string;
+  llmBaseUrl?: string;
+  llmModel?: string;
+  llmProvider?: string;
+}): {
+  llmApiKey: string;
+  llmBaseUrl: string;
+  llmModel: string;
+  llmProvider: string;
+} {
+  const key = isRetiredGroqKey(input.llmApiKey || "") ? "" : (input.llmApiKey || "").trim();
+  const provider = (input.llmProvider || "").trim();
+  const baseUrl = (input.llmBaseUrl || "").trim();
+  const groq = provider === "groq" || /api\.groq\.com/i.test(baseUrl);
+  if (groq || !provider) {
+    const keepModel =
+      input.llmModel &&
+      !/gpt-oss|llama-3|mixtral|groq/i.test(input.llmModel) &&
+      /gemini/i.test(input.llmModel);
+    return {
+      llmApiKey: key,
+      llmProvider: DEFAULT_LLM.id,
+      llmBaseUrl: DEFAULT_LLM.baseUrl,
+      llmModel: keepModel ? input.llmModel : DEFAULT_LLM.model,
+    };
+  }
+  return {
+    llmApiKey: key,
+    llmProvider: provider,
+    llmBaseUrl: baseUrl || DEFAULT_LLM.baseUrl,
+    llmModel: (input.llmModel || "").trim() || DEFAULT_LLM.model,
+  };
+}

@@ -40,7 +40,7 @@ export async function POST(request: Request) {
 
     if (body.ping) {
       if (!settings.llmApiKey) {
-        return NextResponse.json({ error: "AI anahtarı yok" }, { status: 400 });
+        return NextResponse.json({ error: "Google Gemini anahtarı yok" }, { status: 400 });
       }
       try {
         await pingLlm({

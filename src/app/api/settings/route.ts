@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { badRequest, readJson } from "@/lib/http";
+import { normalizeLlmConfig } from "@/lib/llm-providers";
 import { getSettings, updateSettings } from "@/lib/settings";
 import { bustStatsCache } from "@/lib/stats";
 import { deployHints } from "@/lib/platform";
@@ -86,6 +87,24 @@ export async function PUT(request: Request) {
       const tmp = patch.delayMinSec;
       patch.delayMinSec = patch.delayMaxSec;
       patch.delayMaxSec = tmp;
+    }
+
+    if (
+      patch.llmApiKey != null ||
+      patch.llmBaseUrl != null ||
+      patch.llmModel != null ||
+      patch.llmProvider != null
+    ) {
+      const current = await getSettings();
+      Object.assign(
+        patch,
+        normalizeLlmConfig({
+          llmApiKey: patch.llmApiKey ?? current.llmApiKey,
+          llmBaseUrl: patch.llmBaseUrl ?? current.llmBaseUrl,
+          llmModel: patch.llmModel ?? current.llmModel,
+          llmProvider: patch.llmProvider ?? current.llmProvider,
+        }),
+      );
     }
 
     await updateSettings(patch);
