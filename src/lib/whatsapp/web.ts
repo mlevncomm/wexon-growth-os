@@ -17,7 +17,7 @@ type WaSocket = {
     on: (event: string, cb: (data: unknown) => void) => void;
     off?: (event: string, cb: (data: unknown) => void) => void;
   };
-  sendMessage: (jid: string, content: { text: string }) => Promise<unknown>;
+  sendMessage: (jid: string, content: { text: string }) => Promise<{ key?: { id?: string } } | undefined>;
   end: (error: Error | undefined) => Promise<void>;
   logout: (msg?: string) => Promise<void>;
 };
@@ -498,18 +498,81 @@ async function socketForSend(owner: string): Promise<WaSocket> {
   return sock;
 }
 
+// Baileys writes a regular chat message to the socket fire-and-forget
+// (`sendNode`, no server round-trip) — `sock.sendMessage()` resolving tells
+// us nothing about whether WhatsApp actually accepted it. The only real
+// signal is the "messages.update" event WhatsApp's server sends back for
+// the message id: status ERROR means the server rejected it outright (most
+// commonly error code 463 — the account is rate-limited/restricted from
+// starting new 1:1 chats after too many "cold" first-contact messages in a
+// short window), anything at PENDING or above means the server accepted it.
+const ACK_TIMEOUT_MS = 15_000;
+const RESTRICTED_ERROR_CODES = new Set(["463", "479"]);
+
+function waitForAck(sock: WaSocket, msgId: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      sock.ev.off?.("messages.update", handler);
+      fn();
+    };
+    const handler = (data: unknown) => {
+      const updates = data as Array<{
+        key?: { id?: string };
+        update?: { status?: number; messageStubParameters?: string[] };
+      }>;
+      if (!Array.isArray(updates)) return;
+      for (const u of updates) {
+        if (u.key?.id !== msgId) continue;
+        const status = u.update?.status;
+        if (status === 0) {
+          const code = u.update?.messageStubParameters?.[0];
+          const restricted = code ? RESTRICTED_ERROR_CODES.has(code) : false;
+          finish(() =>
+            reject(
+              new Error(
+                restricted
+                  ? "WhatsApp hesabı yeni sohbet başlatmaktan kısıtlanmış görünüyor (hata 463). Bu numaraya tekrar denemeyin; kısıtlama genelde kısa sürede kendiliğinden kalkar."
+                  : `WhatsApp mesajı reddetti (hata ${code ?? "bilinmiyor"}).`,
+              ),
+            ),
+          );
+          return;
+        }
+        if (status !== undefined && status >= 1) {
+          finish(resolve);
+          return;
+        }
+      }
+    };
+    const timer = setTimeout(() => {
+      // No explicit error and no ack within the window — treat as
+      // retryable rather than claim success we can't back up.
+      finish(() =>
+        reject(new Error("WhatsApp bağlı değil. Sunucudan teslim onayı alınamadı, tekrar denenecek.")),
+      );
+    }, ACK_TIMEOUT_MS);
+    sock.ev.on("messages.update", handler);
+  });
+}
+
 export async function sendWebMessage(e164: string, text: string, owner = tenantId()): Promise<void> {
   const sock = await socketForSend(owner);
   const jid = `${phoneForWhatsApp(e164)}@s.whatsapp.net`;
-  await sock.sendMessage(jid, { text });
-  await new Promise((r) => setTimeout(r, 700));
+  const sent = await sock.sendMessage(jid, { text });
+  const msgId = sent?.key?.id;
 
-  // sock.sendMessage() only confirms the message was handed to this socket's
-  // outgoing queue — it does not wait for a server ack. If the connection
-  // dropped and reconnected (a new socket replacing this one) in the moment
-  // right after, the send can silently be lost while still looking like
-  // success here. Treat that as a retryable failure instead of reporting
-  // a false "sent".
+  if (msgId) {
+    await waitForAck(sock, msgId);
+  } else {
+    await new Promise((r) => setTimeout(r, 700));
+  }
+
+  // Belt-and-suspenders: even a positive ack doesn't matter if the socket
+  // that received it has since been replaced by a reconnect.
   const live = lives().get(owner);
   if (!live || live.sock !== sock || !live.ready) {
     throw new Error("WhatsApp bağlı değil. Gönderim sırasında bağlantı koptu, tekrar denenecek.");
