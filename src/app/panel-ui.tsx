@@ -151,7 +151,7 @@ export default function PanelPage() {
               <div key={lead.id} className="activity-row">
                 <div>
                   <div style={{ fontWeight: 700 }}>{lead.name}</div>
-                  <div className="muted" style={{ fontSize: 12 }}>{new Date(lead.createdAt).toLocaleDateString("tr-TR")}</div>
+                  <div className="muted" style={{ fontSize: 12 }}>{new Date(lead.createdAt).toLocaleDateString("tr-TR", { timeZone: "Europe/Istanbul" })}</div>
                 </div>
                 <span className="muted">{[lead.district, lead.city].filter(Boolean).join(" · ") || "—"}</span>
                 <span className={`pill ${pillTone(lead.status)}`}>{statusLabel(lead.status)}</span>
@@ -217,10 +217,19 @@ function campaignStatus(status: string) {
   return status;
 }
 
+/** Sunucu (UTC) ve tarayıcı (yerel saat dilimi) farklı günde olabilir; ikisi de
+ * aynı stringi üretsin diye gün sınırı hep İstanbul saatine göre hesaplanır. */
 function startOfDay(d: Date) {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Istanbul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(d);
+  const y = parts.find((p) => p.type === "year")?.value;
+  const m = parts.find((p) => p.type === "month")?.value;
+  const day = parts.find((p) => p.type === "day")?.value;
+  return new Date(`${y}-${m}-${day}T00:00:00+03:00`);
 }
 
 function buildBuckets(leads: Lead[], mode: "daily" | "weekly") {
@@ -232,7 +241,10 @@ function buildBuckets(leads: Lead[], mode: "daily" | "weekly") {
       const next = new Date(day);
       next.setDate(day.getDate() + 1);
       return {
-        label: day.toLocaleDateString("tr-TR", { weekday: "short" }).replace(".", "").slice(0, 2),
+        label: day
+          .toLocaleDateString("tr-TR", { weekday: "short", timeZone: "Europe/Istanbul" })
+          .replace(".", "")
+          .slice(0, 2),
         found: leads.filter((l) => inRange(l.createdAt, day, next)).length,
         sent: leads.filter((l) => l.status === "yazildi" && inRange(l.updatedAt ?? l.createdAt, day, next)).length,
       };
