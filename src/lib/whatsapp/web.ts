@@ -503,4 +503,15 @@ export async function sendWebMessage(e164: string, text: string, owner = tenantI
   const jid = `${phoneForWhatsApp(e164)}@s.whatsapp.net`;
   await sock.sendMessage(jid, { text });
   await new Promise((r) => setTimeout(r, 700));
+
+  // sock.sendMessage() only confirms the message was handed to this socket's
+  // outgoing queue — it does not wait for a server ack. If the connection
+  // dropped and reconnected (a new socket replacing this one) in the moment
+  // right after, the send can silently be lost while still looking like
+  // success here. Treat that as a retryable failure instead of reporting
+  // a false "sent".
+  const live = lives().get(owner);
+  if (!live || live.sock !== sock || !live.ready) {
+    throw new Error("WhatsApp bağlı değil. Gönderim sırasında bağlantı koptu, tekrar denenecek.");
+  }
 }
