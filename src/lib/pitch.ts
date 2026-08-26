@@ -55,72 +55,72 @@ const SECTORS: { id: SectorId; label: string; keys: string[] }[] = [
 
 const SOFTWARE: Record<SectorId, Record<PitchOffer, string>> = {
   kuafor: {
-    web: "Merhaba {ad}, ben Wexon.dev’den yazıyorum. {ilçe} bölgesinde salonlar için randevuyu WhatsApp yazışmasından kurtarıp tek bir bağlantıya taşıyan basit siteler kuruyoruz. İsterseniz nasıl göründüğünü kısaca gösterebilirim, uygun musunuz?",
-    yenile: "Merhaba {ad}, salonunuzun sitesini gördüm — randevu kısmı biraz eskimiş, ziyaretçi telefona düşmeden önce kaybolabiliyor. {ilçe}’deki benzer salonlarda bunu tek sayfada topluyoruz. Kısa bir bakış atmamı ister misiniz?",
+    web: "{ad} için online bir site olmadığında randevu talepleri genelde WhatsApp ve telefon arasında dağılabiliyor, özellikle yoğun saatlerde müşteriyi takip etmek zorlaşabiliyor. Ben Wexon.dev’den yazıyorum; randevu almayı kolaylaştıran, hizmetleri ve fiyatları düzenli gösteren sade bir site hazırlayabiliriz, {ilçe} tarafında böyle bir çalışma düşünür müsünüz?",
+    yenile: "{ad} için mevcut sitenize baktım; hizmetler ve iletişim bilgileri biraz daha güncel ve düzenli sunulsa müşterinin aradığını bulması kolaylaşabilir. Wexon.dev olarak mobilde daha modern görünen, hizmetleri öne çıkaran ve randevu talebini sadeleştiren bir yapı hazırlayabiliriz, örnek bir tasarıma bakmak ister misiniz?",
   },
   restoran: {
-    web: "Merhaba {ad}, Wexon.dev’den selam. {ilçe}’de menü ve rezervasyon Instagram profilinde kaybolan restoranlara sade, hızlı yüklenen bir site kuruyoruz — Google Haritalar’dan doğrudan masa alınabiliyor. İlgilenirseniz kısaca anlatabilirim.",
-    yenile: "Merhaba {ad}, işletmenizin sitesini inceledim; menü güncel değilse ya da yavaş açılıyorsa arama sonuçlarında geride kalıyorsunuz demektir. {ilçe}’de bunu birkaç günde toparlıyoruz. Kısa bir görüşme uygun mu?",
+    web: "{ad} hakkında bilgi arayan müşteriler menüye, çalışma saatlerine veya rezervasyona ulaşmak için çoğu zaman Instagram ve WhatsApp arasında dolaşıyor. Wexon.dev olarak menünüzü ve mekan bilgilerinizi tek yerde toplayan, telefondan kolay kullanılan bir site hazırlayabiliriz; {ilçe} için böyle bir çözüm ilginizi çeker mi?",
+    yenile: "{ad} sitesine göz attım; menü bölümü ve rezervasyon akışı biraz eski bir kullanım hissi veriyor, özellikle telefonda daha sade bir yapı faydalı olabilir. Wexon.dev olarak menüyü daha düzenli sergileyen ve rezervasyon talebini kolaylaştıran yeni bir arayüz tasarlayabiliriz, nasıl görüneceğine bakmak ister misiniz?",
   },
   kafe: {
-    web: "Merhaba {ad}, Wexon.dev’den yazıyorum. {ilçe}’deki bir kafenin konumu ve menüsü genelde Instagram’a gömülü kalıyor — misafir haritada aramıyor, DM’den soruyor. Basit bir vitrin site bu işi kolaylaştırıyor, kısa bir örnek gösterebilirim.",
-    yenile: "Merhaba {ad}, kafenizin sitesine baktım; hız ve menü tarafı biraz geride kalmış görünüyor. {ilçe}’de bu tür siteleri birkaç günde tazeliyoruz. 10 dakikalık bir görüşme ayarlayabilir miyiz?",
+    web: "{ad} gibi bir kafede müşteriler menüye ve konuma hızlıca ulaşmak isterken bilgiler yalnızca Instagram’da kaldığında bazı sorular tekrar tekrar WhatsApp’a gelebiliyor. Wexon.dev olarak menü, konum, çalışma saatleri ve iletişim bilgilerini tek sayfada buluşturan modern bir site hazırlayabiliriz, uygun olur mu?",
+    yenile: "{ad} için mevcut siteyi inceledim; menüye ulaşmak birkaç adım gerektiriyor ve mobil görünüm biraz daha ferah bir düzenle toparlanabilir. Wexon.dev olarak menüyü öne çıkaran, konumu kolay gösteren ve telefonda rahat kullanılan yeni bir tasarım oluşturabiliriz, görmek ister misiniz?",
   },
   klinik: {
-    web: "Merhaba {ad}, Wexon.dev’den yazıyorum. {ilçe}’de hastalar çoğu zaman Instagram’dan geliyor ama randevu yine telefonla alınıyor — sade bir hizmet + randevu sayfası bu adımı kısaltıyor. Uygun bir saatte kısaca anlatabilir miyim?",
-    yenile: "Merhaba {ad}, kliniğinizin sitesine baktım; tedavi sayfaları ve randevu formu biraz zayıf kalmış, arama sonucunda rakipler öne çıkabiliyor. {ilçe}’de bu tarz siteleri düzenli güncelliyoruz. Kısa bir not paylaşabilir miyim?",
+    web: "{ad} için randevu talepleri yalnızca WhatsApp üzerinden geldiğinde yoğun saatlerde mesajların arasında müşteri takibi zorlaşabiliyor. Wexon.dev olarak hizmetlerinizi, fiyat bilgilerinizi ve randevu talebini tek yerde toplayan sade bir site hazırlayabiliriz; {ilçe} bölgesindeki müşterileriniz için böyle bir yapı düşünür müsünüz?",
+    yenile: "{ad} sitesine göz attım; hizmetler ve randevu bölümü biraz eski görünüyor, özellikle mobilde daha temiz bir sunumla müşterinin karar vermesi kolaylaşabilir. Wexon.dev olarak hizmetleri görsel biçimde öne çıkaran ve randevu talebini kısaltan yeni bir tasarım hazırlayabiliriz, incelemek ister misiniz?",
   },
   dis: {
-    web: "Merhaba {ad}, Wexon.dev’den selam. {ilçe}’de diş kliniklerinde fiyat ve randevu soruları genelde mesaj kutusunda birikiyor. Tedavi sayfaları ve randevu formu olan bir site bu yükü hafifletiyor. 10 dakikalık bir görüşme uygun mu?",
-    yenile: "Merhaba {ad}, kliniğinizin sitesini gördüm; implant ya da ortodonti gibi sayfalar eksikse arama sizi atlıyor olabilir. {ilçe}’de bunu tamamlıyoruz. Kısa bir kontrol paylaşmamı ister misiniz?",
+    web: "{ad} hakkında bilgi arayan bir hasta hizmetleri, doktor bilgilerini ve randevu seçeneklerini tek yerde göremediğinde doğrudan telefon veya WhatsApp’a yönelmek zorunda kalabiliyor. Wexon.dev olarak kliniğinizi güven veren ve sade bir şekilde tanıtan, randevu talebini kolaylaştıran bir site hazırlayabiliriz; uygun olur mu?",
+    yenile: "{ad} sitesine göz attım; hizmetler ve randevu bilgileri biraz daha belirgin hale getirilirse özellikle mobil ziyaretçiler için kullanım kolaylaşabilir. Wexon.dev olarak kliniğin hizmetlerini daha düzenli sunan ve randevu talebine kısa yoldan ulaştıran modern bir tasarım hazırlayabiliriz, incelemek ister misiniz?",
   },
   emlak: {
-    web: "Merhaba {ad}, Wexon.dev’den yazıyorum. {ilçe}’de portföyler genelde WhatsApp’ta dağınık kalıyor, ilanlar kayboluyor. Düzenli bir ilan sitesi bu işi toparlıyor. Bu hafta 15 dakikalık bir görüşme mümkün mü?",
-    yenile: "Merhaba {ad}, ofisinizin sitesine baktım; ilanlar güncel değilse müşteri güveni düşüyor olabilir. {ilçe}’de portföy akışını tazeliyoruz. Kısa bir tur atalım mı?",
+    web: "{ad} için ilanlara bakan kişiler yalnızca sosyal medya veya ilan platformlarına yönlendirildiğinde işletmenin tüm hizmetlerini tek yerde görmek zorlaşabiliyor. Wexon.dev olarak portföyünüzü, hizmetlerinizi ve iletişim bilgilerinizi düzenli biçimde sunan modern bir site hazırlayabiliriz; {ilçe} için böyle bir çalışma düşünür müsünüz?",
+    yenile: "{ad} sitesini inceledim; ilanların sunumu ve iletişim bölümü biraz eski bir yapıda kalmış, güncel portföyü daha görsel ve anlaşılır göstermek mümkün. Wexon.dev olarak mobil odaklı, portföyü öne çıkaran ve iletişim sürecini sadeleştiren yeni bir site tasarlayabiliriz, örneğine bakmak ister misiniz?",
   },
   muhasebe: {
-    web: "Merhaba {ad}, Wexon.dev’den selam. {ilçe}’de mali müşavirlik bürolarına genelde referansla iş geliyor, ama sitede hizmetler görünmüyor. Sade bir hizmet sayfası bunu değiştirebilir. Uygun bir gün var mı?",
-    yenile: "Merhaba {ad}, ofisinizin sitesini gördüm; beyanname veya şirket kuruluşu gibi hizmetler ayrı sayfada değilse arama sizi atlıyor olabilir. {ilçe}’de bunu netleştiriyoruz. Kısa bir görüşme uygun mu?",
+    web: "{ad} için hizmet almak isteyen işletmeler hangi konularda destek verdiğinizi çoğu zaman telefon veya WhatsApp üzerinden öğrenmek durumunda kalabiliyor. Wexon.dev olarak muhasebe hizmetlerinizi anlaşılır şekilde anlatan, iletişim talebini kolaylaştıran ve telefonda rahat kullanılan bir site hazırlayabiliriz; böyle bir çalışma size uygun olur mu?",
+    yenile: "{ad} sitesini inceledim; hizmetlerin anlatımı ve iletişim alanı biraz eski bir düzende kalmış, bilgiler daha net bölümlere ayrılabilir. Wexon.dev olarak hizmetlerinizi daha profesyonel gösteren ve potansiyel müşterinin size ulaşmasını kolaylaştıran bir tasarım hazırlayabiliriz, yeni görünümü görmek ister misiniz?",
   },
   avukat: {
-    web: "Merhaba {ad}, Wexon.dev’den yazıyorum. {ilçe}’de büroların dosya soruları çoğu zaman telefonla karışıyor. Uzmanlık alanlarını ayrı sayfada, görüşme formuyla toplayan bir site bunu sadeleştiriyor. Kısa bir tanışma uygun mu?",
-    yenile: "Merhaba {ad}, büronuzun sitesine baktım; uzmanlık alanları tek paragrafta kalmış — müvekkil arama sonucunda başka bir büroyu seçebiliyor. {ilçe}’de sayfa yapısını netleştiriyoruz. Uygun bir gün var mı?",
+    web: "{ad} hakkında araştırma yapan biri uzmanlık alanlarınızı ve iletişim bilgilerinizi tek yerde göremediğinde size ulaşmadan önce farklı kaynaklara bakmak zorunda kalabiliyor. Wexon.dev olarak çalışma alanlarınızı sade biçimde anlatan, mobil uyumlu ve iletişim talebini kolaylaştıran profesyonel bir site oluşturabiliriz; {ilçe} için düşünür müsünüz?",
+    yenile: "{ad} sitesine baktım; uzmanlık alanları ve iletişim bölümü biraz daha sade bir hiyerarşiyle sunulabilir, mevcut görünüm de güncel bir dokunuştan fayda görebilir. Wexon.dev olarak daha kurumsal görünen ve ziyaretçiyi iletişime yönlendiren yeni bir yapı tasarlayabiliriz, bir örneğine bakmak ister misiniz?",
   },
   otel: {
-    web: "Merhaba {ad}, Wexon.dev’den selam. {ilçe}’de oda sorusu çoğu zaman Booking dışında Instagram’a düşüyor. Direkt rezervasyon alan bir vitrin site komisyonu azaltıyor. 15 dakikalık bir görüşme uygun mu?",
-    yenile: "Merhaba {ad}, otelinizin sitesini gördüm; direkt rezervasyon zayıfsa komisyon payınız artıyor olabilir. {ilçe}’de hız ve rezervasyon akışını tazeliyoruz. Kısa bir görüşme ayarlayalım mı?",
+    web: "{ad} için konaklama araştıran misafirler oda bilgilerini ve fiyatları görmek istediğinde çoğunlukla rezervasyon platformlarına yönlendiriliyor, bu da komisyonsuz direkt rezervasyon şansını azaltıyor. Wexon.dev olarak odaları, olanakları ve direkt rezervasyon talebini toplayan bir site hazırlayabiliriz; ilgilenir misiniz?",
+    yenile: "{ad} sitesini inceledim; oda görselleri ve rezervasyon akışı biraz eski bir yapıda kalmış. Wexon.dev olarak direkt rezervasyonu kolaylaştıran, mobilde daha akıcı çalışan yeni bir tasarım hazırlayabiliriz, bakmak ister misiniz?",
   },
   insaat: {
-    web: "Merhaba {ad}, Wexon.dev’den yazıyorum. {ilçe}’de referans projeler genelde WhatsApp’ta kayboluyor. Proje galerisi ve teklif formu olan bir kurumsal site bunu toparlıyor. Bu hafta uygun bir gün var mı?",
-    yenile: "Merhaba {ad}, firmanızın sitesine baktım; tamamlanan işler güncel değilse ihalede güven kaybı olabiliyor. {ilçe}’de proje ve teklif akışını yeniliyoruz. 10 dakikalık bir görüşme uygun mu?",
+    web: "{ad} için tadilat veya inşaat hizmeti arayan biri yaptığınız işleri ve hangi alanlarda çalıştığınızı hızlıca görmek isteyebilir, bunlar yalnızca WhatsApp’ta kalınca seçim yapmak zorlaşıyor. Wexon.dev olarak projelerinizi ve hizmetlerinizi sergileyen modern bir site hazırlayabiliriz; {ilçe} için değerlendirmek ister misiniz?",
+    yenile: "{ad} sitesine baktım; yapılan işlerin sunumu ve hizmet açıklamaları biraz eski görünüyor, projeleri daha güçlü gösterecek bir düzen kurulabilir. Wexon.dev olarak referansları öne çıkaran, telefonda rahat gezilen ve teklif talebini kolaylaştıran yeni bir site tasarlayabiliriz, örneğini görmek ister misiniz?",
   },
   oto: {
-    web: "Merhaba {ad}, Wexon.dev’den selam. {ilçe}’de servis randevusu ve fiyat sorusu genelde telefonda sıra oluşturuyor. Hizmet listesi + WhatsApp randevu satırı olan bir site bunu hızlandırıyor. Kısa bir örnek gösterebilirim.",
-    yenile: "Merhaba {ad}, servisinizin sitesini gördüm; randevu alanı yoksa müşteri başka bir servise gidebiliyor. {ilçe}’de form ve harita görünürlüğünü güncelliyoruz. Uygun bir gün var mı?",
+    web: "{ad} için müşteriler arıza veya bakım konusunda bilgi almak istediğinde telefon ve WhatsApp trafiği gün içinde epey dağılabiliyor. Wexon.dev olarak hizmetleri, iletişim seçeneklerini ve talep formunu tek yerde toplayan sade bir site kurabiliriz; {ilçe} bölgesindeki müşterilerin size daha kolay ulaşması için değerlendirmek ister misiniz?",
+    yenile: "{ad} sitesine baktım; hizmetler ve iletişim alanları biraz eski görünüyor, özellikle telefondan hızlıca bilgi almak isteyen biri için daha net bir akış oluşturulabilir. Wexon.dev olarak servis hizmetlerini düzenli gösteren ve iletişim talebini kolaylaştıran bir tasarım hazırlayabiliriz, yeni halini görmek ister misiniz?",
   },
   magaza: {
     web: "Merhaba {ad}, Wexon.dev’den yazıyorum. {ilçe}’de vitrininiz Instagram’da kalıyorsa satış dükkânda sınırlı kalıyor demektir. Ürün vitrini + WhatsApp sipariş satırı olan bir site bunu genişletiyor. 10 dakikalık bir görüşme uygun mu?",
     yenile: "Merhaba {ad}, mağazanızın sitesine baktım; sayfa yavaş açılıyorsa ziyaretçi tamamlamadan çıkabiliyor. {ilçe}’de hız ve ürün sayfasını tazeliyoruz. Kısa bir teknik not paylaşabilir miyim?",
   },
   lojistik: {
-    web: "Merhaba {ad}, Wexon.dev’den selam. {ilçe}’de teklif süreci genelde telefonda yazılarak ilerliyor. Hizmet ve teklif formu olan sade bir site bu süreci hızlandırıyor. Bu hafta 10 dakikanız var mı?",
-    yenile: "Merhaba {ad}, firmanızın sitesine baktım; teklif formu yoksa iş WhatsApp’ta kaybolabiliyor. {ilçe}’de form ve hat sayfalarını güncelliyoruz. Uygun bir gün var mı?",
+    web: "{ad} için taşınma teklifi almak isteyen müşteriler hizmet bölgelerini ve süreci öğrenmek için tekrar tekrar WhatsApp’tan yazmak zorunda kalıyor. Wexon.dev olarak hizmet bölgelerinizi anlatan ve ön teklif formu içeren sade bir site hazırlayabiliriz; {ilçe} için değerlendirir misiniz?",
+    yenile: "{ad} sitesine baktım; teklif alma adımı biraz geride kalmış ve hizmetler net ayrılmamış. Wexon.dev olarak teklif formunu öne çıkaran, mobilde rahat kullanılan yeni bir düzen kurabiliriz, örneğine bakmak ister misiniz?",
   },
   spor: {
-    web: "Merhaba {ad}, Wexon.dev’den yazıyorum. {ilçe}’de üyelik soruları genelde Instagram DM’de birikiyor. Paketleri ve kayıt formunu tek sayfada toplayan bir site bunu sadeleştiriyor. Kısa bir görüşme uygun mu?",
-    yenile: "Merhaba {ad}, salonunuzun sitesine baktım; paket ve kayıt sayfası zayıfsa üye adayı kaçıyor olabilir. {ilçe}’de bunu tazeliyoruz. 10 dakikalık bir görüşme ister misiniz?",
+    web: "{ad} hakkında bilgi almak isteyen biri üyelik, ders programı ve iletişim detaylarını farklı yerlerde aradığında karar vermesi gereğinden fazla uzayabiliyor. Wexon.dev olarak salonunuzu tanıtan, programları düzenli gösteren ve deneme ya da üyelik talebini kolaylaştıran bir site oluşturabiliriz; {ilçe} için ilgilenir misiniz?",
+    yenile: "{ad} sitesine baktım; ders programı ve üyelik bilgileri biraz daha görünür olsa ziyaretçinin aradığına ulaşması kolaylaşabilir, genel görünüm de güncellenebilir. Wexon.dev olarak mobilde daha akıcı çalışan, programı öne çıkaran yeni bir arayüz tasarlayabiliriz, görmek ister misiniz?",
   },
   ofis: {
     web: "Merhaba {ad}, Wexon.dev’den selam. {ilçe}’de hizmet tarifi sitede yer almazsa teklif genelde referansa kalıyor. Sade bir hizmet + randevu sayfası bunu değiştirebilir. Uygun bir gün var mı?",
     yenile: "Merhaba {ad}, ofisinizin sitesine baktım; hizmetler tek blokta kalmışsa arama sizi atlıyor olabilir. {ilçe}’de sayfa yapısını netleştiriyoruz. Kısa bir görüşme uygun mu?",
   },
   egitim: {
-    web: "Merhaba {ad}, Wexon.dev’den yazıyorum. {ilçe}’de kayıt ve program bilgisi genelde Instagram’da dağınık kalıyor. Program + kayıt formu olan bir site veliye net bir yol gösteriyor. 10 dakikalık bir tanışma uygun mu?",
-    yenile: "Merhaba {ad}, kurumunuzun sitesine baktım; kayıt formu yoksa veli genelde WhatsApp’tan yazıyor, bu da takibi zorlaştırıyor. {ilçe}’de program sayfasını tazeliyoruz. Uygun bir gün var mı?",
+    web: "{ad} hakkında bilgi almak isteyen öğrenciler veya veliler kurs programını, eğitimleri ve kayıt sürecini farklı kanallardan takip etmek zorunda kalabiliyor. Wexon.dev olarak eğitimlerinizi düzenli anlatan, programları kolay gösteren ve kayıt talebini sadeleştiren bir site hazırlayabiliriz; {ilçe} için böyle bir çalışma düşünür müsünüz?",
+    yenile: "{ad} sitesine göz attım; kurs programları ve eğitim bilgileri biraz eski bir düzende sunulmuş, içerikler daha anlaşılır şekilde gruplanabilir. Wexon.dev olarak mobilde daha modern görünen ve kayıt sürecine yönlendiren yeni bir yapı tasarlayabiliriz, nasıl göründüğüne bakmak ister misiniz?",
   },
   generic: {
-    web: "Merhaba {ad}, Wexon.dev’den yazıyorum. {ilçe}’de Google’da telefon numaranız görünüyor ama site yoksa müşteri arama sonucunda rakibe kayabiliyor. Sade bir vitrin site + WhatsApp satırı bunu değiştiriyor. 10 dakikalık bir görüşme uygun mu?",
-    yenile: "Merhaba {ad}, işletmenizin sitesine baktım; hız veya form eksikse teklif kaçıyor olabilir. {ilçe}’de bunu birkaç günde toparlıyoruz. Kısa bir görüşme ayarlayalım mı?",
+    web: "{ad} için sizi ilk kez araştıran bir müşterinin hizmetlerinizi, konumunuzu ve size nasıl ulaşacağını tek yerde bulabilmesi işleri kolaylaştırabilir; yalnızca sosyal medya veya WhatsApp’a bağlı kalmak bazı talepleri dağıtabiliyor. Wexon.dev olarak işletmenize uygun sade bir site hazırlayabiliriz, ilgilenir misiniz?",
+    yenile: "{ad} sitesine baktım; genel yapı biraz eski görünüyor ve bazı bilgiler daha düzenli bir şekilde öne çıkarılabilir, özellikle mobil kullanım tarafında sadeleşme faydalı olabilir. Wexon.dev olarak işletmenizin tarzına uygun, daha modern ve iletişime odaklanan bir site tasarlayabiliriz, örneğine bakmak ister misiniz?",
   },
 };
 
