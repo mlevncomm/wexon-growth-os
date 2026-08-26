@@ -55,72 +55,72 @@ const SECTORS: { id: SectorId; label: string; keys: string[] }[] = [
 
 const SOFTWARE: Record<SectorId, Record<PitchOffer, string>> = {
   kuafor: {
-    web: "Merhaba {ad}, {ilçe} salonunda randevu çoğu zaman WhatsApp ve Instagram’da kayboluyor. Online randevu + vitrin site ile dolu saati netleştiriyoruz. 10 dakikalık bir bakış uygun mu?",
-    yenile: "Merhaba {ad}, {ilçe} kuaförünüzün sitesi var ama randevu hâlâ telefona düşüyorsa dönüşüm kaçıyor. Form, WhatsApp ve Google görünürlüğünü aynı akışa bağlıyoruz. Kısa bir kontrol paylaşayım mı?",
+    web: "Merhaba {ad}, ben Wexon.dev’den yazıyorum. {ilçe} bölgesinde salonlar için randevuyu WhatsApp yazışmasından kurtarıp tek bir bağlantıya taşıyan basit siteler kuruyoruz. İsterseniz nasıl göründüğünü kısaca gösterebilirim, uygun musunuz?",
+    yenile: "Merhaba {ad}, salonunuzun sitesini gördüm — randevu kısmı biraz eskimiş, ziyaretçi telefona düşmeden önce kaybolabiliyor. {ilçe}’deki benzer salonlarda bunu tek sayfada topluyoruz. Kısa bir bakış atmamı ister misiniz?",
   },
   restoran: {
-    web: "Merhaba {ad}, {ilçe} restoranda menü ve rezervasyon Instagram bio’da kalınca masa kaçıyor. Rezervasyonlu site + Google Maps düzeni kuruyoruz. Bu hafta 10 dakika ayırabilir misiniz?",
-    yenile: "Merhaba {ad}, {ilçe} işletmenizin sitesi var; menü ve rezervasyon güncel değilse arama kaybettiriyor. Hız, menü ve rezervasyonu tek sayfada toparlıyoruz. Uygun bir gün var mı?",
+    web: "Merhaba {ad}, Wexon.dev’den selam. {ilçe}’de menü ve rezervasyon Instagram profilinde kaybolan restoranlara sade, hızlı yüklenen bir site kuruyoruz — Google Haritalar’dan doğrudan masa alınabiliyor. İlgilenirseniz kısaca anlatabilirim.",
+    yenile: "Merhaba {ad}, işletmenizin sitesini inceledim; menü güncel değilse ya da yavaş açılıyorsa arama sonuçlarında geride kalıyorsunuz demektir. {ilçe}’de bunu birkaç günde toparlıyoruz. Kısa bir görüşme uygun mu?",
   },
   kafe: {
-    web: "Merhaba {ad}, {ilçe} kahve dükkanında konum ve menü çoğu misafire Instagram’dan gidiyor. Vitrin site + harita + WhatsApp sipariş satırı kuruyoruz. Kısa bir örnek göstereyim mi?",
-    yenile: "Merhaba {ad}, {ilçe} kafenizin sitesi var ama yavaş veya menüsüzse Google’da geride kalırsınız. Hız ve menü kartını düzeltip haritayı güçlendiriyoruz. 10 dakikalık bakış uygun mu?",
+    web: "Merhaba {ad}, Wexon.dev’den yazıyorum. {ilçe}’deki bir kafenin konumu ve menüsü genelde Instagram’a gömülü kalıyor — misafir haritada aramıyor, DM’den soruyor. Basit bir vitrin site bu işi kolaylaştırıyor, kısa bir örnek gösterebilirim.",
+    yenile: "Merhaba {ad}, kafenizin sitesine baktım; hız ve menü tarafı biraz geride kalmış görünüyor. {ilçe}’de bu tür siteleri birkaç günde tazeliyoruz. 10 dakikalık bir görüşme ayarlayabilir miyiz?",
   },
   klinik: {
-    web: "Merhaba {ad}, {ilçe} klinikte hasta çoğu zaman Instagram’dan geliyor, randevu yine telefona düşüyor. Hizmet sayfası + randevu formu olan sade bir site kuruyoruz. Uygun bir saatte bakabilir miyiz?",
-    yenile: "Merhaba {ad}, {ilçe} kliniğinizin sitesi var; randevu ve tedavi sayfaları zayıfsa Google’da rakip öne çıkar. İçerik + form + hız düzeni yapıyoruz. Kısa bir tarama notu paylaşayım mı?",
+    web: "Merhaba {ad}, Wexon.dev’den yazıyorum. {ilçe}’de hastalar çoğu zaman Instagram’dan geliyor ama randevu yine telefonla alınıyor — sade bir hizmet + randevu sayfası bu adımı kısaltıyor. Uygun bir saatte kısaca anlatabilir miyim?",
+    yenile: "Merhaba {ad}, kliniğinizin sitesine baktım; tedavi sayfaları ve randevu formu biraz zayıf kalmış, arama sonucunda rakipler öne çıkabiliyor. {ilçe}’de bu tarz siteleri düzenli güncelliyoruz. Kısa bir not paylaşabilir miyim?",
   },
   dis: {
-    web: "Merhaba {ad}, {ilçe} diş kliniğinde tedavi fiyatı ve randevu sorusu hâlâ mesaj kutusunda birikiyor. Tedavi sayfaları + randevu formu olan bir site kuruyoruz. 10 dakikalık görüşme uygun mu?",
-    yenile: "Merhaba {ad}, {ilçe} kliniğinizin sitesi var ama implant/ortodonti sayfası yoksa arama kaybettirir. Tedavi sayfası ve randevu formunu netleştiriyoruz. Kısa bir kontrol ister misiniz?",
+    web: "Merhaba {ad}, Wexon.dev’den selam. {ilçe}’de diş kliniklerinde fiyat ve randevu soruları genelde mesaj kutusunda birikiyor. Tedavi sayfaları ve randevu formu olan bir site bu yükü hafifletiyor. 10 dakikalık bir görüşme uygun mu?",
+    yenile: "Merhaba {ad}, kliniğinizin sitesini gördüm; implant ya da ortodonti gibi sayfalar eksikse arama sizi atlıyor olabilir. {ilçe}’de bunu tamamlıyoruz. Kısa bir kontrol paylaşmamı ister misiniz?",
   },
   emlak: {
-    web: "Merhaba {ad}, {ilçe} portföyü WhatsApp’ta dağınık kalınca ilan kaçıyor. İlan listeli site + WhatsApp yönlendirme kuruyoruz. Bu hafta 15 dakikalık bir bakış uygun mu?",
-    yenile: "Merhaba {ad}, {ilçe} ofisinizin sitesi var; ilanlar güncel değilse güven düşer. Portföy ve teklif formunu aynı akışa bağlıyoruz. Kısa bir tur atalım mı?",
+    web: "Merhaba {ad}, Wexon.dev’den yazıyorum. {ilçe}’de portföyler genelde WhatsApp’ta dağınık kalıyor, ilanlar kayboluyor. Düzenli bir ilan sitesi bu işi toparlıyor. Bu hafta 15 dakikalık bir görüşme mümkün mü?",
+    yenile: "Merhaba {ad}, ofisinizin sitesine baktım; ilanlar güncel değilse müşteri güveni düşüyor olabilir. {ilçe}’de portföy akışını tazeliyoruz. Kısa bir tur atalım mı?",
   },
   muhasebe: {
-    web: "Merhaba {ad}, {ilçe} mali müşavirlikte yeni iş çoğu referansla geliyor, sitede hizmet görünmüyor. Hizmet + randevu sayfası olan sade bir ofis sitesi kuruyoruz. Uygun bir gün var mı?",
-    yenile: "Merhaba {ad}, {ilçe} ofisinizin sitesi var ama beyanname/şirket kuruluşu sayfası yoksa arama sizi atlar. Hizmet sayfalarını netleştiriyoruz. 10 dakikalık bir bakış uygun mu?",
+    web: "Merhaba {ad}, Wexon.dev’den selam. {ilçe}’de mali müşavirlik bürolarına genelde referansla iş geliyor, ama sitede hizmetler görünmüyor. Sade bir hizmet sayfası bunu değiştirebilir. Uygun bir gün var mı?",
+    yenile: "Merhaba {ad}, ofisinizin sitesini gördüm; beyanname veya şirket kuruluşu gibi hizmetler ayrı sayfada değilse arama sizi atlıyor olabilir. {ilçe}’de bunu netleştiriyoruz. Kısa bir görüşme uygun mu?",
   },
   avukat: {
-    web: "Merhaba {ad}, {ilçe} büroda dosya sorusu Instagram ve telefonda karışıyor. Uzmanlık sayfaları + görüşme formu olan sade bir site kuruyoruz. Kısa bir tanışma uygun mu?",
-    yenile: "Merhaba {ad}, {ilçe} büronuzun sitesi var; uzmanlıklar tek paragrafta kalıyorsa müvekkil Google’da başkasını seçer. Sayfa yapısını netleştiriyoruz. Uygun bir gün var mı?",
+    web: "Merhaba {ad}, Wexon.dev’den yazıyorum. {ilçe}’de büroların dosya soruları çoğu zaman telefonla karışıyor. Uzmanlık alanlarını ayrı sayfada, görüşme formuyla toplayan bir site bunu sadeleştiriyor. Kısa bir tanışma uygun mu?",
+    yenile: "Merhaba {ad}, büronuzun sitesine baktım; uzmanlık alanları tek paragrafta kalmış — müvekkil arama sonucunda başka bir büroyu seçebiliyor. {ilçe}’de sayfa yapısını netleştiriyoruz. Uygun bir gün var mı?",
   },
   otel: {
-    web: "Merhaba {ad}, {ilçe} tesiste oda sorusu Booking dışında Instagram’a düşüyor. Direkt rezervasyonlu vitrin site kuruyoruz, komisyonu azaltır. 15 dakikalık bir bakış uygun mu?",
-    yenile: "Merhaba {ad}, {ilçe} otelinizin sitesi var; direkt rezervasyon zayıfsa komisyon yer. Hız, oda sayfası ve rezervasyonu toparlıyoruz. Kısa bir kontrol paylaşayım mı?",
+    web: "Merhaba {ad}, Wexon.dev’den selam. {ilçe}’de oda sorusu çoğu zaman Booking dışında Instagram’a düşüyor. Direkt rezervasyon alan bir vitrin site komisyonu azaltıyor. 15 dakikalık bir görüşme uygun mu?",
+    yenile: "Merhaba {ad}, otelinizin sitesini gördüm; direkt rezervasyon zayıfsa komisyon payınız artıyor olabilir. {ilçe}’de hız ve rezervasyon akışını tazeliyoruz. Kısa bir görüşme ayarlayalım mı?",
   },
   insaat: {
-    web: "Merhaba {ad}, {ilçe} şantiyede referans proje WhatsApp’ta kayboluyor. Proje galerili kurumsal site + teklif formu kuruyoruz. Bu hafta uygun bir gün var mı?",
-    yenile: "Merhaba {ad}, {ilçe} firmanızın sitesi var; biten işler güncel değilse ihale güveni düşer. Proje ve teklif akışını yeniliyoruz. 10 dakikalık bakış uygun mu?",
+    web: "Merhaba {ad}, Wexon.dev’den yazıyorum. {ilçe}’de referans projeler genelde WhatsApp’ta kayboluyor. Proje galerisi ve teklif formu olan bir kurumsal site bunu toparlıyor. Bu hafta uygun bir gün var mı?",
+    yenile: "Merhaba {ad}, firmanızın sitesine baktım; tamamlanan işler güncel değilse ihalede güven kaybı olabiliyor. {ilçe}’de proje ve teklif akışını yeniliyoruz. 10 dakikalık bir görüşme uygun mu?",
   },
   oto: {
-    web: "Merhaba {ad}, {ilçe} serviste randevu ve fiyat sorusu telefonda kuyruk oluyor. Hizmet listeli site + WhatsApp randevu satırı kuruyoruz. Kısa bir örnek göstereyim mi?",
-    yenile: "Merhaba {ad}, {ilçe} servisinizin sitesi var ama randevu yoksa müşteri başka dükkâna gider. Form ve harita görünürlüğünü düzeltiyoruz. Uygun bir gün var mı?",
+    web: "Merhaba {ad}, Wexon.dev’den selam. {ilçe}’de servis randevusu ve fiyat sorusu genelde telefonda sıra oluşturuyor. Hizmet listesi + WhatsApp randevu satırı olan bir site bunu hızlandırıyor. Kısa bir örnek gösterebilirim.",
+    yenile: "Merhaba {ad}, servisinizin sitesini gördüm; randevu alanı yoksa müşteri başka bir servise gidebiliyor. {ilçe}’de form ve harita görünürlüğünü güncelliyoruz. Uygun bir gün var mı?",
   },
   magaza: {
-    web: "Merhaba {ad}, {ilçe} mağazada vitrin Instagram, satış dükkânda kalıyor. Ürün/vitrin site veya vitrin + WhatsApp sipariş kuruyoruz. 10 dakikalık ihtiyaç turu uygun mu?",
-    yenile: "Merhaba {ad}, {ilçe} mağazanızın sitesi var; ürün ve sepet yavaşsa satış kaçıyor. Hız ve ürün sayfasını toparlıyoruz. Kısa bir teknik not paylaşayım mı?",
+    web: "Merhaba {ad}, Wexon.dev’den yazıyorum. {ilçe}’de vitrininiz Instagram’da kalıyorsa satış dükkânda sınırlı kalıyor demektir. Ürün vitrini + WhatsApp sipariş satırı olan bir site bunu genişletiyor. 10 dakikalık bir görüşme uygun mu?",
+    yenile: "Merhaba {ad}, mağazanızın sitesine baktım; sayfa yavaş açılıyorsa ziyaretçi tamamlamadan çıkabiliyor. {ilçe}’de hız ve ürün sayfasını tazeliyoruz. Kısa bir teknik not paylaşabilir miyim?",
   },
   lojistik: {
-    web: "Merhaba {ad}, {ilçe} lojistikte teklif hâlâ telefonda yazılıyor. Hizmet + teklif formlu sade bir site kuruyoruz. Bu hafta 10 dakika ayırabilir misiniz?",
-    yenile: "Merhaba {ad}, {ilçe} firmanızın sitesi var; teklif formu yoksa iş WhatsApp’ta kaybolur. Form ve hat sayfalarını netleştiriyoruz. Uygun bir gün var mı?",
+    web: "Merhaba {ad}, Wexon.dev’den selam. {ilçe}’de teklif süreci genelde telefonda yazılarak ilerliyor. Hizmet ve teklif formu olan sade bir site bu süreci hızlandırıyor. Bu hafta 10 dakikanız var mı?",
+    yenile: "Merhaba {ad}, firmanızın sitesine baktım; teklif formu yoksa iş WhatsApp’ta kaybolabiliyor. {ilçe}’de form ve hat sayfalarını güncelliyoruz. Uygun bir gün var mı?",
   },
   spor: {
-    web: "Merhaba {ad}, {ilçe} salonda üyelik sorusu Instagram DM’de birikiyor. Paketler + kayıt formu olan site kuruyoruz. Kısa bir bakış uygun mu?",
-    yenile: "Merhaba {ad}, {ilçe} salonunuzun sitesi var; paket ve kayıt sayfası zayıfsa üye kaçıyor. Form ve paketleri netleştiriyoruz. 10 dakikalık kontrol ister misiniz?",
+    web: "Merhaba {ad}, Wexon.dev’den yazıyorum. {ilçe}’de üyelik soruları genelde Instagram DM’de birikiyor. Paketleri ve kayıt formunu tek sayfada toplayan bir site bunu sadeleştiriyor. Kısa bir görüşme uygun mu?",
+    yenile: "Merhaba {ad}, salonunuzun sitesine baktım; paket ve kayıt sayfası zayıfsa üye adayı kaçıyor olabilir. {ilçe}’de bunu tazeliyoruz. 10 dakikalık bir görüşme ister misiniz?",
   },
   ofis: {
-    web: "Merhaba {ad}, {ilçe} ofiste hizmet tarifi sitede yoksa teklif referansa kalıyor. Hizmet + randevu sayfası kuruyoruz. Uygun bir gün var mı?",
-    yenile: "Merhaba {ad}, {ilçe} ofisinizin sitesi var; hizmetler tek blokta kalıyorsa arama sizi atlar. Sayfa yapısını netleştiriyoruz. Kısa bir tur atalım mı?",
+    web: "Merhaba {ad}, Wexon.dev’den selam. {ilçe}’de hizmet tarifi sitede yer almazsa teklif genelde referansa kalıyor. Sade bir hizmet + randevu sayfası bunu değiştirebilir. Uygun bir gün var mı?",
+    yenile: "Merhaba {ad}, ofisinizin sitesine baktım; hizmetler tek blokta kalmışsa arama sizi atlıyor olabilir. {ilçe}’de sayfa yapısını netleştiriyoruz. Kısa bir görüşme uygun mu?",
   },
   egitim: {
-    web: "Merhaba {ad}, {ilçe} kurumunda kayıt ve program Instagram’da dağınık. Program + kayıt formu olan site kuruyoruz. 10 dakikalık tanışma uygun mu?",
-    yenile: "Merhaba {ad}, {ilçe} kurumunuzun sitesi var; kayıt formu yoksa veli WhatsApp’a düşer. Program sayfası ve formu toparlıyoruz. Uygun bir gün var mı?",
+    web: "Merhaba {ad}, Wexon.dev’den yazıyorum. {ilçe}’de kayıt ve program bilgisi genelde Instagram’da dağınık kalıyor. Program + kayıt formu olan bir site veliye net bir yol gösteriyor. 10 dakikalık bir tanışma uygun mu?",
+    yenile: "Merhaba {ad}, kurumunuzun sitesine baktım; kayıt formu yoksa veli genelde WhatsApp’tan yazıyor, bu da takibi zorlaştırıyor. {ilçe}’de program sayfasını tazeliyoruz. Uygun bir gün var mı?",
   },
   generic: {
-    web: "Merhaba {ad}, {ilçe} işletmesinde Google’da telefon var, site yoksa müşteri rakibe kayıyor. Sade vitrin + WhatsApp/form satırı kuruyoruz. 10 dakikalık bir bakış uygun mu?",
-    yenile: "Merhaba {ad}, {ilçe} işletmenizin sitesi var; yavaş veya formsuzsa teklif kaçıyor. Hız, form ve Google görünürlüğünü toparlıyoruz. Kısa bir kontrol paylaşayım mı?",
+    web: "Merhaba {ad}, Wexon.dev’den yazıyorum. {ilçe}’de Google’da telefon numaranız görünüyor ama site yoksa müşteri arama sonucunda rakibe kayabiliyor. Sade bir vitrin site + WhatsApp satırı bunu değiştiriyor. 10 dakikalık bir görüşme uygun mu?",
+    yenile: "Merhaba {ad}, işletmenizin sitesine baktım; hız veya form eksikse teklif kaçıyor olabilir. {ilçe}’de bunu birkaç günde toparlıyoruz. Kısa bir görüşme ayarlayalım mı?",
   },
 };
 
