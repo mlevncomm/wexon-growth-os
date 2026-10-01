@@ -204,7 +204,7 @@ export function QueuePanel({ onClose, open = false }: { onClose?: () => void; op
         <div className="muted" style={{ fontSize: 11, letterSpacing: "0.12em", fontWeight: 700 }}>SIRADAKİ</div>
         <div style={{ marginTop: 8, fontWeight: 800 }}>{snap?.current?.name ?? "Bekleyen yok"}</div>
         <div className="muted" style={{ marginTop: 4, fontSize: 13 }}>
-          {snap?.current?.phone || "Onaylananlar tavan ve gecikmeyle gider"}
+          {snap?.current?.phone || (canSend ? "Onaylananlar tavan ve gecikmeyle gider" : "Taslakları tek tek WhatsApp’ta açın")}
         </div>
       </div>
       <div>
@@ -230,18 +230,22 @@ export function QueuePanel({ onClose, open = false }: { onClose?: () => void; op
             Şimdi dene
           </button>
         ) : null}
-        {snap?.paused || snap?.stopped ? (
-          <button className="btn btn-wexon" type="button" onClick={() => void control("resume")}>
-            Gönderime devam et
-          </button>
-        ) : (
-          <button className="btn btn-ghost" type="button" onClick={() => void control("pause")}>
-            Gönderimi duraklat
-          </button>
-        )}
-        <button className="btn btn-danger" type="button" onClick={() => void control("stop")}>
-          Kuyruğu durdur
-        </button>
+        {canSend ? (
+          <>
+            {snap?.paused || snap?.stopped ? (
+              <button className="btn btn-wexon" type="button" onClick={() => void control("resume")}>
+                Gönderime devam et
+              </button>
+            ) : (
+              <button className="btn btn-ghost" type="button" onClick={() => void control("pause")}>
+                Gönderimi duraklat
+              </button>
+            )}
+            <button className="btn btn-danger" type="button" onClick={() => void control("stop")}>
+              Kuyruğu durdur
+            </button>
+          </>
+        ) : null}
       </div>
     </aside>
   );

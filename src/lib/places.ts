@@ -134,7 +134,7 @@ export async function searchPlaces(opts: {
   websiteFilter?: WebsiteFilter;
   regionCode?: string;
   languageCode?: string;
-  onHit?: (hit: PlaceHit) => Promise<void> | void;
+  onHit?: (hit: PlaceHit) => Promise<boolean | void> | boolean | void;
 }): Promise<{ hits: PlaceHit[]; skipped: number }> {
   const settings = await getSettings();
   const apiKey = normalizePlacesKey(settings.googlePlacesApiKey);
@@ -184,8 +184,11 @@ export async function searchPlaces(opts: {
       if (hits.length >= opts.targetCount) break;
       let hit = mapPlace(raw, opts.regionCode);
       if (!hit || seen.has(hit.placeId)) continue;
+      seen.add(hit.placeId);
 
-      if (!hit.phone || !hit.website || websiteFilter !== "any") {
+      const needsPhone = opts.requirePhone && !hit.phone;
+      const needsWebsite = websiteFilter !== "any" && !hit.website;
+      if (needsPhone || needsWebsite) {
         const detailed = await fetchDetails(
           apiKey,
           hit.placeId,
@@ -201,9 +204,12 @@ export async function searchPlaces(opts: {
         continue;
       }
 
-      seen.add(hit.placeId);
+      const accepted = await opts.onHit?.(hit);
+      if (accepted === false) {
+        skipped += 1;
+        continue;
+      }
       hits.push(hit);
-      await opts.onHit?.(hit);
     }
 
     if (!json.nextPageToken) break;
@@ -289,7 +295,7 @@ async function searchPlacesLegacy(
     phonePrefix: string;
     regionCode?: string;
     languageCode?: string;
-    onHit?: (hit: PlaceHit) => Promise<void> | void;
+    onHit?: (hit: PlaceHit) => Promise<boolean | void> | boolean | void;
   },
   textQuery: string,
   websiteFilter: WebsiteFilter,
@@ -319,6 +325,7 @@ async function searchPlacesLegacy(
       const placeId = raw.place_id;
       const name = raw.name?.trim();
       if (!placeId || !name || seen.has(placeId)) continue;
+      seen.add(placeId);
 
       let hit: PlaceHit = {
         placeId,
@@ -341,9 +348,12 @@ async function searchPlacesLegacy(
         continue;
       }
 
-      seen.add(placeId);
+      const accepted = await opts.onHit?.(hit);
+      if (accepted === false) {
+        skipped += 1;
+        continue;
+      }
       hits.push(hit);
-      await opts.onHit?.(hit);
     }
 
     if (!json.next_page_token) break;

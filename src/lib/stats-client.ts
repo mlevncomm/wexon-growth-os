@@ -26,7 +26,7 @@ export const EMPTY_STATS: DashboardStats = {
   sentToday: 0,
   dailyCap: 40,
   yeni: 0,
-  hasPlacesKey: true,
+  hasPlacesKey: false,
   waCloud: false,
   waLocal: "disconnected",
   lastCampaign: null,

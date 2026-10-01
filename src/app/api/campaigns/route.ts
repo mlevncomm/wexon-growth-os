@@ -2,7 +2,7 @@ import { after, NextResponse } from "next/server";
 import { ensureSeed, rememberWebsiteFilter, runCampaign, startCampaignInBackground } from "@/lib/campaigns";
 import { badRequest, readJson } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
-import { hubFor, worldGroupFor, zoneFor } from "@/lib/regions";
+import { worldGroupFor, zoneFor } from "@/lib/regions";
 import { getSettings } from "@/lib/settings";
 import { isServerless } from "@/lib/platform";
 import { bustStatsCache } from "@/lib/stats";
@@ -82,8 +82,8 @@ export async function POST(request: Request) {
     if (scope === "worldGroup" && !worldGroupFor(city.replace(/^Dünya:\s*/, ""))) {
       return NextResponse.json({ error: "Geçersiz dünya bölgesi." }, { status: 400 });
     }
-    if (scope === "hub" && !hubFor(city)) {
-      return NextResponse.json({ error: "Geçersiz dünya şehri." }, { status: 400 });
+    if (scope === "hub" && !city) {
+      return NextResponse.json({ error: "Dünya şehri gerekli." }, { status: 400 });
     }
 
     const settings = await getSettings();
@@ -97,7 +97,20 @@ export async function POST(request: Request) {
       );
     }
 
+    const active = await prisma.campaign.findFirst({
+      where: { tenantId: ctx.tenantId, status: { in: ["queued", "running"] } },
+      orderBy: { createdAt: "desc" },
+      select: { id: true },
+    });
+    if (active) {
+      return NextResponse.json(
+        { error: "Devam eden bir keşif var. Önce onu durdurun veya tamamlanmasını bekleyin.", id: active.id },
+        { status: 409 },
+      );
+    }
+
     const targetCount = Math.min(60, Math.max(1, Number(body.targetCount) || 20));
+    const minRating = Math.min(5, Math.max(0, Number(body.minRating) || 0));
     const websiteFilter = parseWebsiteFilter(body.websiteFilter);
     const baseData = {
       tenantId: ctx.tenantId,
@@ -105,7 +118,7 @@ export async function POST(request: Request) {
       city,
       district: scope === "city" || scope === "hub" ? (body.district ?? "").trim() : "",
       targetCount,
-      minRating: Number(body.minRating) || 0,
+      minRating,
       requirePhone: body.requirePhone !== false,
       phonePrefix: (body.phonePrefix ?? "").trim(),
       status: "queued" as const,

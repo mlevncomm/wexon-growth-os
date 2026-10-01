@@ -152,18 +152,27 @@ export default function AraPage() {
   useEffect(() => {
     if (!campaignId) return;
     let alive = true;
+    let timer: number | undefined;
     const poll = async () => {
-      const res = await fetch(`/api/campaigns/${campaignId}`, { cache: "no-store" });
-      if (!res.ok || !alive) return;
-      const next = (await res.json()) as Campaign;
-      setCampaign(next);
-      if (next.status === "done" || next.status === "error" || next.status === "cancelled") setBusy(false);
+      try {
+        const res = await fetch(`/api/campaigns/${campaignId}`, { cache: "no-store" });
+        if (!res.ok || !alive) return;
+        const next = (await res.json()) as Campaign;
+        setCampaign(next);
+        const terminal = next.status === "done" || next.status === "error" || next.status === "cancelled";
+        if (terminal) {
+          setBusy(false);
+          return;
+        }
+        timer = window.setTimeout(() => void poll(), 1500);
+      } catch {
+        if (alive) timer = window.setTimeout(() => void poll(), 4000);
+      }
     };
     void poll();
-    const t = setInterval(() => void poll(), 1500);
     return () => {
       alive = false;
-      clearInterval(t);
+      if (timer) window.clearTimeout(timer);
     };
   }, [campaignId]);
 
@@ -280,13 +289,22 @@ export default function AraPage() {
 
   async function stopSearch() {
     if (!campaignId) return;
-    await fetch(`/api/campaigns/${campaignId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "stop" }),
-    });
-    toast.push("Keşif durduruldu");
-    setBusy(false);
+    try {
+      const res = await fetch(`/api/campaigns/${campaignId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "stop" }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || "Keşif durdurulamadı");
+      setCampaign((prev) => prev ? { ...prev, status: "cancelled" } : prev);
+      toast.push("Keşif durduruldu");
+      setBusy(false);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Keşif durdurulamadı";
+      setError(message);
+      toast.push(message, "bad");
+    }
   }
 
   const found = campaign?.foundCount ?? 0;

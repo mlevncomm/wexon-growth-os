@@ -12,6 +12,8 @@ const g = globalThis as unknown as {
   __wexonWebFilter?: Map<string, WebsiteFilter>;
 };
 
+const CAMPAIGN_STALE_MS = 6 * 60_000;
+
 function running(): Set<string> {
   if (!g.__gooleadsCampaigns) g.__gooleadsCampaigns = new Set();
   return g.__gooleadsCampaigns;
@@ -41,7 +43,7 @@ export async function resumeStaleCampaign(): Promise<string | null> {
       tenantId: id,
       OR: [
         { status: "queued" },
-        { status: "running", updatedAt: { lt: new Date(Date.now() - 90_000) } },
+        { status: "running", updatedAt: { lt: new Date(Date.now() - CAMPAIGN_STALE_MS) } },
       ],
     },
     orderBy: { createdAt: "asc" },
@@ -68,7 +70,7 @@ async function executeCampaign(id: string, ownerId: string, targetCount: number)
   const campaign = await prisma.campaign.findFirst({ where: { id, tenantId: ownerId } });
   if (!campaign || campaign.status === "cancelled" || campaign.status === "done") return;
 
-  const stale = new Date(Date.now() - 90_000);
+  const stale = new Date(Date.now() - CAMPAIGN_STALE_MS);
   const claimed = await prisma.campaign.updateMany({
     where: {
       id,
@@ -107,11 +109,7 @@ async function executeCampaign(id: string, ownerId: string, targetCount: number)
               where: { tenantId_placeId: { tenantId: ownerId, placeId: hit.placeId } },
             });
             if (existing) {
-              await prisma.campaign.update({
-                where: { id },
-                data: { skippedCount: { increment: 1 } },
-              });
-              return;
+              return false;
             }
             await prisma.lead.create({
               data: {
@@ -136,6 +134,7 @@ async function executeCampaign(id: string, ownerId: string, targetCount: number)
               where: { id },
               data: { foundCount: { increment: 1 } },
             });
+            return true;
           },
         });
         await prisma.campaign.update({

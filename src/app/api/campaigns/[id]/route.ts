@@ -7,8 +7,10 @@ import { withTenant } from "@/lib/tenant";
 
 export const dynamic = "force-dynamic";
 
+const CAMPAIGN_STALE_MS = 6 * 60_000;
+
 function kick(id: string, status: string, updatedAt: Date) {
-  const stale = Date.now() - updatedAt.getTime() > 90_000;
+  const stale = Date.now() - updatedAt.getTime() > CAMPAIGN_STALE_MS;
   if (status !== "queued" && !(status === "running" && stale)) return;
   if (isServerless()) after(() => runCampaign(id));
   else startCampaignInBackground(id);
