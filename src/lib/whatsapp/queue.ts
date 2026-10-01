@@ -196,7 +196,9 @@ function isGenericDraft(message: string): boolean {
     t.includes("keşif notunu hazırladık") ||
     t.includes("kapsam ve süre tek sayfada") ||
     t.includes("aktif bir web sitesi göremedim") ||
-    t.includes("ben wexon.dev’den mehmet")
+    t.includes("ben wexon.dev’den mehmet") ||
+    t.includes("daha rafine bir web deneyimi üzerine") ||
+    t.includes("sade, mobil odaklı bir web deneyimi üzerine")
   );
 }
 

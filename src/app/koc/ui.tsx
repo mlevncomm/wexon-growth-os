@@ -190,7 +190,7 @@ export default function KocPage() {
           <div className="key-block" style={{ marginTop: 12 }}>
             <strong>Önerilen başlangıç</strong>
             <p className="panel-note" style={{ marginTop: 6 }}>
-              Wexon.dev kimliği, 4.900 TL tek sayfalık site, doğrulanmış bilgi ve ücretsiz örnek görünüm CTA’sını tek tıkla uygular.
+              Wexon.dev kimliği, 4.900 TL başlangıç bedeli, doğrulanmış bilgi ve işletmeye özel örnek ekran CTA’sını tek tıkla uygular.
             </p>
             <button className="btn btn-ghost" type="button" disabled={busy} onClick={() => void applyWexonStandard()}>
               Wexon satış standardını uygula

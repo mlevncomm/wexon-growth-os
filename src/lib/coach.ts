@@ -46,7 +46,7 @@ export async function applyWexonSalesPlaybook() {
     data: {
       tenantId: tenantId(),
       role: "assistant",
-      body: "Wexon satış standardı uygulandı. Kısa, doğrulanmış, 4.900 TL teklifi ve ücretsiz örnek CTA’sı artık AI metinlerine yön verir.",
+      body: "Wexon satış standardı uygulandı. Kurumsal stüdyo tonu, doğrulanmış bilgi, 4.900 TL başlangıç bedeli ve işletmeye özel örnek ekran CTA’sı artık AI metinlerine yön verir.",
     },
   });
   return coachSnapshot();
