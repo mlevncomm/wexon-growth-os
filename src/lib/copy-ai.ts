@@ -33,6 +33,7 @@ export const LEGACY_SOFTWARE_TEMPLATE_BODIES = new Set([
   "Merhaba {ad}, yavaş site ve kopuk form {ilçe} adresinizde kayıp satış demek. Hız, yedek ve küçük geliştirmeyi aylık bakıma bağlıyoruz. Kısa bir teknik not paylaşayım mı?",
   "Merhaba {ad}, {ilçe} için web, teklif ve WhatsApp’ı aynı hunide birleştiriyoruz. Hangi kanaldan gelenin müşteri olduğunu net görürsünüz. Bu hafta 15 dakikalık bir harita çıkarabilir miyiz?",
   "Merhaba {ad}, {ilçe} işletmenizde site ve form aynı akışta değilse teklif kaçıyor. Vitrin + WhatsApp satırını netleştiriyoruz. Size uyan bir gün var mı?",
+  "Merhaba {ad}, {ilçe} için yazılım keşif notunu hazırladık. Kapsam ve süre tek sayfada. Size uyan bir gün var mı?",
   "Merhaba {ad}, {ilçe} işletmesinde site yalnızca vitrin kalırsa teklif kaçıyor. Dönüşümlü sayfa, teklif formu ve takip paneli kuruyoruz. 15 dakikalık bir ihtiyaç görüşmesi uygun mu?",
 ]);
 
