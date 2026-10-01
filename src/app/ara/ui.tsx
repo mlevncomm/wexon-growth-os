@@ -60,7 +60,7 @@ export default function AraPage() {
   const [regions] = useState<Region[]>(REGIONS);
   const [showAllCities, setShowAllCities] = useState(false);
   const [scope, setScope] = useState<Scope>("city");
-  const [selectedQueries, setSelectedQueries] = useState<string[]>(["restoran"]);
+  const [selectedQueries, setSelectedQueries] = useState<string[]>([]);
   const [customQuery, setCustomQuery] = useState("");
   const [city, setCity] = useState("İstanbul");
   const [cityFilter, setCityFilter] = useState("");
@@ -119,17 +119,7 @@ export default function AraPage() {
         setSectorPresets(presets);
         setVertical(json.vertical ?? "");
         const allowed = new Set(groups.flatMap((g) => g.items.map((i) => i.query)));
-        const first = groups[0]?.items[0]?.query;
-        const seeded = json.vertical === "software" || json.vertical === "yks";
-        if (json.vertical === "software") setWebsiteFilter("without");
-        setSelectedQueries((prev) => {
-          const pack = presets[0]?.queries.filter((q) => allowed.has(q)) ?? [];
-          if (seeded && pack.length && prev.length === 1 && prev[0] === "restoran") return pack;
-          const keep = prev.filter((q) => allowed.has(q));
-          if (keep.length) return keep;
-          if (pack.length) return pack;
-          return first ? [first] : [];
-        });
+        setSelectedQueries((prev) => prev.filter((q) => allowed.has(q)));
       })
       .catch(() => undefined);
   }, []);
@@ -190,6 +180,11 @@ export default function AraPage() {
       .filter((g) => g.items.length);
   }, [sectorGroups, sectorFilter]);
 
+  const sectorOnlyPresets = useMemo(
+    () => sectorPresets.filter((preset) => !preset.websiteFilter),
+    [sectorPresets],
+  );
+
   function toggleQuery(query: string) {
     setSelectedQueries((prev) =>
       prev.includes(query) ? prev.filter((q) => q !== query) : [...prev, query],
@@ -208,7 +203,6 @@ export default function AraPage() {
 
   function applyPreset(preset: SectorPreset) {
     setSelectedQueries(preset.queries);
-    if (preset.websiteFilter) setWebsiteFilter(preset.websiteFilter);
     setSectorFilter("");
   }
 
@@ -498,19 +492,17 @@ export default function AraPage() {
             Temizle
           </button>
         </div>
-        {sectorPresets.length ? (
+        {sectorOnlyPresets.length ? (
           <div className="field" style={{ marginBottom: 12 }}>
-            <span>Hazır paket</span>
+            <span>İstersen sektör paketi seç</span>
             <ChipStrip wrap>
-              {sectorPresets.map((p) => {
+              {sectorOnlyPresets.map((p) => {
                 const queriesOn = p.queries.length > 0 && p.queries.every((q) => selectedQueries.includes(q));
-                const siteOn = !p.websiteFilter || p.websiteFilter === websiteFilter;
-                const on = queriesOn && siteOn;
                 return (
                   <button
                     key={p.id}
                     type="button"
-                    className={`chip${on ? " on" : ""}`}
+                    className={`chip${queriesOn ? " on" : ""}`}
                     title={p.hint}
                     onClick={() => applyPreset(p)}
                   >
@@ -539,7 +531,7 @@ export default function AraPage() {
           </div>
         ) : (
           <p className="muted" style={{ margin: "10px 0 0", fontSize: 13 }}>
-            Paket seçin veya aşağıdaki etiketlerden ekleyin. Listede yoksa alta kelime yazın.
+            Aramaya başlayın; yalnızca seçtiğiniz sektörler eklenecek. Listede yoksa alta kendi kelimenizi yazın.
           </p>
         )}
         <div className="sector-groups" style={{ marginTop: 14 }}>
