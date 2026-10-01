@@ -1,5 +1,5 @@
 import { prisma } from "./prisma";
-import { generateSalesCopy, copyAngles } from "./copy-ai";
+import { generateSalesCopy, copyAngles, LEGACY_SOFTWARE_TEMPLATE_BODIES } from "./copy-ai";
 import { searchPlaces } from "./places";
 import { englishQuery, parseQueries } from "./sectors";
 import { resolveSearchLocations } from "./search-scope";
@@ -212,6 +212,9 @@ export async function ensureSeed(explicitTenantId?: string, vertical?: Vertical)
       for (const t of needed) {
         const exists = await prisma.template.findFirst({ where: { tenantId: id, name: t.name } });
         if (!exists) await prisma.template.create({ data: { tenantId: id, ...t } });
+        else if (vert === "software" && LEGACY_SOFTWARE_TEMPLATE_BODIES.has(exists.body)) {
+          await prisma.template.update({ where: { id: exists.id }, data: { body: t.body } });
+        }
       }
       if ((await prisma.template.count({ where: { tenantId: id } })) === 0) {
         await prisma.template.create({ data: { tenantId: id, ...generateSalesCopy(copyAngles(vert)[0].id, vert) } });

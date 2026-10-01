@@ -28,6 +28,14 @@ export const COPY_ANGLES = WATER_ANGLES;
 
 export type CopyAngle = string;
 
+export const LEGACY_SOFTWARE_TEMPLATE_BODIES = new Set([
+  "Merhaba {ad}, {ilçe} operasyonunda tekrarlayan işler ekibi yavaşlatır. Sipariş, teklif ve takip adımlarını tek panelde toplayan bir yazılım kuruyoruz. 20 dakikalık bir süreç taraması uygun mu?",
+  "Merhaba {ad}, yavaş site ve kopuk form {ilçe} adresinizde kayıp satış demek. Hız, yedek ve küçük geliştirmeyi aylık bakıma bağlıyoruz. Kısa bir teknik not paylaşayım mı?",
+  "Merhaba {ad}, {ilçe} için web, teklif ve WhatsApp’ı aynı hunide birleştiriyoruz. Hangi kanaldan gelenin müşteri olduğunu net görürsünüz. Bu hafta 15 dakikalık bir harita çıkarabilir miyiz?",
+  "Merhaba {ad}, {ilçe} işletmenizde site ve form aynı akışta değilse teklif kaçıyor. Vitrin + WhatsApp satırını netleştiriyoruz. Size uyan bir gün var mı?",
+  "Merhaba {ad}, {ilçe} işletmesinde site yalnızca vitrin kalırsa teklif kaçıyor. Dönüşümlü sayfa, teklif formu ve takip paneli kuruyoruz. 15 dakikalık bir ihtiyaç görüşmesi uygun mu?",
+]);
+
 export function copyAngles(vertical: Vertical = "water") {
   if (vertical === "software") return SOFTWARE_ANGLES;
   if (vertical === "yks") return YKS_ANGLES;
@@ -44,27 +52,27 @@ export function generateSalesCopy(angle: CopyAngle, vertical: Vertical = "water"
       case "otomasyon":
         return {
           name: "Yazılım — otomasyon",
-          body: "Merhaba {ad}, {ilçe} operasyonunda tekrarlayan işler ekibi yavaşlatır. Sipariş, teklif ve takip adımlarını tek panelde toplayan bir yazılım kuruyoruz. 20 dakikalık bir süreç taraması uygun mu?",
+          body: "Merhaba {ad}, ben Wexon.dev’den Mehmet. Tekrarlayan teklif, sipariş veya müşteri takip işlerini tek panelde topluyoruz. İşletmenize uygun kısa bir otomasyon fikri göndermemi ister misiniz?",
         };
       case "bakim":
         return {
           name: "Yazılım — bakım",
-          body: "Merhaba {ad}, yavaş site ve kopuk form {ilçe} adresinizde kayıp satış demek. Hız, yedek ve küçük geliştirmeyi aylık bakıma bağlıyoruz. Kısa bir teknik not paylaşayım mı?",
+          body: "Merhaba {ad}, ben Wexon.dev’den Mehmet. Mevcut sitenizin mobil görünümü ve iletişim akışı için birkaç iyileştirme fikrim var. Ücretsiz kısa bir inceleme göndermemi ister misiniz?",
         };
       case "satis":
         return {
           name: "Yazılım — satış",
-          body: "Merhaba {ad}, {ilçe} için web, teklif ve WhatsApp’ı aynı hunide birleştiriyoruz. Hangi kanaldan gelenin müşteri olduğunu net görürsünüz. Bu hafta 15 dakikalık bir harita çıkarabilir miyiz?",
+          body: "Merhaba {ad}, ben Wexon.dev’den Mehmet. Müşterinin sizi bulup WhatsApp’tan teklif istemesini kolaylaştıran tek sayfalık siteler hazırlıyoruz. Size ücretsiz bir örnek görünüm göndermemi ister misiniz?",
         };
       case "takip":
         return {
           name: "Yazılım — takip",
-          body: "Merhaba {ad}, {ilçe} işletmenizde site ve form aynı akışta değilse teklif kaçıyor. Vitrin + WhatsApp satırını netleştiriyoruz. Size uyan bir gün var mı?",
+          body: "Merhaba {ad}, ben Wexon.dev’den Mehmet. Daha önce web sitesiyle ilgili yazmıştım; uygun değilseniz rahatsız etmeyeyim. Ücretsiz örnek görünümü paylaşmamı ister misiniz?",
         };
       default:
         return {
           name: "Yazılım — web",
-          body: "Merhaba {ad}, {ilçe} işletmesinde site yalnızca vitrin kalırsa teklif kaçıyor. Dönüşümlü sayfa, teklif formu ve takip paneli kuruyoruz. 15 dakikalık bir ihtiyaç görüşmesi uygun mu?",
+          body: "Merhaba {ad}, ben Wexon.dev’den Mehmet. İşletmenizi mobilde düzgün tanıtan ve müşteriyi doğrudan WhatsApp’a yönlendiren tek sayfalık siteyi 4.900 TL lansman fiyatıyla hazırlıyoruz. Ücretsiz örnek görünüm ister misiniz?",
         };
     }
   }
