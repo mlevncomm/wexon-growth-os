@@ -1,4 +1,5 @@
-import { normalizePhone, matchesPrefix, formatPhoneDisplay, phoneForWhatsApp } from "../src/lib/phone.ts";
+import { normalizePhone, matchesPrefix, formatPhoneDisplay, phoneForWhatsApp, isWhatsAppCapablePhone } from "../src/lib/phone.ts";
+import { composePitch } from "../src/lib/pitch.ts";
 import { renderTemplate } from "../src/lib/templates.ts";
 import { englishQuery, parseQueries } from "../src/lib/sectors.ts";
 import { resolveSearchLocations } from "../src/lib/search-scope.ts";
@@ -43,6 +44,9 @@ check(formatPhoneDisplay("+905321112233") === "+90 532 111 22 33", "display TR")
 check(formatPhoneDisplay("+971501234567") === "+971 501 234 567", "display AE", formatPhoneDisplay("+971501234567"));
 check(phoneForWhatsApp("+905321112233") === "905321112233", "wa digits");
 check(matchesPrefix("+905321112233", "0532"), "prefix 0532");
+check(isWhatsAppCapablePhone("+905321112233"), "TR mobile is WhatsApp candidate");
+check(!isWhatsAppCapablePhone("+902722131234"), "TR 0272 landline rejected");
+check(isWhatsAppCapablePhone("+971501234567"), "international E164 candidate");
 
 const msg = renderTemplate("Merhaba {ad} / {ilçe}", {
   name: "Test Klinik",
@@ -70,6 +74,19 @@ const cityFallback = renderTemplate("Merhaba {ad}, {ilçe} salonunda.", {
   phone: "",
 });
 check(cityFallback === "Merhaba Nuri, İstanbul salonunda.", "template city fallback", cityFallback);
+
+const softwarePitch = composePitch("software", {
+  name: "Test Diş Kliniği",
+  address: "Merkez",
+  district: "Merkez",
+  city: "Afyonkarahisar",
+  phone: "+905321112233",
+  website: "",
+  campaignQuery: "diş kliniği",
+});
+check(softwarePitch.body.includes("Wexon.dev’den Mehmet"), "pitch identifies sender", softwarePitch.body);
+check(softwarePitch.body.includes("4.900 TL"), "pitch contains offer price", softwarePitch.body);
+check(softwarePitch.body.length < 360, "pitch remains concise", softwarePitch.body.length);
 
 check(englishQuery("restoran") === "restaurant", "en restoran");
 check(englishQuery("klinik") === "clinic", "en klinik");

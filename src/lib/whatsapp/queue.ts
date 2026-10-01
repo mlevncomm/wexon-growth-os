@@ -1,4 +1,5 @@
 import { composePitch, AUTO_TEMPLATE_ID, AUTO_TEMPLATE_MARKER } from "../pitch";
+import { isWhatsAppCapablePhone } from "../phone";
 import { prisma } from "../prisma";
 import { isServerless } from "../platform";
 import { getSettings, updateSettings } from "../settings";
@@ -256,7 +257,7 @@ export async function enqueueLeads(opts: {
       where: { id: leadId, tenantId: owner },
       include: { campaign: { select: { query: true } } },
     });
-    if (!lead || !lead.phone) {
+    if (!lead || !isWhatsAppCapablePhone(lead.phone)) {
       skipped += 1;
       continue;
     }

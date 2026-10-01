@@ -657,7 +657,7 @@ export default function AraPage() {
         </div>
         <label className="check-row">
           <input type="checkbox" checked={requirePhone} onChange={(e) => setRequirePhone(e.target.checked)} />
-          Telefonu olmayanları alma
+            Yalnızca WhatsApp’a uygun mobil numaraları al
         </label>
       </div>
 

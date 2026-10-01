@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { formatPhoneDisplay } from "@/lib/phone";
+import { formatPhoneDisplay, isWhatsAppCapablePhone } from "@/lib/phone";
 import { LEAD_STATUSES } from "@/lib/lead-status";
 import { markStatsDirty, openQueue } from "@/lib/os-events";
 import { useToast } from "@/components/Toast";
@@ -148,7 +148,7 @@ export default function MusterilerPage() {
   function selectVisible(onlyPhone = false) {
     const next: Record<string, boolean> = {};
     for (const lead of leads) {
-      if (!onlyPhone || lead.phone) next[lead.id] = true;
+      if (!onlyPhone || isWhatsAppCapablePhone(lead.phone)) next[lead.id] = true;
     }
     setSelected(next);
   }
@@ -183,7 +183,7 @@ export default function MusterilerPage() {
       <h1 className="page-title">Müşteriler</h1>
       <p className="page-copy">
         Alıcı listesi. Onaya al varsayılanı sektör + site: kuaföre randevu sitesi, restoranına rezervasyon,
-        sitesi olana yenileme. Sabit “keşif notu” yok. Kuyruğa yalnızca telefonu olan, yazılmamış kayıtlar girer.
+        sitesi olana yenileme. Sabit hatlar WhatsApp kuyruğuna alınmaz; yalnızca uygun mobil numaralar girer.
       </p>
 
       <div className="toolbar">
@@ -237,7 +237,7 @@ export default function MusterilerPage() {
           Tümünü seç
         </button>
         <button className="btn btn-ghost" type="button" disabled={!leads.length} onClick={() => selectVisible(true)}>
-          Telefonluları seç
+          WhatsApp numaralarını seç
         </button>
         <button className="btn btn-ghost" type="button" disabled={!selectedIds.length} onClick={() => setSelected({})}>
           Seçimi bırak
@@ -307,12 +307,16 @@ export default function MusterilerPage() {
                 </tr>
               </thead>
               <tbody>
-                {leads.map((lead) => (
+                {leads.map((lead) => {
+                  const canWhatsApp = isWhatsAppCapablePhone(lead.phone);
+                  return (
                   <tr key={lead.id}>
                     <td>
                       <input
                         type="checkbox"
                         checked={Boolean(selected[lead.id])}
+                        disabled={!canWhatsApp}
+                        title={canWhatsApp ? "Mesaj için seç" : "Sabit hat veya WhatsApp'a uygun olmayan numara"}
                         onChange={(e) => setSelected((prev) => ({ ...prev, [lead.id]: e.target.checked }))}
                       />
                     </td>
@@ -326,6 +330,7 @@ export default function MusterilerPage() {
                     </td>
                     <td>
                       <div>{lead.phone ? formatPhoneDisplay(lead.phone) : "—"}</div>
+                      {!canWhatsApp ? <div className="muted" style={{ fontSize: 12 }}>Sabit hat · WhatsApp yok</div> : null}
                       <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
                         {lead.mapsUrl ? <a className="muted" href={lead.mapsUrl} target="_blank" rel="noreferrer">Maps</a> : null}
                         {lead.website ? <a className="muted" href={lead.website} target="_blank" rel="noreferrer">Web</a> : null}
@@ -352,27 +357,33 @@ export default function MusterilerPage() {
                       />
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
           <div className="lead-cards">
-            {leads.map((lead) => (
+            {leads.map((lead) => {
+              const canWhatsApp = isWhatsAppCapablePhone(lead.phone);
+              return (
               <article key={lead.id} className="card lead-card">
                 <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   <input
                     type="checkbox"
                     checked={Boolean(selected[lead.id])}
+                    disabled={!canWhatsApp}
                     onChange={(e) => setSelected((prev) => ({ ...prev, [lead.id]: e.target.checked }))}
                   />
                   <strong>{lead.name}</strong>
                 </label>
                 <span className="muted">{lead.address}</span>
                 <span>{lead.phone ? formatPhoneDisplay(lead.phone) : "—"}</span>
+                {!canWhatsApp ? <span className="muted">Sabit hat · WhatsApp yok</span> : null}
                 <LeadControls lead={lead} />
               </article>
-            ))}
+              );
+            })}
           </div>
         </>
       )}

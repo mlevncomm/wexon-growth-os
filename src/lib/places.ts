@@ -1,4 +1,4 @@
-import { matchesPrefix, normalizePhone } from "./phone";
+import { isWhatsAppCapablePhone, matchesPrefix, normalizePhone } from "./phone";
 import { getSettings } from "./settings";
 import { matchesWebsiteFilter, parseWebsiteFilter, type WebsiteFilter } from "./website";
 
@@ -226,7 +226,7 @@ function skipHit(
   websiteFilter: WebsiteFilter,
 ): boolean {
   if (opts.minRating > 0 && (hit.rating == null || hit.rating < opts.minRating)) return true;
-  if (opts.requirePhone && !hit.phone) return true;
+  if (opts.requirePhone && !isWhatsAppCapablePhone(hit.phone)) return true;
   if (hit.phone && !matchesPrefix(hit.phone, opts.phonePrefix)) return true;
   if (!matchesWebsiteFilter(hit.website, websiteFilter)) return true;
   return false;

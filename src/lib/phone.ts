@@ -99,6 +99,18 @@ export function phoneForWhatsApp(e164: string): string {
   return e164.replace(/^\+/, "");
 }
 
+/**
+ * Türkiye'de WhatsApp için yalnızca 05xx mobil numaraları güvenli adaydır.
+ * Sabit hatlar (+90 2xx / 3xx / 4xx) wa.me bağlantısına gönderilmez.
+ * Diğer ülkelerde numara tipini alan kodundan güvenilir biçimde çıkaramadığımız
+ * için geçerli E.164 numaralarını aday kabul ederiz; son kontrol WhatsApp'ındır.
+ */
+export function isWhatsAppCapablePhone(e164: string): boolean {
+  if (!/^\+\d{8,15}$/.test(e164)) return false;
+  if (e164.startsWith("+90")) return /^\+905\d{9}$/.test(e164);
+  return true;
+}
+
 export function matchesPrefix(e164: string, prefix: string): boolean {
   const wanted = prefix.trim();
   if (!wanted) return true;

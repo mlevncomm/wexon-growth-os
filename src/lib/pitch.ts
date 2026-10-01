@@ -124,6 +124,34 @@ const SOFTWARE: Record<SectorId, Record<PitchOffer, string>> = {
   },
 };
 
+const SOFTWARE_BENEFITS: Record<SectorId, string> = {
+  kuafor: "hizmetleri, fiyatları ve randevu bilgisini",
+  restoran: "menüyü, konumu ve rezervasyon bilgisini",
+  kafe: "menüyü, çalışma saatlerini ve konumu",
+  klinik: "hizmetleri ve randevu bilgisini",
+  dis: "tedavileri ve randevu bilgisini",
+  emlak: "portföyü ve iletişim seçeneklerini",
+  muhasebe: "hizmetleri ve iletişim bilgisini",
+  avukat: "çalışma alanlarını ve iletişim bilgisini",
+  otel: "odaları ve rezervasyon bilgisini",
+  insaat: "projeleri ve teklif alma yolunu",
+  oto: "hizmetleri ve randevu bilgisini",
+  magaza: "ürünleri ve WhatsApp sipariş yolunu",
+  lojistik: "hizmet bölgelerini ve teklif formunu",
+  spor: "üyelikleri, dersleri ve iletişim bilgisini",
+  ofis: "hizmetleri ve teklif alma yolunu",
+  egitim: "programları ve kayıt bilgisini",
+  generic: "hizmetleri ve iletişim bilgisini",
+};
+
+function softwarePitch(sector: SectorId, offer: PitchOffer): string {
+  const benefit = SOFTWARE_BENEFITS[sector];
+  if (offer === "yenile") {
+    return `Merhaba {ad}, ben Wexon.dev’den Mehmet. Mevcut sitenizde ${benefit} mobilde daha net gösterecek kısa bir yenileme fikrim var. Ücretsiz bir örnek görünüm göndermemi ister misiniz?`;
+  }
+  return `Merhaba {ad}, ben Wexon.dev’den Mehmet. İşletmeniz için aktif bir web sitesi göremedim. ${benefit} tek sayfada toplayan mobil uyumlu siteyi 4.900 TL lansman fiyatıyla hazırlıyoruz. Ücretsiz bir örnek görünüm göndermemi ister misiniz?`;
+}
+
 const WATER: Record<SectorId, string> = {
   restoran:
     "Merhaba {ad}, {ilçe} mutfağında kireç çayı, buzu ve makineyi bozar. Restoranlara uygun arıtma ile lezzeti koruyup arızayı düşürüyoruz. 10 dakikalık yerinde bakış uygun mu?",
@@ -213,7 +241,7 @@ export function composePitch(
   const sector = inferSector(lead);
   const offer = vertical === "software" ? inferOffer(lead.website) : "web";
   let raw = SOFTWARE.generic[offer];
-  if (vertical === "software") raw = SOFTWARE[sector.id][offer];
+  if (vertical === "software") raw = softwarePitch(sector.id, offer);
   else if (vertical === "yks") raw = YKS[sector.id] ?? YKS.generic;
   else raw = WATER[sector.id] ?? WATER.generic;
   const body = renderTemplate(raw, lead);
