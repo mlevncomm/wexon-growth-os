@@ -104,6 +104,25 @@ export default function KocPage() {
     toast.push(playbookToo ? "Sohbet ve playbook silindi" : "Sohbet temizlendi");
   }
 
+  async function applyWexonStandard() {
+    setBusy(true);
+    try {
+      const res = await fetch("/api/coach", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "apply-wexon-sales" }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Playbook uygulanamadı");
+      apply(json);
+      toast.push("Wexon satış standardı uygulandı");
+    } catch (err) {
+      toast.push(err instanceof Error ? err.message : "Playbook uygulanamadı", "bad");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div>
       <div className="page-kicker">Marka</div>
@@ -168,6 +187,15 @@ export default function KocPage() {
             {busy ? <div className="muted" style={{ fontSize: 13 }}>Not alıyor…</div> : null}
             <div ref={bottom} />
           </div>
+          <div className="key-block" style={{ marginTop: 12 }}>
+            <strong>Önerilen başlangıç</strong>
+            <p className="panel-note" style={{ marginTop: 6 }}>
+              Wexon.dev kimliği, 4.900 TL tek sayfalık site, doğrulanmış bilgi ve ücretsiz örnek görünüm CTA’sını tek tıkla uygular.
+            </p>
+            <button className="btn btn-ghost" type="button" disabled={busy} onClick={() => void applyWexonStandard()}>
+              Wexon satış standardını uygula
+            </button>
+          </div>
           <form className="coach-form" onSubmit={(e) => void send(e)}>
             <input
               value={text}
@@ -199,7 +227,7 @@ export default function KocPage() {
               {playbookActive ? "Aktif" : "Boş"}
             </span>
           </div>
-          <p className="panel-note">Fine-tune yok. Bu alanlar şablon üretimine enjekte edilir.</p>
+          <p className="panel-note">Bunlar kalıcı marka kurallarıdır; AI ile oluşturulan mesajlara otomatik eklenir.</p>
           <div className="playbook-grid">
             <PlayRow label="Ton" value={playbook?.tone} />
             <PlayRow label="Kurallar" value={playbook?.rules} />

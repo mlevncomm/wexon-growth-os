@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { coachSnapshot, coachTurn, resetCoach } from "@/lib/coach";
+import { applyWexonSalesPlaybook, coachSnapshot, coachTurn, resetCoach } from "@/lib/coach";
 import { badRequest, readJson } from "@/lib/http";
 import { withTenant } from "@/lib/tenant";
 
@@ -11,9 +11,12 @@ export async function GET() {
 
 export async function POST(request: Request) {
   return withTenant(async () => {
-    const body = await readJson<{ message?: string }>(request);
+    const body = await readJson<{ message?: string; action?: string }>(request);
     if (!body) return badRequest("Geçersiz istek.");
     try {
+      if (body.action === "apply-wexon-sales") {
+        return NextResponse.json(await applyWexonSalesPlaybook());
+      }
       return NextResponse.json(await coachTurn(typeof body.message === "string" ? body.message : ""));
     } catch (err) {
       const message = err instanceof Error ? err.message : "Koç yanıt vermedi";

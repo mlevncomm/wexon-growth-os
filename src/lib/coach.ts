@@ -1,6 +1,6 @@
 import { generateLlmCopy, llmChat, parseJsonObject } from "./llm";
 import { prisma } from "./prisma";
-import { getPlaybook, mergePlaybook, playbookIsActive, savePlaybook, type Playbook } from "./playbook";
+import { getPlaybook, mergePlaybook, playbookIsActive, savePlaybook, WEXON_SALES_PLAYBOOK } from "./playbook";
 import { getSettings } from "./settings";
 import { currentTenant, tenantId } from "./tenant";
 import { coachSystemPrompt } from "./verticals";
@@ -37,6 +37,18 @@ export async function resetCoach(resetPlaybook = false) {
   if (resetPlaybook) {
     await savePlaybook({ tone: "", rules: "", forbidden: "", offer: "", cta: "" });
   }
+  return coachSnapshot();
+}
+
+export async function applyWexonSalesPlaybook() {
+  await savePlaybook(WEXON_SALES_PLAYBOOK);
+  await prisma.coachMessage.create({
+    data: {
+      tenantId: tenantId(),
+      role: "assistant",
+      body: "Wexon satış standardı uygulandı. Kısa, doğrulanmış, 4.900 TL teklifi ve ücretsiz örnek CTA’sı artık AI metinlerine yön verir.",
+    },
+  });
   return coachSnapshot();
 }
 

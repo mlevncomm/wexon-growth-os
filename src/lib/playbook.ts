@@ -8,6 +8,14 @@ export type Playbook = {
   cta: string;
 };
 
+export const WEXON_SALES_PLAYBOOK: Playbook = {
+  tone: "Samimi, güven veren ve profesyonel; 2-4 kısa cümle.",
+  rules: "İlk mesajda Wexon.dev’den Mehmet diye tanıt. Yalnızca doğrulanmış bilgi kullan; görmediğin ayrıntıyı incelemiş gibi yazma. Site yoksa mobil uyumlu tek sayfalık site öner. İlk mesajda toplantı isteme. Takip mesajında rahatsız etmeme seçeneği ver.",
+  forbidden: "garanti, en iyi, kaçırmayın, hemen şimdi, ucuz, son fırsat, baskı dili, yapay teknik jargon",
+  offer: "Mobil uyumlu tek sayfalık web sitesi 4.900 TL lansman fiyatı. Ücretsiz örnek görünüm sunulabilir.",
+  cta: "Ücretsiz bir örnek görünüm göndermemi ister misiniz?",
+};
+
 function asText(value: unknown, max = 2000): string {
   return typeof value === "string" ? value.replace(/\s+\n/g, "\n").trim().slice(0, max) : "";
 }
