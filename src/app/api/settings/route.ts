@@ -60,6 +60,9 @@ export async function PUT(request: Request) {
       patch.campaignMediaUrl = mediaUrl;
       if (mediaUrl) patch.campaignMediaId = "";
     }
+    if (typeof body.campaignMediaName === "string") {
+      patch.campaignMediaName = body.campaignMediaName.trim().slice(0, 160);
+    }
     if (typeof body.llmApiKey === "string" && !isMasked(body.llmApiKey)) {
       patch.llmApiKey = body.llmApiKey.trim();
     }

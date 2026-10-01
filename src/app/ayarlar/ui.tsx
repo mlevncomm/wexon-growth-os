@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { upload } from "@vercel/blob/client";
 import Link from "next/link";
 import { ChipStrip } from "@/components/ChipStrip";
 import { ConnectGuide } from "@/components/ConnectGuide";
@@ -100,6 +101,7 @@ export default function AyarlarPage() {
   const [mediaBusy, setMediaBusy] = useState(false);
   const [mediaName, setMediaName] = useState("");
   const [hasMediaId, setHasMediaId] = useState(false);
+  const [mediaProgress, setMediaProgress] = useState(0);
 
   useEffect(() => {
     const boot = window.setTimeout(() => {
@@ -203,26 +205,42 @@ export default function AyarlarPage() {
       toast.push("Yalnızca görsel veya video seçin", "bad");
       return;
     }
-    const max = type === "image" ? 5 * 1024 * 1024 : 16 * 1024 * 1024;
+    const max = 60 * 1024 * 1024;
     if (file.size > max) {
-      toast.push(`${type === "image" ? "Görsel" : "Video"} en fazla ${max / 1024 / 1024} MB olabilir`, "bad");
+      toast.push(`Dosya en fazla ${max / 1024 / 1024} MB olabilir`, "bad");
       return;
     }
     setMediaBusy(true);
+    setMediaProgress(0);
     try {
-      const payload = new FormData();
-      payload.set("file", file);
-      const res = await fetch("/api/campaign-media", { method: "POST", body: payload });
+      const blob = await upload(`campaign/${file.name}`, file, {
+        access: "public",
+        handleUploadUrl: "/api/campaign-media",
+        multipart: file.size > 10 * 1024 * 1024,
+        clientPayload: JSON.stringify({ type, name: file.name }),
+        onUploadProgress: ({ percentage }) => setMediaProgress(Math.round(percentage)),
+      });
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          campaignMediaEnabled: true,
+          campaignMediaType: type,
+          campaignMediaUrl: blob.url,
+          campaignMediaName: file.name,
+        }),
+      });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Medya yüklenemedi");
+      if (!res.ok) throw new Error(json.error || "Medya ayarı kaydedilemedi");
       setForm((prev) => ({
         ...prev,
         campaignMediaEnabled: true,
-        campaignMediaType: json.type,
-        campaignMediaUrl: "",
+        campaignMediaType: type,
+        campaignMediaUrl: blob.url,
       }));
-      setMediaName(json.name);
-      setHasMediaId(true);
+      setMediaName(file.name);
+      setHasMediaId(false);
+      setMediaProgress(100);
       toast.push("Kampanya medyası kaydedildi");
     } catch (err) {
       toast.push(err instanceof Error ? err.message : "Medya yüklenemedi", "bad");
@@ -454,38 +472,15 @@ export default function AyarlarPage() {
             </span>
           </div>
           <p className="panel-note">
-            Etkinleştirildiğinde yalnızca ilk WhatsApp temasında görsel veya video, mesaj metni açıklama olarak eklenerek gönderilir. Görsel en fazla 5 MB, video en fazla 16 MB olmalıdır.
+            Görsel veya videoyu seçin; sistem Vercel&apos;e yükleyip ilk WhatsApp mesajlarına otomatik ekler. Takip mesajlarında tekrar göndermez. En fazla 60 MB.
           </p>
           <div className="key-stack">
             <label className="field">
-              <span>Medya türü</span>
-              <select
-                value={form.campaignMediaType}
-                onChange={(e) => setForm({ ...form, campaignMediaType: e.target.value })}
-              >
-                <option value="">Seçin</option>
-                <option value="image">Görsel</option>
-                <option value="video">Video</option>
-              </select>
-            </label>
-            <label className="field">
-              <span>Herkese açık HTTPS medya adresi</span>
-              <input
-                type="url"
-                value={form.campaignMediaUrl}
-                onChange={(e) => {
-                  setForm({ ...form, campaignMediaUrl: e.target.value });
-                  if (e.target.value) setHasMediaId(false);
-                }}
-                placeholder="https://.../kampanya.mp4"
-              />
-            </label>
-            <label className="field">
-              <span>Ya da Meta Cloud&apos;a dosya yükle</span>
+              <span>Görsel veya video seç</span>
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp,video/mp4,video/3gpp"
-                disabled={mediaBusy || !flags.hasCloudToken || !form.waPhoneNumberId}
+                disabled={mediaBusy}
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) void uploadCampaignMedia(file);
@@ -494,10 +489,8 @@ export default function AyarlarPage() {
               />
             </label>
           </div>
+          {mediaBusy ? <p className="panel-note">Yükleniyor: %{mediaProgress}</p> : null}
           {mediaName ? <p className="panel-note">Yüklü dosya: <strong>{mediaName}</strong></p> : null}
-          {!flags.hasCloudToken || !form.waPhoneNumberId ? (
-            <p className="error-box">Doğrudan dosya yüklemek için önce WhatsApp Cloud token ve Phone number ID kaydedilmelidir. HTTPS medya adresi seçeneğini yine kullanabilirsiniz.</p>
-          ) : null}
           <div className="save-row">
             <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <input
