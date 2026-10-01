@@ -192,7 +192,11 @@ function wantsAuto(templateId: string, body?: string): boolean {
 
 function isGenericDraft(message: string): boolean {
   const t = message.toLocaleLowerCase("tr");
-  return t.includes("keşif notunu hazırladık") || t.includes("kapsam ve süre tek sayfada");
+  return (
+    t.includes("keşif notunu hazırladık") ||
+    t.includes("kapsam ve süre tek sayfada") ||
+    t.includes("aktif bir web sitesi göremedim")
+  );
 }
 
 function pitchFromLead(

@@ -124,32 +124,32 @@ const SOFTWARE: Record<SectorId, Record<PitchOffer, string>> = {
   },
 };
 
-const SOFTWARE_BENEFITS: Record<SectorId, string> = {
-  kuafor: "hizmetleri, fiyatları ve randevu bilgisini",
-  restoran: "menüyü, konumu ve rezervasyon bilgisini",
-  kafe: "menüyü, çalışma saatlerini ve konumu",
-  klinik: "hizmetleri ve randevu bilgisini",
-  dis: "tedavileri ve randevu bilgisini",
-  emlak: "portföyü ve iletişim seçeneklerini",
-  muhasebe: "hizmetleri ve iletişim bilgisini",
-  avukat: "çalışma alanlarını ve iletişim bilgisini",
-  otel: "odaları ve rezervasyon bilgisini",
-  insaat: "projeleri ve teklif alma yolunu",
-  oto: "hizmetleri ve randevu bilgisini",
-  magaza: "ürünleri ve WhatsApp sipariş yolunu",
-  lojistik: "hizmet bölgelerini ve teklif formunu",
-  spor: "üyelikleri, dersleri ve iletişim bilgisini",
-  ofis: "hizmetleri ve teklif alma yolunu",
-  egitim: "programları ve kayıt bilgisini",
-  generic: "hizmetleri ve iletişim bilgisini",
+const SOFTWARE_POSITIONING: Record<SectorId, string> = {
+  kuafor: "hizmetleri, uygulama örneklerini ve randevu yolunu tek bakışta anlatan",
+  restoran: "menüyü, konumu ve rezervasyon yolunu zahmetsizce sunan",
+  kafe: "menüyü, atmosferi ve konum bilgisini mobilde güçlü biçimde sunan",
+  klinik: "hizmet alanlarını, uzmanlık bilgisini ve randevu yolunu güven veren bir düzende sunan",
+  dis: "tedavi alanlarını, hekim bilgisini ve randevu yolunu güven veren bir düzende sunan",
+  emlak: "portföyü ve iletişim yolunu görsel, sade bir düzende sunan",
+  muhasebe: "uzmanlık alanlarını ve iletişim yolunu kurumsal bir dille anlatan",
+  avukat: "çalışma alanlarını ve iletişim yolunu ölçülü, kurumsal bir düzende sunan",
+  otel: "odaları, olanakları ve doğrudan rezervasyon yolunu öne çıkaran",
+  insaat: "projeleri, uzmanlık alanlarını ve teklif sürecini güçlü biçimde sunan",
+  oto: "hizmetleri, güven unsurlarını ve randevu yolunu netleştiren",
+  magaza: "ürünleri ve sipariş yolunu mobil odaklı bir vitrine dönüştüren",
+  lojistik: "hizmet bölgelerini ve teklif sürecini anlaşılır biçimde sunan",
+  spor: "üyelikleri, ders programını ve iletişim yolunu tek yerde sunan",
+  ofis: "hizmetleri ve teklif alma yolunu kurumsal bir düzende sunan",
+  egitim: "programları, eğitim yaklaşımını ve kayıt yolunu düzenli biçimde sunan",
+  generic: "hizmetleri, güven unsurlarını ve iletişim yolunu tek bakışta sunan",
 };
 
 function softwarePitch(sector: SectorId, offer: PitchOffer): string {
-  const benefit = SOFTWARE_BENEFITS[sector];
+  const positioning = SOFTWARE_POSITIONING[sector];
   if (offer === "yenile") {
-    return `Merhaba {ad}, ben Wexon.dev’den Mehmet. Mevcut sitenizde ${benefit} mobilde daha net gösterecek kısa bir yenileme fikrim var. Ücretsiz bir örnek görünüm göndermemi ister misiniz?`;
+    return `Merhaba, ben Wexon.dev’den Mehmet. {ad} için ${positioning} daha rafine bir web deneyimi üzerine size özel bir önerim var. Uygun görürseniz örnek ilk ekranı hazırlayıp paylaşmamı ister misiniz?`;
   }
-  return `Merhaba {ad}, ben Wexon.dev’den Mehmet. İşletmeniz için aktif bir web sitesi göremedim. ${benefit} tek sayfada toplayan mobil uyumlu siteyi 4.900 TL lansman fiyatıyla hazırlıyoruz. Ücretsiz bir örnek görünüm göndermemi ister misiniz?`;
+  return `Merhaba, ben Wexon.dev’den Mehmet. {ad} için ${positioning} sade, mobil odaklı bir web deneyimi üzerine size özel bir önerim var. Lansmana özel 4.900 TL’den başlayan çalışma için örnek ilk ekranı hazırlayıp paylaşmamı ister misiniz?`;
 }
 
 const WATER: Record<SectorId, string> = {
