@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { markStatsDirty } from "@/lib/os-events";
+import { phoneForWhatsApp } from "@/lib/phone";
 import { useToast } from "./Toast";
 
 type Draft = { id: string; name: string; phone: string; message: string; channel: string };
@@ -27,6 +28,7 @@ type Snapshot = {
 export function QueuePanel({ onClose, open = false }: { onClose?: () => void; open?: boolean }) {
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [editing, setEditing] = useState<Record<string, string>>({});
+  const [opened, setOpened] = useState<Record<string, boolean>>({});
   const toast = useToast();
 
   useEffect(() => {
@@ -102,6 +104,24 @@ export function QueuePanel({ onClose, open = false }: { onClose?: () => void; op
     toast.push("Kuyruk şimdi denendi");
   }
 
+  async function markSent(id: string) {
+    const message = editing[id] ?? snap?.drafts?.find((d) => d.id === id)?.message ?? "";
+    const res = await fetch("/api/outreach/approve", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, action: "manual-sent", message }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.push(json.error || "Gönderim kaydedilemedi", "bad");
+      return;
+    }
+    const next = await fetch("/api/outreach", { cache: "no-store" });
+    if (next.ok) setSnap(await next.json());
+    markStatsDirty();
+    toast.push("Gönderim kaydedildi; müşteri Yazıldı durumuna alındı");
+  }
+
   const waiting = (snap?.queued ?? 0) + (snap?.sending ?? 0);
   const pending = snap?.pending ?? snap?.drafts?.length ?? 0;
   const cap = snap?.dailyCap ?? 40;
@@ -131,7 +151,7 @@ export function QueuePanel({ onClose, open = false }: { onClose?: () => void; op
           {snap?.cloud
             ? "Kanal: WhatsApp Cloud"
             : snap?.serverless
-              ? "Cloud yok — canlı gönderim yok. QR Vercel’de çalışmaz."
+              ? "Manuel mod — WhatsApp Business'ta açıp son gönderimi siz onaylarsınız."
               : "Kanal: QR yedek (Cloud yok)"}
           {pending > 0 ? " Her kart sektör ve siteye göre yazıldı." : ""}
         </div>
@@ -149,9 +169,26 @@ export function QueuePanel({ onClose, open = false }: { onClose?: () => void; op
                 onChange={(e) => setEditing((prev) => ({ ...prev, [d.id]: e.target.value }))}
               />
               <div className="pending-actions">
-                <button className="btn btn-wexon" type="button" onClick={() => void moderate(d.id, "approve")}>
-                  Onayla
-                </button>
+                {snap?.cloud ? (
+                  <button className="btn btn-wexon" type="button" onClick={() => void moderate(d.id, "approve")}>
+                    Onayla
+                  </button>
+                ) : (
+                  <a
+                    className="btn btn-wexon"
+                    href={`https://wa.me/${phoneForWhatsApp(d.phone)}?text=${encodeURIComponent(editing[d.id] ?? d.message)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={() => setOpened((prev) => ({ ...prev, [d.id]: true }))}
+                  >
+                    WhatsApp&apos;ta aç
+                  </a>
+                )}
+                {!snap?.cloud && opened[d.id] ? (
+                  <button className="btn btn-ghost" type="button" onClick={() => void markSent(d.id)}>
+                    Gönderdim
+                  </button>
+                ) : null}
                 <button className="btn btn-ghost" type="button" onClick={() => void moderate(d.id, "edit")}>
                   Düzenle
                 </button>
@@ -185,12 +222,14 @@ export function QueuePanel({ onClose, open = false }: { onClose?: () => void; op
       </div>
       <div className="muted" style={{ fontSize: 13 }}>
         <span className={`dot${live ? "" : snap?.paused ? " warn" : " off"}`} />
-        {live ? "Canlı gönderim" : canSend ? "Beklemede" : "Gönderim kapalı (Cloud yok)"}
+        {live ? "Canlı gönderim" : canSend ? "Beklemede" : "Manuel gönderim hazır"}
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: "auto" }}>
-        <button className="btn btn-ghost" type="button" onClick={() => void tickNow()}>
-          Şimdi dene
-        </button>
+        {canSend ? (
+          <button className="btn btn-ghost" type="button" onClick={() => void tickNow()}>
+            Şimdi dene
+          </button>
+        ) : null}
         {snap?.paused || snap?.stopped ? (
           <button className="btn btn-wexon" type="button" onClick={() => void control("resume")}>
             Gönderime devam et

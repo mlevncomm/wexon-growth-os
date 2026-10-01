@@ -2,7 +2,7 @@ import { after, NextResponse } from "next/server";
 import { badRequest, readJson } from "@/lib/http";
 import { bustStatsCache } from "@/lib/stats";
 import { runWithTenant, withTenant } from "@/lib/tenant";
-import { moderateJobs, processQueueTick } from "@/lib/whatsapp/queue";
+import { markManualSent, moderateJobs, processQueueTick } from "@/lib/whatsapp/queue";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,13 +19,22 @@ export async function POST(request: Request) {
     if (!body) return badRequest("Geçersiz istek.");
     const ids = [...(body.ids ?? []), body.id ?? ""].filter(Boolean);
     const action = body.action;
-    if (!ids.length || (action !== "approve" && action !== "reject" && action !== "edit")) {
+    if (!ids.length || (action !== "approve" && action !== "reject" && action !== "edit" && action !== "manual-sent")) {
       return badRequest("Onaylanacak iş ve eylem gerekli.");
     }
     if (action === "edit" && !String(body.message ?? "").trim()) {
       return badRequest("Düzenlenen metin boş olamaz.");
     }
     try {
+      if (action === "manual-sent") {
+        const result = await markManualSent({
+          id: ids[0],
+          message: typeof body.message === "string" ? body.message : undefined,
+        });
+        if (!result.updated) return badRequest("Taslak bulunamadı veya daha önce işlendi.");
+        bustStatsCache(ctx.tenantId);
+        return NextResponse.json(result);
+      }
       const result = await moderateJobs({
         ids,
         action,

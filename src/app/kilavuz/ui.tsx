@@ -41,7 +41,7 @@ const STEPS = [
     n: "05",
     href: "/",
     title: "Kuyruktan onayla",
-    body: "Sağ üst Kuyruk veya sol anahtar. Taslağı okuyun, düzenleyin, Onayla / Reddet. Onaysız mesaj gitmez. Cloud yoksa canlıda gönderim olmaz.",
+    body: "Sağ üst Kuyruk veya sol anahtar. Cloud bağlıysa Onayla ile gönderilir. Cloud yoksa WhatsApp'ta aç ile hazır mesajı açın; gönderdikten sonra Gönderdim'e basın.",
   },
 ] as const;
 

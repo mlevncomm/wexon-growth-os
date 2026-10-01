@@ -338,6 +338,42 @@ export async function moderateJobs(opts: {
   return { updated };
 }
 
+export async function markManualSent(opts: {
+  id: string;
+  message?: string;
+}): Promise<{ updated: number }> {
+  const owner = tid();
+  const job = await prisma.outreachJob.findFirst({
+    where: {
+      id: opts.id,
+      tenantId: owner,
+      status: { in: ["pending", "queued", "failed"] },
+    },
+    select: { id: true, leadId: true, message: true },
+  });
+  if (!job) return { updated: 0 };
+
+  const message = (opts.message ?? job.message).trim();
+  if (!message) throw new Error("Mesaj boş olamaz.");
+
+  await prisma.$transaction([
+    prisma.outreachJob.update({
+      where: { id: job.id },
+      data: {
+        message,
+        status: "sent",
+        sentAt: new Date(),
+        error: null,
+      },
+    }),
+    prisma.lead.update({
+      where: { id: job.leadId },
+      data: { status: "yazildi" },
+    }),
+  ]);
+  return { updated: 1 };
+}
+
 export async function getQueueSnapshot() {
   const owner = tid();
   const settings = await getSettings();
