@@ -11,6 +11,11 @@ type Settings = {
   googlePlacesApiKey: string;
   waCloudToken: string;
   waPhoneNumberId: string;
+  campaignMediaEnabled: boolean;
+  campaignMediaType: string;
+  campaignMediaUrl: string;
+  campaignMediaId: string;
+  campaignMediaName: string;
   delayMinSec: number;
   delayMaxSec: number;
   dailyCap: number;
@@ -38,6 +43,9 @@ type SettingsForm = Pick<
   | "googlePlacesApiKey"
   | "waCloudToken"
   | "waPhoneNumberId"
+  | "campaignMediaEnabled"
+  | "campaignMediaType"
+  | "campaignMediaUrl"
   | "delayMinSec"
   | "delayMaxSec"
   | "dailyCap"
@@ -56,6 +64,9 @@ export default function AyarlarPage() {
     googlePlacesApiKey: "",
     waCloudToken: "",
     waPhoneNumberId: "",
+    campaignMediaEnabled: false,
+    campaignMediaType: "",
+    campaignMediaUrl: "",
     delayMinSec: 20,
     delayMaxSec: 45,
     dailyCap: 40,
@@ -86,6 +97,9 @@ export default function AyarlarPage() {
   const [llmBusy, setLlmBusy] = useState(false);
   const [llmCheck, setLlmCheck] = useState<"idle" | "ok" | "bad">("idle");
   const [llmCheckMsg, setLlmCheckMsg] = useState("");
+  const [mediaBusy, setMediaBusy] = useState(false);
+  const [mediaName, setMediaName] = useState("");
+  const [hasMediaId, setHasMediaId] = useState(false);
 
   useEffect(() => {
     const boot = window.setTimeout(() => {
@@ -102,6 +116,9 @@ export default function AyarlarPage() {
             googlePlacesApiKey: s.googlePlacesApiKey,
             waCloudToken: s.waCloudToken,
             waPhoneNumberId: s.waPhoneNumberId,
+            campaignMediaEnabled: Boolean(s.campaignMediaEnabled),
+            campaignMediaType: s.campaignMediaType ?? "",
+            campaignMediaUrl: s.campaignMediaUrl ?? "",
             delayMinSec: s.delayMinSec,
             delayMaxSec: s.delayMaxSec,
             dailyCap: s.dailyCap,
@@ -117,6 +134,8 @@ export default function AyarlarPage() {
             hasIgToken: s.hasIgToken,
             hasIgUserId: s.hasIgUserId,
           });
+          setMediaName(s.campaignMediaName ?? "");
+          setHasMediaId(Boolean(s.campaignMediaId));
           setDeploy({
             hosted: Boolean(s.hosted),
             appUrl: s.appUrl || "http://127.0.0.1:3000",
@@ -176,6 +195,61 @@ export default function AyarlarPage() {
       setForm((prev) => ({ ...prev, igWebhookVerifyToken: json.igWebhookVerifyToken }));
     }
     return true;
+  }
+
+  async function uploadCampaignMedia(file: File) {
+    const type = file.type.startsWith("image/") ? "image" : file.type.startsWith("video/") ? "video" : "";
+    if (!type) {
+      toast.push("Yalnızca görsel veya video seçin", "bad");
+      return;
+    }
+    const max = type === "image" ? 5 * 1024 * 1024 : 16 * 1024 * 1024;
+    if (file.size > max) {
+      toast.push(`${type === "image" ? "Görsel" : "Video"} en fazla ${max / 1024 / 1024} MB olabilir`, "bad");
+      return;
+    }
+    setMediaBusy(true);
+    try {
+      const payload = new FormData();
+      payload.set("file", file);
+      const res = await fetch("/api/campaign-media", { method: "POST", body: payload });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Medya yüklenemedi");
+      setForm((prev) => ({
+        ...prev,
+        campaignMediaEnabled: true,
+        campaignMediaType: json.type,
+        campaignMediaUrl: "",
+      }));
+      setMediaName(json.name);
+      setHasMediaId(true);
+      toast.push("Kampanya medyası kaydedildi");
+    } catch (err) {
+      toast.push(err instanceof Error ? err.message : "Medya yüklenemedi", "bad");
+    } finally {
+      setMediaBusy(false);
+    }
+  }
+
+  async function clearCampaignMedia() {
+    setMediaBusy(true);
+    try {
+      const res = await fetch("/api/campaign-media", { method: "DELETE" });
+      if (!res.ok) throw new Error("Medya kaldırılamadı");
+      setForm((prev) => ({
+        ...prev,
+        campaignMediaEnabled: false,
+        campaignMediaType: "",
+        campaignMediaUrl: "",
+      }));
+      setMediaName("");
+      setHasMediaId(false);
+      toast.push("Kampanya medyası kaldırıldı");
+    } catch (err) {
+      toast.push(err instanceof Error ? err.message : "Medya kaldırılamadı", "bad");
+    } finally {
+      setMediaBusy(false);
+    }
   }
 
   async function testLlm() {
@@ -368,6 +442,81 @@ export default function AyarlarPage() {
             </div>
           </section>
         </div>
+
+        <section className="card panel" style={{ marginTop: 14 }}>
+          <div className="panel-head">
+            <div>
+              <div className="page-kicker">İlk temas</div>
+              <h2>Kampanya medyası</h2>
+            </div>
+            <span className={`pill ${form.campaignMediaEnabled && (hasMediaId || form.campaignMediaUrl) ? "ok" : "mute"}`}>
+              {form.campaignMediaEnabled && (hasMediaId || form.campaignMediaUrl) ? "Aktif" : "Kapalı"}
+            </span>
+          </div>
+          <p className="panel-note">
+            Etkinleştirildiğinde yalnızca ilk WhatsApp temasında görsel veya video, mesaj metni açıklama olarak eklenerek gönderilir. Görsel en fazla 5 MB, video en fazla 16 MB olmalıdır.
+          </p>
+          <div className="key-stack">
+            <label className="field">
+              <span>Medya türü</span>
+              <select
+                value={form.campaignMediaType}
+                onChange={(e) => setForm({ ...form, campaignMediaType: e.target.value })}
+              >
+                <option value="">Seçin</option>
+                <option value="image">Görsel</option>
+                <option value="video">Video</option>
+              </select>
+            </label>
+            <label className="field">
+              <span>Herkese açık HTTPS medya adresi</span>
+              <input
+                type="url"
+                value={form.campaignMediaUrl}
+                onChange={(e) => {
+                  setForm({ ...form, campaignMediaUrl: e.target.value });
+                  if (e.target.value) setHasMediaId(false);
+                }}
+                placeholder="https://.../kampanya.mp4"
+              />
+            </label>
+            <label className="field">
+              <span>Ya da Meta Cloud&apos;a dosya yükle</span>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,video/mp4,video/3gpp"
+                disabled={mediaBusy || !flags.hasCloudToken || !form.waPhoneNumberId}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void uploadCampaignMedia(file);
+                  e.currentTarget.value = "";
+                }}
+              />
+            </label>
+          </div>
+          {mediaName ? <p className="panel-note">Yüklü dosya: <strong>{mediaName}</strong></p> : null}
+          {!flags.hasCloudToken || !form.waPhoneNumberId ? (
+            <p className="error-box">Doğrudan dosya yüklemek için önce WhatsApp Cloud token ve Phone number ID kaydedilmelidir. HTTPS medya adresi seçeneğini yine kullanabilirsiniz.</p>
+          ) : null}
+          <div className="save-row">
+            <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <input
+                type="checkbox"
+                checked={form.campaignMediaEnabled}
+                onChange={(e) => setForm({ ...form, campaignMediaEnabled: e.target.checked })}
+              />
+              İlk mesajlarda otomatik gönder
+            </label>
+            <button className="btn btn-wexon" type="button" onClick={() => void save()} disabled={mediaBusy}>
+              Medya ayarını kaydet
+            </button>
+            {(hasMediaId || form.campaignMediaUrl) ? (
+              <button className="btn" type="button" onClick={() => void clearCampaignMedia()} disabled={mediaBusy}>
+                Medyayı kaldır
+              </button>
+            ) : null}
+          </div>
+        </section>
 
         <section className="card panel" style={{ marginTop: 14 }}>
           <div className="panel-head">

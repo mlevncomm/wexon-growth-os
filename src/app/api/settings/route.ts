@@ -48,6 +48,18 @@ export async function PUT(request: Request) {
     if (typeof body.waPhoneNumberId === "string") {
       patch.waPhoneNumberId = body.waPhoneNumberId.trim();
     }
+    if (typeof body.campaignMediaEnabled === "boolean") {
+      patch.campaignMediaEnabled = body.campaignMediaEnabled;
+    }
+    if (body.campaignMediaType === "image" || body.campaignMediaType === "video" || body.campaignMediaType === "") {
+      patch.campaignMediaType = body.campaignMediaType;
+    }
+    if (typeof body.campaignMediaUrl === "string") {
+      const mediaUrl = body.campaignMediaUrl.trim();
+      if (mediaUrl && !/^https:\/\//i.test(mediaUrl)) return badRequest("Medya adresi HTTPS ile başlamalıdır.");
+      patch.campaignMediaUrl = mediaUrl;
+      if (mediaUrl) patch.campaignMediaId = "";
+    }
     if (typeof body.llmApiKey === "string" && !isMasked(body.llmApiKey)) {
       patch.llmApiKey = body.llmApiKey.trim();
     }

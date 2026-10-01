@@ -17,7 +17,13 @@ type WaSocket = {
     on: (event: string, cb: (data: unknown) => void) => void;
     off?: (event: string, cb: (data: unknown) => void) => void;
   };
-  sendMessage: (jid: string, content: { text: string }) => Promise<{ key?: { id?: string } } | undefined>;
+  sendMessage: (
+    jid: string,
+    content:
+      | { text: string }
+      | { image: { url: string }; caption: string }
+      | { video: { url: string }; caption: string },
+  ) => Promise<{ key?: { id?: string } } | undefined>;
   end: (error: Error | undefined) => Promise<void>;
   logout: (msg?: string) => Promise<void>;
 };
@@ -559,10 +565,22 @@ function waitForAck(sock: WaSocket, msgId: string): Promise<void> {
   });
 }
 
-export async function sendWebMessage(e164: string, text: string, owner = tenantId()): Promise<void> {
+export async function sendWebMessage(
+  e164: string,
+  text: string,
+  owner = tenantId(),
+  media?: { type: "image" | "video"; url: string },
+): Promise<void> {
   const sock = await socketForSend(owner);
   const jid = `${phoneForWhatsApp(e164)}@s.whatsapp.net`;
-  const sent = await sock.sendMessage(jid, { text });
+  const sent = await sock.sendMessage(
+    jid,
+    media?.type === "image"
+      ? { image: { url: media.url }, caption: text }
+      : media?.type === "video"
+        ? { video: { url: media.url }, caption: text }
+        : { text },
+  );
   const msgId = sent?.key?.id;
 
   if (msgId) {

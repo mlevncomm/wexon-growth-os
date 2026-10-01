@@ -1,7 +1,13 @@
 import { phoneForWhatsApp } from "../phone";
 import { getSettings } from "../settings";
 
-export async function sendCloudMessage(e164: string, text: string): Promise<void> {
+export type CampaignMedia = {
+  type: "image" | "video";
+  id?: string;
+  url?: string;
+};
+
+export async function sendCloudMessage(e164: string, text: string, media?: CampaignMedia): Promise<void> {
   const settings = await getSettings();
   if (!settings.waCloudToken || !settings.waPhoneNumberId) {
     throw new Error("Cloud API bilgileri eksik");
@@ -15,12 +21,22 @@ export async function sendCloudMessage(e164: string, text: string): Promise<void
         Authorization: `Bearer ${settings.waCloudToken}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        to: phoneForWhatsApp(e164),
-        type: "text",
-        text: { preview_url: false, body: text },
-      }),
+      body: JSON.stringify(media
+        ? {
+            messaging_product: "whatsapp",
+            to: phoneForWhatsApp(e164),
+            type: media.type,
+            [media.type]: {
+              ...(media.id ? { id: media.id } : { link: media.url }),
+              caption: text,
+            },
+          }
+        : {
+            messaging_product: "whatsapp",
+            to: phoneForWhatsApp(e164),
+            type: "text",
+            text: { preview_url: false, body: text },
+          }),
     },
   );
 

@@ -5,7 +5,7 @@ import { isServerless } from "../platform";
 import { getSettings, updateSettings } from "../settings";
 import { currentTenant, tenantId } from "../tenant";
 import type { Vertical } from "../verticals";
-import { cloudConfigured, sendCloudMessage } from "./cloud";
+import { cloudConfigured, sendCloudMessage, type CampaignMedia } from "./cloud";
 
 type QueueGlobal = {
   running: boolean;
@@ -51,16 +51,21 @@ function jitter(minSec: number, maxSec: number): number {
   return lo + Math.random() * (hi - lo);
 }
 
-async function sendMessage(phone: string, text: string): Promise<"cloud" | "local"> {
+async function sendMessage(phone: string, text: string, media?: CampaignMedia): Promise<"cloud" | "local"> {
   if (await cloudConfigured()) {
-    await sendCloudMessage(phone, text);
+    await sendCloudMessage(phone, text, media);
     return "cloud";
   }
   const { sendWebMessage, webReady } = await import("./web");
   if (!(await webReady())) {
     throw new Error("WhatsApp bağlı değil. Mesaj ekranında QR’ı okutun.");
   }
-  await sendWebMessage(phone, text);
+  await sendWebMessage(
+    phone,
+    text,
+    undefined,
+    media?.url ? { type: media.type, url: media.url } : undefined,
+  );
   return "local";
 }
 
@@ -118,7 +123,20 @@ async function tick(): Promise<"idle" | "sent" | "wait" | "paused" | "capped"> {
   }
 
   try {
-    await sendMessage(job.lead.phone, job.message);
+    const mediaType = settings.campaignMediaType === "image" || settings.campaignMediaType === "video"
+      ? settings.campaignMediaType
+      : null;
+    const firstMessageMedia: CampaignMedia | undefined =
+      job.lead.status === "yeni" &&
+      settings.campaignMediaEnabled &&
+      mediaType &&
+      (settings.campaignMediaId || settings.campaignMediaUrl)
+        ? {
+            type: mediaType,
+            ...(settings.campaignMediaId ? { id: settings.campaignMediaId } : { url: settings.campaignMediaUrl }),
+          }
+        : undefined;
+    await sendMessage(job.lead.phone, job.message, firstMessageMedia);
     await prisma.outreachJob.update({
       where: { id: job.id },
       data: { status: "sent", sentAt: new Date(), error: null },

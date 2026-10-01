@@ -6,6 +6,11 @@ export type Settings = {
   googlePlacesApiKey: string;
   waCloudToken: string;
   waPhoneNumberId: string;
+  campaignMediaEnabled: boolean;
+  campaignMediaType: string;
+  campaignMediaUrl: string;
+  campaignMediaId: string;
+  campaignMediaName: string;
   delayMinSec: number;
   delayMaxSec: number;
   dailyCap: number;
@@ -24,6 +29,11 @@ type SettingsRow = {
   googlePlacesApiKey: string;
   waCloudToken: string;
   waPhoneNumberId: string;
+  campaignMediaEnabled: boolean;
+  campaignMediaType: string;
+  campaignMediaUrl: string;
+  campaignMediaId: string;
+  campaignMediaName: string;
   delayMinSec: number;
   delayMaxSec: number;
   dailyCap: number;
@@ -70,6 +80,11 @@ function mapSettings(row: SettingsRow | null): Settings {
       row?.googlePlacesApiKey || process.env.GOOGLE_PLACES_API_KEY || "",
     waCloudToken: row?.waCloudToken || "",
     waPhoneNumberId: row?.waPhoneNumberId || "",
+    campaignMediaEnabled: row?.campaignMediaEnabled ?? false,
+    campaignMediaType: row?.campaignMediaType || "",
+    campaignMediaUrl: row?.campaignMediaUrl || "",
+    campaignMediaId: row?.campaignMediaId || "",
+    campaignMediaName: row?.campaignMediaName || "",
     delayMinSec: row?.delayMinSec ?? 20,
     delayMaxSec: row?.delayMaxSec ?? 45,
     dailyCap: row?.dailyCap ?? 40,
