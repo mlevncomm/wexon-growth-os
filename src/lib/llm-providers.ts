@@ -3,7 +3,7 @@ export const LLM_PROVIDERS = [
     id: "gemini",
     label: "Google Gemini",
     baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
-    model: "gemini-3.5-flash",
+    model: "gemini-3.7-flash",
     hint: "aistudio.google.com/apikey — AIza… ile başlayan Google AI Studio anahtarı",
   },
   {
@@ -33,8 +33,10 @@ export const DEFAULT_LLM = LLM_PROVIDERS[0];
 
 /** Tried in order when Gemini returns 404 for a retired model id. */
 export const GEMINI_MODEL_FALLBACKS = [
-  "gemini-3.5-flash",
+  "gemini-3.8-flash",
+  "gemini-3.7-flash",
   "gemini-3.6-flash",
+  "gemini-3.5-flash",
   "gemini-3.5-flash-lite",
   "gemini-2.5-flash",
   "gemini-2.0-flash",
@@ -49,7 +51,7 @@ export function isGeminiApiKey(key: string): boolean {
 }
 
 export function isStaleGeminiModel(model: string): boolean {
-  return /^(gemini-2\.5-flash|gemini-1\.5-flash|gemini-pro)(-[a-z0-9]+)?$/i.test(model.trim());
+  return /^(gemini-2\.0-flash|gemini-2\.5-flash|gemini-1\.5-flash|gemini-pro)(-[a-z0-9]+)?$/i.test(model.trim());
 }
 
 export function isGeminiEndpoint(baseUrl: string, model: string, apiKey = ""): boolean {

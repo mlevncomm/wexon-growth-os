@@ -281,8 +281,8 @@ function buildPrompt(angle: CopyAngle, brief: string, playbook?: Playbook, verti
   const book = playbookToPrompt(playbook ?? { tone: "", rules: "", forbidden: "", offer: "", cta: "" });
   return `WhatsApp B2B satış mesajı yaz. Ürün: ${productLine(vertical)}.
 Rakibe yazma. Açı: ${angleLabel(angle, vertical)}.
-Türkçe, 2-3 cümle, profesyonel ve nazik. {ad} ve {ilçe} yer tutucuları aynen kalsın.
-İYS, onay, izin varmış gibi yazma. Fiyat uydurma. CTA: keşif randevusu veya kısa görüşme.
+Türkçe, 2-4 kısa cümle, profesyonel ve nazik. {ad} ve {ilçe} yer tutucuları aynen kalsın.
+İYS, onay veya izin varmış gibi yazma. Fiyatı yalnızca playbook'ta açıkça varsa kullan. Playbook CTA'sı varsa onu kullan; yoksa kolay cevaplanabilir tek bir soru sor.
 ${book}
 ${extra}
 Çıktı yalnızca JSON:

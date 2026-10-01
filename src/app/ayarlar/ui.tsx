@@ -384,7 +384,7 @@ export default function AyarlarPage() {
             <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">
               Google AI Studio
             </a>{" "}
-            adresinden alın (AIza…). Anahtar yoksa Mesaj ekranı hazır metinle çalışır.
+            adresinden alın (AIza…). Anahtar yoksa Mesaj ekranı hazır metinle çalışır. Varsayılan model: Gemini 3.7 Flash; Pro modeli hesabınızda ücretli kota gerektirebilir.
           </p>
           <div className="field">
             <span>Sağlayıcı</span>
