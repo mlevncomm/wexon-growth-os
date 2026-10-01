@@ -50,11 +50,14 @@ export default function MusterilerPage() {
   }
 
   useEffect(() => {
-    setQ(urlQ);
-    void load(urlQ, status).catch((err: Error) => {
-      setError(err.message);
-      setLoading(false);
-    });
+    const boot = window.setTimeout(() => {
+      setQ(urlQ);
+      void load(urlQ, status).catch((err: Error) => {
+        setError(err.message);
+        setLoading(false);
+      });
+    }, 0);
+    return () => window.clearTimeout(boot);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlQ]);
 

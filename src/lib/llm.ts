@@ -244,7 +244,7 @@ export function parseCopyLoose(raw: string): { name: string; body: string } | nu
 
 export function sanitizeCopy(input: { name: string; body: string }, angle: CopyAngle, vertical: Vertical = "water") {
   const fallback = generateSalesCopy(angle, vertical);
-  let name = input.name.replace(/\s+/g, " ").trim().slice(0, 80) || fallback.name;
+  const name = input.name.replace(/\s+/g, " ").trim().slice(0, 80) || fallback.name;
   let body = input.body.replace(/\s+\n/g, "\n").trim();
   if (!body) body = fallback.body;
   if (!body.includes("{ad}")) body = `Merhaba {ad}, ${body}`;

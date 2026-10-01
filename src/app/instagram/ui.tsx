@@ -47,10 +47,6 @@ export default function InstagramPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    if (current) setDraft(current.draft);
-  }, [current?.id, current?.draft]);
-
   async function act(action: string, extra: Record<string, string> = {}) {
     setBusy(true);
     try {
@@ -106,7 +102,10 @@ export default function InstagramPage() {
                   type="button"
                   className={`key-block${selected === t.id ? " on" : ""}`}
                   style={{ textAlign: "left", cursor: "pointer" }}
-                  onClick={() => setSelected(t.id)}
+                  onClick={() => {
+                    setSelected(t.id);
+                    setDraft(t.draft);
+                  }}
                 >
                   <strong>{t.username || t.igsid}</strong>
                   <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>

@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { PlatformShell } from "@/components/PlatformShell";
 
 type TenantUser = { id: string; email: string; createdAt: string };
@@ -22,6 +23,7 @@ const VERTICAL: Record<string, string> = {
 };
 
 export default function PlatformPage() {
+  const router = useRouter();
   const [tenants, setTenants] = useState<TenantCard[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
@@ -40,7 +42,10 @@ export default function PlatformPage() {
   }, []);
 
   useEffect(() => {
-    void load().catch((err: Error) => setError(err.message));
+    const boot = window.setTimeout(() => {
+      void load().catch((err: Error) => setError(err.message));
+    }, 0);
+    return () => window.clearTimeout(boot);
   }, [load]);
 
   const census = useMemo(() => {
@@ -73,7 +78,8 @@ export default function PlatformPage() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "İşlem başarısız");
       if (body.action === "impersonate") {
-        window.location.href = "/";
+        router.replace("/");
+        router.refresh();
         return;
       }
       await load();
@@ -115,7 +121,8 @@ export default function PlatformPage() {
             type="button"
             onClick={() => {
               void fetch("/api/auth", { method: "DELETE" }).then(() => {
-                window.location.href = "/giris";
+                router.replace("/giris");
+                router.refresh();
               });
             }}
           >

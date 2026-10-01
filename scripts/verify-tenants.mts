@@ -168,7 +168,7 @@ async function main() {
   else fail("IDOR did not mutate", "notes written");
 
   await expectStatus("member platform 403", "GET", "/api/platform", 403, { cookie: aquails });
-  await expectStatus("member tick 403", "GET", "/api/outreach/tick", 403, { cookie: aquails });
+  await expectStatus("member tick 403", "POST", "/api/outreach/tick", 403, { cookie: aquails });
 
   const aSet = await req("GET", "/api/settings", { cookie: aquails });
   const wSet = await req("GET", "/api/settings", { cookie: wexon });

@@ -7,6 +7,9 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "verify:logic": "tsx scripts/verify-logic.mts",
+    "check": "npm run lint && npm run typecheck && npm run verify:logic && npm run build",
     "postinstall": "prisma generate",
     "db": "prisma migrate dev"
   },
@@ -29,6 +32,7 @@
     "eslint-config-next": "16.3.1",
     "prisma": "^6.19.3",
     "tailwindcss": "^4",
+    "tsx": "^4.20.6",
     "typescript": "^5"
   }
 }

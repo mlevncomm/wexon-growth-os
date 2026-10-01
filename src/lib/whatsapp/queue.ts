@@ -75,7 +75,7 @@ async function tick(): Promise<"idle" | "sent" | "wait" | "paused" | "capped"> {
     return "capped";
   }
 
-  const job = await prisma.outreachJob.findFirst({
+  const candidate = await prisma.outreachJob.findFirst({
     where: {
       tenantId: owner,
       status: "queued",
@@ -83,9 +83,22 @@ async function tick(): Promise<"idle" | "sent" | "wait" | "paused" | "capped"> {
       scheduledAt: { lte: new Date() },
     },
     orderBy: { scheduledAt: "asc" },
+    select: { id: true },
+  });
+  if (!candidate) return "idle";
+
+  // Birden fazla serverless worker aynı anda çalışsa bile işi yalnızca biri sahiplenir.
+  const claimed = await prisma.outreachJob.updateMany({
+    where: { id: candidate.id, tenantId: owner, status: "queued" },
+    data: { status: "sending", error: null },
+  });
+  if (claimed.count !== 1) return "wait";
+
+  const job = await prisma.outreachJob.findFirst({
+    where: { id: candidate.id, tenantId: owner, status: "sending" },
     include: { lead: true },
   });
-  if (!job) return "idle";
+  if (!job) return "wait";
 
   if (!job.lead.phone) {
     await prisma.outreachJob.update({
@@ -102,11 +115,6 @@ async function tick(): Promise<"idle" | "sent" | "wait" | "paused" | "capped"> {
     });
     return "sent";
   }
-
-  await prisma.outreachJob.update({
-    where: { id: job.id },
-    data: { status: "sending" },
-  });
 
   try {
     await sendMessage(job.lead.phone, job.message);

@@ -19,8 +19,10 @@ export default function GirisPage() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    const saved = window.localStorage.getItem("wexon_admin_email");
-    if (saved) setEmail(saved);
+    const restore = window.setTimeout(() => {
+      const saved = window.localStorage.getItem("wexon_admin_email");
+      if (saved) setEmail(saved);
+    }, 0);
     void fetch("/api/auth", { cache: "no-store" })
       .then((r) => r.json())
       .then((j: { ok?: boolean; home?: string; role?: string }) => {
@@ -31,6 +33,7 @@ export default function GirisPage() {
         else router.replace(n);
       })
       .catch(() => undefined);
+    return () => window.clearTimeout(restore);
   }, [router]);
 
   async function submit(e: FormEvent) {

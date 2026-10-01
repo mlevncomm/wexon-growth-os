@@ -147,10 +147,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     };
     window.addEventListener(OPEN_QUEUE, onOpen);
     window.addEventListener(STATS_DIRTY, onDirty);
-    if (new URLSearchParams(window.location.search).get("queue") === "1") {
-      setQueueOpen(true);
-    }
+    const openFromUrl = window.setTimeout(() => {
+      if (new URLSearchParams(window.location.search).get("queue") === "1") setQueueOpen(true);
+    }, 0);
     return () => {
+      window.clearTimeout(openFromUrl);
       window.removeEventListener(OPEN_QUEUE, onOpen);
       window.removeEventListener(STATS_DIRTY, onDirty);
     };
@@ -191,7 +192,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "stop-impersonate" }),
     }).then(() => {
-      window.location.href = "/platform";
+      router.replace("/platform");
+      router.refresh();
     });
   }
 

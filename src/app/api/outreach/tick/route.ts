@@ -32,17 +32,22 @@ export async function GET(request: Request) {
   const cron = process.env.CRON_SECRET ?? "";
   const header = request.headers.get("authorization") ?? "";
   const okCron = Boolean(cron) && header === `Bearer ${cron}`;
-  if (!okCron) {
-    const session = await readSession();
-    if (!session) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
-    if (session.role !== "platform" || session.impersonatorId) {
-      return NextResponse.json({ error: "Yalnızca üst yönetici veya cron" }, { status: 403 });
-    }
-  }
+  if (!okCron) return NextResponse.json({ error: "Geçersiz cron yetkisi" }, { status: 401 });
   const results = await tickAll();
   return NextResponse.json({ ok: true, results });
 }
 
 export async function POST(request: Request) {
-  return GET(request);
+  const session = await readSession();
+  if (!session) return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
+  if (session.role !== "platform" || session.impersonatorId) {
+    return NextResponse.json({ error: "Yalnızca üst yönetici" }, { status: 403 });
+  }
+  const origin = request.headers.get("origin");
+  const expectedOrigin = new URL(request.url).origin;
+  if (origin && origin !== expectedOrigin) {
+    return NextResponse.json({ error: "Geçersiz istek kaynağı" }, { status: 403 });
+  }
+  const results = await tickAll();
+  return NextResponse.json({ ok: true, results });
 }
