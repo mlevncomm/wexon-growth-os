@@ -5,7 +5,14 @@ import { markStatsDirty } from "@/lib/os-events";
 import { phoneForWhatsApp } from "@/lib/phone";
 import { useToast } from "./Toast";
 
-type Draft = { id: string; name: string; phone: string; message: string; channel: string };
+type Draft = {
+  id: string;
+  name: string;
+  phone: string;
+  message: string;
+  channel: string;
+  firstContact: boolean;
+};
 
 type Snapshot = {
   paused: boolean;
@@ -21,6 +28,7 @@ type Snapshot = {
   sentToday: number;
   failed: number;
   lastError?: string | null;
+  campaignMedia?: { type: "image" | "video"; url: string } | null;
   current: { id: string; status: string; name: string; phone: string } | null;
   drafts?: Draft[];
 };
@@ -168,6 +176,17 @@ export function QueuePanel({ onClose, open = false }: { onClose?: () => void; op
                 value={editing[d.id] ?? d.message}
                 onChange={(e) => setEditing((prev) => ({ ...prev, [d.id]: e.target.value }))}
               />
+              {d.firstContact && snap?.campaignMedia ? (
+                <div className="pending-media" aria-label="İlk mesaj medya önizlemesi">
+                  {snap.campaignMedia.type === "video" ? (
+                    <video src={snap.campaignMedia.url} controls preload="metadata" playsInline />
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element -- kullanıcı tarafından yüklenen değişken Blob URL'si
+                    <img src={snap.campaignMedia.url} alt="İlk mesaj görsel önizlemesi" />
+                  )}
+                  <span>İlk mesajla birlikte gönderilecek</span>
+                </div>
+              ) : null}
               <div className="pending-actions">
                 {snap?.cloud ? (
                   <button className="btn btn-wexon" type="button" onClick={() => void moderate(d.id, "approve")}>

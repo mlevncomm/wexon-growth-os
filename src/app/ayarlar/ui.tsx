@@ -213,7 +213,8 @@ export default function AyarlarPage() {
     setMediaBusy(true);
     setMediaProgress(0);
     try {
-      const blob = await upload(`campaign/${file.name}`, file, {
+      const extension = file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || (type === "video" ? "mp4" : "jpg");
+      const blob = await upload(`campaign/ilk-mesaj.${extension}`, file, {
         access: "public",
         handleUploadUrl: "/api/campaign-media",
         multipart: file.size > 10 * 1024 * 1024,
@@ -227,7 +228,7 @@ export default function AyarlarPage() {
           campaignMediaEnabled: true,
           campaignMediaType: type,
           campaignMediaUrl: blob.url,
-          campaignMediaName: file.name,
+          campaignMediaName: type === "video" ? "Kampanya videosu" : "Kampanya görseli",
         }),
       });
       const json = await res.json();
@@ -238,7 +239,7 @@ export default function AyarlarPage() {
         campaignMediaType: type,
         campaignMediaUrl: blob.url,
       }));
-      setMediaName(file.name);
+      setMediaName(type === "video" ? "Kampanya videosu" : "Kampanya görseli");
       setHasMediaId(false);
       setMediaProgress(100);
       toast.push("Kampanya medyası kaydedildi");
@@ -490,7 +491,7 @@ export default function AyarlarPage() {
             </label>
           </div>
           {mediaBusy ? <p className="panel-note">Yükleniyor: %{mediaProgress}</p> : null}
-          {mediaName ? <p className="panel-note">Yüklü dosya: <strong>{mediaName}</strong></p> : null}
+          {mediaName ? <p className="panel-note"><strong>{form.campaignMediaType === "video" ? "Video yüklendi" : "Görsel yüklendi"}</strong></p> : null}
           <div className="save-row">
             <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <input

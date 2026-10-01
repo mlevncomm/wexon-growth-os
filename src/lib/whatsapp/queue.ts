@@ -423,7 +423,7 @@ export async function getQueueSnapshot() {
       where: { tenantId: owner, status: "pending" },
       orderBy: { createdAt: "asc" },
       take: 30,
-      include: { lead: { select: { name: true, phone: true } } },
+      include: { lead: { select: { name: true, phone: true, status: true } } },
     }),
     prisma.outreachJob.findFirst({
       where: { tenantId: owner, status: "failed", error: { not: null } },
@@ -446,6 +446,12 @@ export async function getQueueSnapshot() {
     sentToday,
     failed,
     lastError: lastFailed?.error ?? null,
+    campaignMedia:
+      settings.campaignMediaEnabled &&
+      settings.campaignMediaUrl &&
+      (settings.campaignMediaType === "image" || settings.campaignMediaType === "video")
+        ? { type: settings.campaignMediaType, url: settings.campaignMediaUrl }
+        : null,
     current: current
       ? {
           id: current.id,
@@ -460,6 +466,7 @@ export async function getQueueSnapshot() {
       phone: job.lead.phone,
       message: job.message,
       channel: job.channel,
+      firstContact: job.lead.status === "yeni",
     })),
   };
 }
