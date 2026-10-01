@@ -11,6 +11,7 @@ type Template = { id: string; name: string; body: string };
 type WaInfo = {
   cloud: boolean;
   serverless?: boolean;
+  webQr?: boolean;
   local: { state: string; qrDataUrl: string | null; error: string | null };
 };
 
@@ -195,11 +196,16 @@ export default function OutreachPage() {
       <div className="page-kicker">Kanal</div>
       <h1 className="page-title">Satış outreach</h1>
       <p className="page-copy">
-        Solda playbook’a uygun metni üretip kaydedin. Gönderim onay kuyruğundan çıkar. WhatsApp’ı bu sitede QR ile bağlayın; oturum işletme kaydına yazılır.
+        Solda playbook’a uygun metni üretip kaydedin. Gönderim onay kuyruğundan çıkar.
+        {wa?.serverless
+          ? " Canlı gönderim için WhatsApp Cloud API kullanılır."
+          : " Yerel kurulumda WhatsApp Business'ı QR ile bağlayabilirsiniz."}
       </p>
 
       <div className="notice" style={{ marginTop: 16 }}>
-        Bu sitede “QR oturumu aç”a basın. Kod görünür görünmez WhatsApp Business → Ayarlar → Cihazlar → Cihaz bağla ile okutun. Okuttuktan sonra rozet yeşile dönene kadar sekmeyi kapatmayın.
+        {wa?.serverless
+          ? "Bu uygulama Vercel'de çalışıyor. Kesintisiz ve güvenilir gönderim için Sistem ekranına Meta WhatsApp Cloud token'ı ile Phone number ID girin; QR bağlantısı canlı sunucuda devre dışıdır."
+          : "“QR oturumu aç”a basın. Kod görünür görünmez WhatsApp Business → Ayarlar → Cihazlar → Cihaz bağla ile okutun."}
       </div>
 
       {error ? <p className="error-box" style={{ marginTop: 14 }}>{error}</p> : null}
@@ -325,7 +331,9 @@ export default function OutreachPage() {
                 : statusLabel(localState)}
             </p>
             <p className="panel-note" style={{ marginTop: 8 }}>
-              WhatsApp Business uygulaması da WhatsApp Web gibi bağlı cihaz kabul eder. Instagram gelen kutusu ayrı ekranda; soğuk DM yok.
+              {wa?.serverless
+                ? "Cloud API Meta'nın resmi canlı bağlantısıdır. Instagram gelen kutusu ayrı ekrandadır."
+                : "WhatsApp Business uygulaması bağlı cihaz kabul eder. Instagram gelen kutusu ayrı ekrandadır."}
             </p>
             {wa?.local.error ? <p className="error-box">{wa.local.error}</p> : null}
             {wa?.local.qrDataUrl ? (
@@ -347,10 +355,12 @@ export default function OutreachPage() {
               <button
                 className="btn btn-wexon"
                 type="button"
-                disabled={connected || connecting}
+                disabled={connected || connecting || wa?.webQr === false}
                 onClick={() => void connectQr()}
               >
-                {connecting || localState === "starting"
+                {wa?.webQr === false
+                  ? "Cloud API gerekli"
+                  : connecting || localState === "starting"
                   ? "QR bekleniyor"
                   : localState === "qr"
                     ? "QR yenile"
@@ -369,8 +379,25 @@ export default function OutreachPage() {
       <div style={{ marginTop: 18 }}>
         <ConnectGuide
           kicker="WhatsApp Business"
-          title="QR ile bağla"
-          steps={[
+          title={wa?.serverless ? "Cloud API ile bağla" : "QR ile bağla"}
+          steps={wa?.serverless ? [
+            {
+              title: "Meta Business hazırlığı",
+              body: "WhatsApp Business Platform'da işletme numaranızı ekleyin ve telefon doğrulamasını tamamlayın.",
+            },
+            {
+              title: "Kalıcı token alın",
+              body: "Meta Business Settings'te sistem kullanıcısına WhatsApp yetkisi verip kalıcı erişim token'ı oluşturun.",
+            },
+            {
+              title: "Phone number ID'yi kopyalayın",
+              body: "Numaranın kendisini değil, WhatsApp API Setup ekranındaki Phone number ID değerini alın.",
+            },
+            {
+              title: "Sistem'e kaydedin",
+              body: "Cloud token ve Phone number ID'yi Sistem ekranına yazın. Bağlantı rozeti Cloud olunca onay kuyruğu canlı gönderime hazırdır.",
+            },
+          ] : [
             {
               title: "Bu sitede QR aç",
               body: "Mesaj ekranında “QR oturumu aç”a basın. Kod bu sayfada çıkar; localhost veya ayrı bir PC oturumu gerekmez.",
@@ -384,8 +411,8 @@ export default function OutreachPage() {
               body: "Bağlandıktan sonra oturum bu işletmenin kaydına yazılır. Gönderim onay kuyruğundan çıkar; rastgele spam yok. Kes’e basınca kanal düşer.",
             },
             {
-              title: "Cloud isteğe bağlı",
-              body: "Meta developer kilidi açılırsa Sistem’e Cloud token da yazılabilir. QR oturumu Cloud yokken asıl kanaldır.",
+              title: "Canlı yayın için Cloud",
+              body: "Vercel gibi sunucusuz ortamlarda QR yerine WhatsApp Cloud API kullanın.",
             },
           ]}
         />

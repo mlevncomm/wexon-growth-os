@@ -81,7 +81,7 @@ const MODULES = [
     kicker: "Kanal",
     title: "Mesaj",
     points: [
-      "Bu sitede QR okutun. Cloud varsa o gider; yoksa QR oturumu asıl kanaldır.",
+      "Canlı Vercel kurulumunda WhatsApp Cloud API kullanın. QR yalnızca yerel veya sürekli çalışan bir sunucuda yedek bağlantıdır.",
       "Hazır metin anahtarsız çalışır. AI için Sistem’e Google Gemini yazın.",
       "Koç playbook’u doluysa AI o kurallara uyar.",
     ],

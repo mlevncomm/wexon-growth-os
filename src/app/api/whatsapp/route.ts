@@ -10,11 +10,12 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 async function payload() {
+  const serverless = isServerless();
   return {
     cloud: await cloudConfigured(),
     local: await getWebStatus(),
-    serverless: isServerless(),
-    webQr: true,
+    serverless,
+    webQr: !serverless,
   };
 }
 
@@ -26,6 +27,11 @@ export async function POST(request: Request) {
   return withTenant(async (ctx) => {
     const body = await readJson<{ action?: string }>(request);
     if (body?.action === "connect") {
+      if (isServerless()) {
+        return badRequest(
+          "Vercel'de QR oturumu kalıcı çalışmaz. Sistem ekranından WhatsApp Cloud API bağlayın.",
+        );
+      }
       // Socket must stay in this request until the phone scan finishes.
       // Returning after the QR is drawn kills the WhatsApp connection on Vercel.
       await beginWebPairing(ctx.tenantId);
