@@ -147,9 +147,9 @@ const SOFTWARE_POSITIONING: Record<SectorId, string> = {
 function softwarePitch(sector: SectorId, offer: PitchOffer): string {
   const positioning = SOFTWARE_POSITIONING[sector];
   if (offer === "yenile") {
-    return `Merhaba, ben Wexon.dev’den Mehmet. {ad} için ${positioning} daha rafine bir web deneyimi üzerine size özel bir önerim var. Uygun görürseniz örnek ilk ekranı hazırlayıp paylaşmamı ister misiniz?`;
+    return `Merhaba, ben Wexon.dev yazılım stüdyosundan Mehmet. {ad} için ${positioning} daha rafine bir web deneyimi üzerine size özel bir önerim var. Uygun görürseniz örnek ilk ekranı hazırlayıp paylaşmamı ister misiniz?`;
   }
-  return `Merhaba, ben Wexon.dev’den Mehmet. {ad} için ${positioning} sade, mobil odaklı bir web deneyimi üzerine size özel bir önerim var. Lansmana özel 4.900 TL’den başlayan çalışma için örnek ilk ekranı hazırlayıp paylaşmamı ister misiniz?`;
+  return `Merhaba, ben Wexon.dev yazılım stüdyosundan Mehmet. {ad} için ${positioning} sade, mobil odaklı bir web deneyimi üzerine size özel bir önerim var. Lansmana özel 4.900 TL’den başlayan çalışma için örnek ilk ekranı hazırlayıp paylaşmamı ister misiniz?`;
 }
 
 const WATER: Record<SectorId, string> = {

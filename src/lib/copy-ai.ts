@@ -29,6 +29,11 @@ export const COPY_ANGLES = WATER_ANGLES;
 export type CopyAngle = string;
 
 export const LEGACY_SOFTWARE_TEMPLATE_BODIES = new Set([
+  "Merhaba {ad}, ben Wexon.dev’den Mehmet. Tekrarlayan teklif, sipariş veya müşteri takip işlerini tek panelde topluyoruz. İşletmenize uygun kısa bir otomasyon fikri göndermemi ister misiniz?",
+  "Merhaba {ad}, ben Wexon.dev’den Mehmet. Mevcut sitenizin mobil görünümü ve iletişim akışı için birkaç iyileştirme fikrim var. Ücretsiz kısa bir inceleme göndermemi ister misiniz?",
+  "Merhaba {ad}, ben Wexon.dev’den Mehmet. Müşterinin sizi bulup WhatsApp’tan teklif istemesini kolaylaştıran tek sayfalık siteler hazırlıyoruz. Size ücretsiz bir örnek görünüm göndermemi ister misiniz?",
+  "Merhaba {ad}, ben Wexon.dev’den Mehmet. Daha önce web sitesiyle ilgili yazmıştım; uygun değilseniz rahatsız etmeyeyim. Ücretsiz örnek görünümü paylaşmamı ister misiniz?",
+  "Merhaba {ad}, ben Wexon.dev’den Mehmet. İşletmenizi mobilde düzgün tanıtan ve müşteriyi doğrudan WhatsApp’a yönlendiren tek sayfalık siteyi 4.900 TL lansman fiyatıyla hazırlıyoruz. Ücretsiz örnek görünüm ister misiniz?",
   "Merhaba {ad}, {ilçe} operasyonunda tekrarlayan işler ekibi yavaşlatır. Sipariş, teklif ve takip adımlarını tek panelde toplayan bir yazılım kuruyoruz. 20 dakikalık bir süreç taraması uygun mu?",
   "Merhaba {ad}, yavaş site ve kopuk form {ilçe} adresinizde kayıp satış demek. Hız, yedek ve küçük geliştirmeyi aylık bakıma bağlıyoruz. Kısa bir teknik not paylaşayım mı?",
   "Merhaba {ad}, {ilçe} için web, teklif ve WhatsApp’ı aynı hunide birleştiriyoruz. Hangi kanaldan gelenin müşteri olduğunu net görürsünüz. Bu hafta 15 dakikalık bir harita çıkarabilir miyiz?",
@@ -53,27 +58,27 @@ export function generateSalesCopy(angle: CopyAngle, vertical: Vertical = "water"
       case "otomasyon":
         return {
           name: "Yazılım — otomasyon",
-          body: "Merhaba {ad}, ben Wexon.dev’den Mehmet. Tekrarlayan teklif, sipariş veya müşteri takip işlerini tek panelde topluyoruz. İşletmenize uygun kısa bir otomasyon fikri göndermemi ister misiniz?",
+          body: "Merhaba, ben Wexon.dev yazılım stüdyosundan Mehmet. {ad} için tekrarlayan teklif, sipariş veya müşteri takip işlerini tek panelde toplayan bir yapı önerebiliriz. İşletmenize uygun kısa bir otomasyon fikri paylaşmamı ister misiniz?",
         };
       case "bakim":
         return {
           name: "Yazılım — bakım",
-          body: "Merhaba {ad}, ben Wexon.dev’den Mehmet. Mevcut sitenizin mobil görünümü ve iletişim akışı için birkaç iyileştirme fikrim var. Ücretsiz kısa bir inceleme göndermemi ister misiniz?",
+          body: "Merhaba, ben Wexon.dev yazılım stüdyosundan Mehmet. {ad} için mevcut web deneyiminin mobil görünümünü ve iletişim akışını güçlendirecek birkaç iyileştirme önerim var. Kısa bir değerlendirme paylaşmamı ister misiniz?",
         };
       case "satis":
         return {
           name: "Yazılım — satış",
-          body: "Merhaba {ad}, ben Wexon.dev’den Mehmet. Müşterinin sizi bulup WhatsApp’tan teklif istemesini kolaylaştıran tek sayfalık siteler hazırlıyoruz. Size ücretsiz bir örnek görünüm göndermemi ister misiniz?",
+          body: "Merhaba, ben Wexon.dev yazılım stüdyosundan Mehmet. {ad} için müşterilerin işletmeyi tanıyıp WhatsApp üzerinden kolayca iletişime geçmesini sağlayan tek sayfalık bir web deneyimi önerebiliriz. Örnek ilk ekranı paylaşmamı ister misiniz?",
         };
       case "takip":
         return {
           name: "Yazılım — takip",
-          body: "Merhaba {ad}, ben Wexon.dev’den Mehmet. Daha önce web sitesiyle ilgili yazmıştım; uygun değilseniz rahatsız etmeyeyim. Ücretsiz örnek görünümü paylaşmamı ister misiniz?",
+          body: "Merhaba, ben Wexon.dev yazılım stüdyosundan Mehmet. Daha önce {ad} için web deneyimiyle ilgili kısa bir öneri paylaşmıştım. Şu an gündeminizde değilse tekrar rahatsız etmeyeyim; örnek ilk ekranı iletmemi ister misiniz?",
         };
       default:
         return {
           name: "Yazılım — web",
-          body: "Merhaba {ad}, ben Wexon.dev’den Mehmet. İşletmenizi mobilde düzgün tanıtan ve müşteriyi doğrudan WhatsApp’a yönlendiren tek sayfalık siteyi 4.900 TL lansman fiyatıyla hazırlıyoruz. Ücretsiz örnek görünüm ister misiniz?",
+          body: "Merhaba, ben Wexon.dev yazılım stüdyosundan Mehmet. {ad} için hizmetleri güçlü biçimde sunan ve müşteriyi doğrudan WhatsApp’a yönlendiren tek sayfalık web sitesini 4.900 TL’den başlayan lansman fiyatıyla hazırlıyoruz. Örnek ilk ekranı paylaşmamı ister misiniz?",
         };
     }
   }

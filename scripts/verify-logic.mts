@@ -84,7 +84,7 @@ const softwarePitch = composePitch("software", {
   website: "",
   campaignQuery: "diş kliniği",
 });
-check(softwarePitch.body.includes("Wexon.dev’den Mehmet"), "pitch identifies sender", softwarePitch.body);
+check(softwarePitch.body.startsWith("Merhaba, ben Wexon.dev yazılım stüdyosundan Mehmet."), "pitch identifies sender professionally", softwarePitch.body);
 check(softwarePitch.body.includes("4.900 TL"), "pitch contains offer price", softwarePitch.body);
 check(softwarePitch.body.length < 360, "pitch remains concise", softwarePitch.body.length);
 
