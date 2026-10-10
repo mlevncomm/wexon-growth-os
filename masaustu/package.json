@@ -1,8 +1,8 @@
 {
   "name": "wexon-growth-os-masaustu",
   "productName": "Wexon Growth OS",
-  "version": "1.0.4",
-  "description": "Wexon Growth OS — Ece ile yapay zekâ destekli telefon araması",
+  "version": "2.0.0",
+  "description": "Wexon Growth OS — müşteri bul, WhatsApp'tan yaz",
   "author": "Wexon",
   "private": true,
   "main": "main.js",
@@ -26,22 +26,9 @@
     },
     "files": [
       "main.js",
-      "preload.js",
-      "sihirbaz.html",
-      "sihirbaz.js",
       "hata.html",
       "hata.js",
       "build/icon.ico"
-    ],
-    "extraResources": [
-      {
-        "from": "kurulum.ps1",
-        "to": "kurulum/kurulum.ps1"
-      },
-      {
-        "from": "WexonSes.cs",
-        "to": "kurulum/WexonSes.cs"
-      }
     ],
     "win": {
       "target": [

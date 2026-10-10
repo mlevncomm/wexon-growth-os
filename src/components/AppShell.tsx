@@ -23,9 +23,8 @@ type Stats = {
 };
 
 const DOCK = [
-  { href: "/", label: "Panel" },
-  { href: "/ara", label: "Keşif" },
-  { href: "/musteriler", label: "Liste" },
+  { href: "/ara", label: "Bul" },
+  { href: "/musteriler", label: "Müşteriler" },
   { href: "/whatsapp", label: "Mesaj" },
 ] as const;
 

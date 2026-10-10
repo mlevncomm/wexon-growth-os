@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { upload } from "@vercel/blob/client";
-import Link from "next/link";
 import { ChipStrip } from "@/components/ChipStrip";
 import { ConnectGuide } from "@/components/ConnectGuide";
 import { useToast } from "@/components/Toast";
@@ -342,12 +341,6 @@ export default function AyarlarPage() {
                 href: "https://business.facebook.com",
                 linkLabel: "Meta Business’ı aç",
               },
-              {
-                title: "Instagram (gelen DM)",
-                body: "Kişisel şifre yok. Instagram Professional + Meta uygulama token ve user ID. Webhook için canlı HTTPS şart.",
-                href: "https://developers.facebook.com",
-                linkLabel: "Meta Developers",
-              },
             ]}
           />
         </div>
@@ -617,117 +610,6 @@ export default function AyarlarPage() {
           )}
         </section>
 
-        <section className="card panel" style={{ marginTop: 14 }}>
-          <div className="panel-head">
-            <div>
-              <div className="page-kicker">Instagram</div>
-              <h2>Business Graph API</h2>
-            </div>
-            <span className={`pill ${flags.hasIgToken && flags.hasIgUserId ? "ok" : "mute"}`}>
-              {flags.hasIgToken && flags.hasIgUserId ? "Bağlı" : "Resmi hesap"}
-            </span>
-          </div>
-          <p className="panel-note">
-            Kişisel giriş yok. Meta Business + Instagram Professional token gerekir. Gelen DM taslağı playbook ile yazılır; siz onaylayınca gider. Webhook için Cloudflare Tunnel veya canlı HTTPS şart — 127.0.0.1 yetmez.
-          </p>
-          <div className="key-stack">
-            <div className="key-block">
-              <label className="field">
-                <span>
-                  Access token
-                  <span className={`pill ${flags.hasIgToken ? "ok" : "mute"}`}>
-                    {flags.hasIgToken ? "Kayıtlı" : "Eksik"}
-                  </span>
-                </span>
-                <input
-                  value={form.igAccessToken}
-                  onChange={(e) => setForm({ ...form, igAccessToken: e.target.value })}
-                  placeholder="EAAG..."
-                  autoComplete="off"
-                />
-              </label>
-            </div>
-            <div className="key-block">
-              <label className="field">
-                <span>
-                  Instagram user ID
-                  <span className={`pill ${flags.hasIgUserId ? "ok" : "mute"}`}>
-                    {flags.hasIgUserId ? "Var" : "Eksik"}
-                  </span>
-                </span>
-                <input
-                  value={form.igUserId}
-                  onChange={(e) => setForm({ ...form, igUserId: e.target.value })}
-                  placeholder="IG kullanıcı ID"
-                  autoComplete="off"
-                />
-              </label>
-            </div>
-            <div className="key-block">
-              <label className="field">
-                <span>Webhook verify token (2. adım)</span>
-                <input
-                  value={form.igWebhookVerifyToken}
-                  onChange={(e) => setForm({ ...form, igWebhookVerifyToken: e.target.value })}
-                  placeholder="Meta’ya yazacağınız rastgele sözcük"
-                  autoComplete="off"
-                />
-              </label>
-            </div>
-          </div>
-          <div className="save-row">
-            <button className="btn btn-wexon" type="button" onClick={() => void save()}>
-              Instagram’ı kaydet
-            </button>
-            <Link className="btn btn-ghost" href="/instagram">
-              Gelen DM
-            </Link>
-            <span className="muted" style={{ fontSize: 13 }}>/api/instagram/webhook</span>
-          </div>
-        </section>
-
-        <section className="card panel" style={{ marginTop: 14 }}>
-          <div className="panel-head">
-            <div>
-              <div className="page-kicker">Yayın</div>
-              <h2>Vercel + Supabase</h2>
-            </div>
-            <span className={`pill ${deploy.hosted ? "ok" : "mute"}`}>
-              {deploy.hosted ? "Vercel" : "Yerel"}
-            </span>
-          </div>
-          <p className="panel-note">
-            Canlı veritabanı Supabase Postgres’tir. Vercel&apos;de WhatsApp için Cloud API kullanılır; QR oturumu yalnızca yerel veya sürekli çalışan sunucuda kullanılmalıdır.
-            {deploy.authConfigured ? " Admin girişi tanımlı." : " Admin için AUTH_SECRET + e-posta + şifre yazın."}
-          </p>
-        </section>
-        <div style={{ marginTop: 14 }}>
-          <ConnectGuide
-            kicker="Yayınlayan için"
-            title="Sunucu env (ortak anahtar değil)"
-            copyValue={deploy.instagramWebhookUrl}
-            steps={[
-              {
-                title: "Supabase Postgres",
-                body: "Yeni proje açın. Connect → Transaction pooler (6543) = DATABASE_URL, sonuna ?pgbouncer=true&connection_limit=1 ekleyin. Session/direct (5432) = DIRECT_URL. prisma/schema.postgres.prisma içeriğini schema.prisma’ya alın (provider postgresql). prisma/supabase-init.sql ve prisma/supabase-rls.sql dosyalarını SQL Editor’de çalıştırın. Data API’yi kapatabilirsiniz; uygulama Prisma kullanır.",
-              },
-              {
-                title: "Vercel env",
-                body: `Yalnızca sunucu sırları: DATABASE_URL, DIRECT_URL, AUTH_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD, APP_URL, CRON_SECRET. Gemini, Places, WhatsApp ve Instagram anahtarlarını buraya yazmayın — her işletme Sistem ekranına kendi anahtarını yapıştırır. APP_URL = ${deploy.appUrl || "https://projeniz.vercel.app"}`,
-              },
-              {
-                title: "Admin girişi",
-                body: deploy.authConfigured
-                  ? "AUTH_SECRET ve admin e-posta/şifre tanımlı. Canlıda da aynı üç değişkeni verin. Adres: /giris"
-                  : "Yerelde .env içine AUTH_SECRET (min 16 karakter), ADMIN_EMAIL, ADMIN_PASSWORD yazıp sunucuyu yeniden başlatın. Vercel’e de aynılarını ekleyin. Giriş: /giris",
-              },
-              {
-                title: "Kron kuyruk",
-                body: "vercel.json her dakika /api/outreach/tick çağırır. CRON_SECRET, Authorization: Bearer ile aynı olsun. Vercel Hobby’de cron günde bir kezdir; dakikalık kuyruk için Pro veya harici cron gerekir. Cloud token yoksa canlı WhatsApp gönderimi olmaz.",
-              },
-            ]}
-          />
-        </div>
         </>
       )}
     </div>

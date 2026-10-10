@@ -4,12 +4,13 @@ Wexon Growth OS, Wexon.dev ve bağlı işletmeler için müşteri adayı keşfi,
 
 ## Temel özellikler
 
+- Sade kullanım: **Müşteri Bul → Müşteriler → WhatsApp'tan yaz**. Masaüstü programı: `masaustu/`
+
 - Google Places ile şehir, ilçe, sektör ve web sitesi durumuna göre işletme keşfi
 - Tenant bazlı müşteri, kampanya, şablon ve ayar izolasyonu
 - Yapay zeka destekli kişiselleştirilmiş mesaj taslakları
 - Mesaj gönderilmeden önce operatör onayı
 - WhatsApp Cloud API veya yerel WhatsApp Web bağlantısı
-- Yapay zekâ ile telefon araması (Arama ekranı): operatör numarayı çevirir, "Ece" doğal Türkçe sesle konuşur; sonuç ve özet müşteri kaydına, takip mesajı onay kuyruğuna düşer
 - Instagram webhook ve konuşma takibi
 - Platform yöneticisi ve işletme kullanıcısı rolleri
 - Vercel cron ile kontrollü kuyruk işleme
@@ -64,8 +65,6 @@ Zorunlu üretim değişkenleri:
 - `IG_ACCESS_TOKEN`
 - `IG_USER_ID`
 - `IG_WEBHOOK_VERIFY_TOKEN`
-- `OPENROUTER_API_KEY` Arama ekranı için (yoksa Sistem'deki OpenRouter anahtarı kullanılır). İsteğe bağlı: `ARAMA_SES_MODELI`, `ARAMA_METIN_MODELI`, `ARAMA_MIN_BAKIYE_USD`
-- `NETGSM_SANTRAL_KULLANICI`, `NETGSM_SANTRAL_SIFRE`, `NETGSM_DAHILI`, `NETGSM_TRUNK` Arama ekranında numarayı Netgsm santralinin çevirmesi için (isteğe bağlı)
 
 Gerçek anahtarları repoya commit etmeyin. Google anahtarını yalnızca gereken API'lerle sınırlandırın ve erişim anahtarlarını düzenli yenileyin.
 

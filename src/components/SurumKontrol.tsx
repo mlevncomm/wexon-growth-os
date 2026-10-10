@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 const ARALIK_MS = 4 * 60 * 1000;
 
-/** Yeni bir yayın çıkınca köşede "Yeni sürüm hazır · Yenile" gösterir. Görüşme sürerken kendiliğinden yenilemez. */
+/** Yeni bir yayın çıkınca köşede "Yeni sürüm var · Güncelle" gösterir. */
 export function SurumKontrol() {
   const [yeni, setYeni] = useState(false);
 
@@ -29,7 +29,6 @@ export function SurumKontrol() {
   }, []);
 
   if (!yeni) return null;
-  const aramaAktif = typeof window !== "undefined" && (window as unknown as { __wexonAramaAktif?: boolean }).__wexonAramaAktif;
   return (
     <div
       role="status"
@@ -39,15 +38,14 @@ export function SurumKontrol() {
         boxShadow: "0 12px 30px rgba(11, 79, 74, 0.28)", fontSize: 13.5,
       }}
     >
-      <span>{aramaAktif ? "Yeni sürüm hazır · görüşme bitince yenile" : "Yeni sürüm hazır"}</span>
+      <span>Yeni sürüm var</span>
       <button
         type="button"
         className="btn btn-mint"
         style={{ minHeight: 34, padding: "0 14px" }}
-        disabled={Boolean(aramaAktif)}
         onClick={() => window.location.reload()}
       >
-        Yenile
+        Güncelle
       </button>
     </div>
   );

@@ -1,12 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { formatPhoneDisplay, isWhatsAppCapablePhone } from "@/lib/phone";
 import { LEAD_STATUSES } from "@/lib/lead-status";
 import { markStatsDirty, openQueue } from "@/lib/os-events";
 import { useToast } from "@/components/Toast";
+import { WhatsAppPenceresi, type MesajLead } from "./WhatsAppPenceresi";
 
 type Lead = {
   id: string;
@@ -37,6 +37,8 @@ export default function MusterilerPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [mesajLead, setMesajLead] = useState<Lead | null>(null);
+  const [firma, setFirma] = useState("");
 
   async function load(nextQ = q, nextStatus = status) {
     const params = new URLSearchParams();
@@ -61,6 +63,13 @@ export default function MusterilerPage() {
     return () => window.clearTimeout(boot);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlQ]);
+
+  useEffect(() => {
+    fetch("/api/me").then((r) => r.json()).then((m: { tenantName?: string | null }) => {
+      const ad = (m.tenantName || "").replace(/\.dev$/i, "");
+      setFirma(ad ? `${ad} yazılım stüdyosundan` : "");
+    }).catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     fetch("/api/templates")
@@ -333,7 +342,7 @@ export default function MusterilerPage() {
                       <div>{lead.phone ? formatPhoneDisplay(lead.phone) : "—"}</div>
                       {!canWhatsApp ? <div className="muted" style={{ fontSize: 12 }}>Sabit hat · WhatsApp yok</div> : null}
                       <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
-                        {lead.phone ? <Link className="muted" href={`/arama?lead=${lead.id}`} style={{ color: "var(--teal)", fontWeight: 700 }}>Ece ile ara</Link> : null}
+                        {lead.phone ? <button type="button" className="btn btn-mint" style={{ minHeight: 30, padding: "0 10px", fontSize: 12.5 }} onClick={() => setMesajLead(lead)}>WhatsApp’tan yaz</button> : null}
                         {lead.mapsUrl ? <a className="muted" href={lead.mapsUrl} target="_blank" rel="noreferrer">Maps</a> : null}
                         {lead.website ? <a className="muted" href={lead.website} target="_blank" rel="noreferrer">Web</a> : null}
                       </div>
@@ -382,6 +391,7 @@ export default function MusterilerPage() {
                 <span className="muted">{lead.address}</span>
                 <span>{lead.phone ? formatPhoneDisplay(lead.phone) : "—"}</span>
                 {!canWhatsApp ? <span className="muted">Sabit hat · WhatsApp yok</span> : null}
+                {lead.phone ? <button type="button" className="btn btn-mint" onClick={() => setMesajLead(lead)}>WhatsApp’tan yaz</button> : null}
                 <LeadControls lead={lead} />
               </article>
               );
@@ -389,6 +399,14 @@ export default function MusterilerPage() {
           </div>
         </>
       )}
+      {mesajLead ? (
+        <WhatsAppPenceresi
+          lead={mesajLead as MesajLead}
+          firma={firma}
+          onClose={() => setMesajLead(null)}
+          onSent={(u) => { setLeads((prev) => prev.map((l) => (l.id === u.id ? { ...l, ...u } : l))); toast.push("WhatsApp açıldı, müşteri “Yazıldı” olarak işaretlendi"); }}
+        />
+      ) : null}
     </div>
   );
 }

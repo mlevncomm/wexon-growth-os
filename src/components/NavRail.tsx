@@ -4,12 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const MAIN = [
-  { href: "/", label: "Panel" },
-  { href: "/ara", label: "Keşif" },
-  { href: "/arama", label: "Arama" },
+  { href: "/ara", label: "Müşteri Bul" },
   { href: "/musteriler", label: "Müşteriler" },
   { href: "/whatsapp", label: "Mesaj" },
-  { href: "/koc", label: "Koç" },
 ] as const;
 
 function Ico({ href }: { href: string }) {
@@ -156,35 +153,7 @@ export function NavRail({
 
       {platform ? null : (
         <>
-      <div className="nav-group">Araçlar</div>
-      <Link
-        href="/instagram"
-        className={`nav-link${pathname.startsWith("/instagram") ? " active" : ""}`}
-        onClick={onNavigate}
-      >
-        <div className="nav-ico-wrap" aria-hidden>
-          <svg className="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="5.5" y="5.5" width="13" height="13" rx="3.2" />
-            <circle cx="12" cy="12" r="3.1" />
-            <circle cx="16.2" cy="7.8" r="0.7" fill="currentColor" />
-          </svg>
-        </div>
-        <span className="nav-label">Instagram</span>
-      </Link>
-      <Link
-        href="/kilavuz"
-        className={`nav-link${pathname.startsWith("/kilavuz") ? " active" : ""}`}
-        onClick={onNavigate}
-      >
-        <div className="nav-ico-wrap" aria-hidden>
-          <svg className="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M6.4 5.4h9.2A2.2 2.2 0 0 1 17.8 7.6v11.2H8.2A1.8 1.8 0 0 1 6.4 17V5.4z" />
-            <path d="M6.4 17a1.8 1.8 0 0 1 1.8-1.8H17.8" />
-            <path d="M9.2 8.6h5.4M9.2 11.4h3.6" />
-          </svg>
-        </div>
-        <span className="nav-label">Kılavuz</span>
-      </Link>
+      <div className="nav-group">Ayarlar</div>
       <Link
         href="/ayarlar"
         className={`nav-link${pathname.startsWith("/ayarlar") ? " active" : ""}`}
@@ -193,7 +162,7 @@ export function NavRail({
         <div className="nav-ico-wrap" aria-hidden>
           <Ico href="/ayarlar" />
         </div>
-        <span className="nav-label">Sistem</span>
+        <span className="nav-label">Ayarlar</span>
       </Link>
         </>
       )}
