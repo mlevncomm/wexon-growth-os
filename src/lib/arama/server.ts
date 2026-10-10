@@ -166,21 +166,28 @@ export async function openRouterStream(key: string, body: object, signal: AbortS
 }
 
 /** Müşterinin ses kaydını yazıya döker (ekranda göstermek, geçmiş ve telesekreter tespiti için). */
-export const STT_MODEL = process.env.ARAMA_YAZI_MODELI || "google/gemini-2.5-flash-lite";
-export async function transcribe(key: string, audioB64: string): Promise<{ text: string; maliyet: number }> {
+export const STT_MODEL = process.env.ARAMA_YAZI_MODELI || "google/gemini-2.5-flash";
+export async function transcribe(key: string, audioB64: string, baglam = ""): Promise<{ text: string; maliyet: number }> {
   const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST", headers: headers(key), signal: AbortSignal.timeout(15_000),
     body: JSON.stringify({
       model: STT_MODEL, temperature: 0, max_tokens: 300, usage: { include: true },
       messages: [{ role: "user", content: [
-        { type: "text", text: "Bu bir telefon görüşmesinden kısa bir Türkçe ses kaydı. Söyleneni kelimesi kelimesine yazıya dök. Sadece söylenen metni yaz; açıklama ekleme. Anlaşılır konuşma yoksa sadece - yaz." },
+        { type: "text", text: [
+          "Türkçe bir satış telefon görüşmesinden, işletme tarafındaki kişinin kısa bir ses kaydı (telefon hattı, kalite düşük olabilir).",
+          baglam ? `Arayan temsilcinin az önce söylediği: "${baglam.slice(0, 300)}"` : "",
+          "Kişinin söylediğini kelimesi kelimesine Türkçe yaz. Emin olmadığın kelimeyi uydurma; anlamlı en yakın Türkçe ifadeyi seç.",
+          "Çıktı SADECE söylenen metin olsun. Hiç konuşma yoksa ya da tamamen anlaşılmıyorsa sadece ### yaz.",
+        ].filter(Boolean).join("\n") },
         { type: "input_audio", input_audio: { data: audioB64, format: "wav" } },
       ] }],
     }),
   });
   const j = (await r.json()) as { choices?: { message?: { content?: string } }[]; usage?: { cost?: number }; error?: { message?: string } };
   if (!r.ok) throw new Error(j.error?.message || `Yazıya dökme hatası (${r.status})`);
-  const text = (j.choices?.[0]?.message?.content ?? "").trim().replace(/^["“]|["”]$/g, "");
+  let text = (j.choices?.[0]?.message?.content ?? "").trim().replace(/^["“]|["”]$/g, "");
+  // Model ses anlaşılmayınca bazen kendi talimatını geri yazar → boş say
+  if (/###|kelimesi kelimesine|yazıya dök|ses kaydı|anlaşılır konuşma|sadece - yaz/i.test(text) || text === "-") text = "";
   return { text: text === "-" ? "" : text, maliyet: Number(j.usage?.cost) || 0 };
 }
 

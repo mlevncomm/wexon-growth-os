@@ -146,6 +146,7 @@ if ($Kontrol) {
   Plan "Varsayılan çıkış + iletişim (telefonun hoparlörü) → $(& $adOrBekle $mCikis 'CABLE Input')"
   Plan "Varsayılan giriş + iletişim (telefonun mikrofonu) → $(& $adOrBekle $eGiris 'Hi-Fi Cable Output')"
   Plan "Arama sırasında ses kısma kapatılacak"
+  Plan "Hi-Fi Cable giriş ve çıkış örnekleme hızı eşitlenecek (kesik ses olmasın)"
 } else {
   if ($simdiCikis -ne $mCikis.Id) { [WexonGrowth.Ses]::VarsayilanYap($mCikis.Id) }
   if ($simdiGiris -ne $eGiris.Id) { [WexonGrowth.Ses]::VarsayilanYap($eGiris.Id) }
@@ -155,6 +156,14 @@ if ($Kontrol) {
   New-Item -Path "HKCU:\Software\Microsoft\Multimedia\Audio" -Force | Out-Null
   Set-ItemProperty -Path "HKCU:\Software\Microsoft\Multimedia\Audio" -Name "UserDuckingPreference" -Value 3 -Type DWord
   Tamam "Arama sırasında ses kısma kapatıldı"
+  # Hi-Fi Cable'ın iki ucu aynı örnekleme hızında olmalı; yoksa telefona giden ses kesik kesik olur
+  $hfIn = Bul '^Hi-Fi Cable Input' $true
+  $hfOut = Bul '^Hi-Fi Cable Output' $false
+  if ($hfIn -and $hfOut) {
+    $hz = [WexonGrowth.Ses]::OrnekHizi($hfIn.Id)
+    if ($hz -gt 0 -and [WexonGrowth.Ses]::OrnekHizi($hfOut.Id) -ne $hz) { [WexonGrowth.Ses]::OrnekHiziniAyarla($hfOut.Id, $hz) }
+    Tamam "Hi-Fi Cable iki ucu aynı hızda: $hz Hz"
+  }
 }
 
 # ---------------------------------------------------------------------------

@@ -58,11 +58,11 @@ namespace WexonGrowth
     [Guid("f8679f50-850a-41cf-9c72-430f290290c8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     interface IPolicyConfig
     {
-        // Sadece SetDefaultEndpoint kullanılır; öncekiler sanal tablo sırası için yer tutucudur.
-        [PreserveSig] int GetMixFormat();
-        [PreserveSig] int GetDeviceFormat();
-        [PreserveSig] int ResetDeviceFormat();
-        [PreserveSig] int SetDeviceFormat();
+        // Sanal tablo sırası Windows'un kendi ses penceresiyle aynıdır.
+        [PreserveSig] int GetMixFormat([MarshalAs(UnmanagedType.LPWStr)] string deviceId, out IntPtr format);
+        [PreserveSig] int GetDeviceFormat([MarshalAs(UnmanagedType.LPWStr)] string deviceId, [MarshalAs(UnmanagedType.Bool)] bool useDefault, out IntPtr format);
+        [PreserveSig] int ResetDeviceFormat([MarshalAs(UnmanagedType.LPWStr)] string deviceId);
+        [PreserveSig] int SetDeviceFormat([MarshalAs(UnmanagedType.LPWStr)] string deviceId, IntPtr endpointFormat, IntPtr mixFormat);
         [PreserveSig] int GetProcessingPeriod();
         [PreserveSig] int SetProcessingPeriod();
         [PreserveSig] int GetShareMode();
@@ -115,6 +115,46 @@ namespace WexonGrowth
             if (en.GetDefaultAudioEndpoint(cikis ? 0 : 1, rol, out dev) != 0) return null;
             string id; dev.GetId(out id);
             return id;
+        }
+
+        /// <summary>Cihazın örnekleme hızını (Hz) döndürür; okunamazsa 0.</summary>
+        public static int OrnekHizi(string deviceId)
+        {
+            var pc = (IPolicyConfig)new PolicyConfigClient();
+            IntPtr p;
+            if (pc.GetDeviceFormat(deviceId, false, out p) != 0 || p == IntPtr.Zero) return 0;
+            try { return Marshal.ReadInt32(p, 4); } finally { Marshal.FreeCoTaskMem(p); }
+        }
+
+        /// <summary>
+        /// Cihazın örnekleme hızını değiştirir (kanal ve bit derinliği aynı kalır).
+        /// Hi-Fi Cable'ın iki ucu aynı hızda olmazsa ses kesik kesik gider.
+        /// </summary>
+        public static void OrnekHiziniAyarla(string deviceId, int hz)
+        {
+            var pc = (IPolicyConfig)new PolicyConfigClient();
+            IntPtr p;
+            int hr = pc.GetDeviceFormat(deviceId, false, out p);
+            if (hr != 0) Marshal.ThrowExceptionForHR(hr);
+            try
+            {
+                int ek = Marshal.ReadInt16(p, 16);              // WAVEFORMATEX.cbSize
+                int boyut = 18 + ek;
+                IntPtr yeni = Marshal.AllocCoTaskMem(boyut);
+                try
+                {
+                    var buf = new byte[boyut];
+                    Marshal.Copy(p, buf, 0, boyut);
+                    int blok = BitConverter.ToInt16(buf, 12);     // nBlockAlign
+                    BitConverter.GetBytes(hz).CopyTo(buf, 4);     // nSamplesPerSec
+                    BitConverter.GetBytes(hz * blok).CopyTo(buf, 8); // nAvgBytesPerSec
+                    Marshal.Copy(buf, 0, yeni, boyut);
+                    hr = pc.SetDeviceFormat(deviceId, yeni, yeni);
+                    if (hr != 0) Marshal.ThrowExceptionForHR(hr);
+                }
+                finally { Marshal.FreeCoTaskMem(yeni); }
+            }
+            finally { Marshal.FreeCoTaskMem(p); }
         }
 
         /// <summary>Cihazı üç rolde de (konsol, multimedya, iletişim) varsayılan yapar.</summary>

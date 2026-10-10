@@ -38,7 +38,9 @@ type Heard = { audio: string; entry: HistMsg; text: Promise<string> };
 // Müşteri AI konuşurken bunları derse sözünü kesme (onay sesleri)
 const BACKCHANNEL_RE = /^(h[ıi]+( ?h[ıi]+)*|ıh[ıi]+|evet+|tamam+|aynen|anladım|peki|olur|tabii?|hmm+|h[ae]+|he ?he|doğru|haklısınız|evet evet|tamam tamam)$/i;
 // Operatör / telesekreter anonsları
-const VOICEMAIL_RE = /(aradığınız (kişiye|numaraya)|şu anda ulaşılamıyor|ulaşılamamaktadır|sesli mesaj|telesekreter|sinyal sesinden sonra|kapsama alanı dışında|numara kullanılmamaktadır|geçici olarak hizmet dışı|mesajınızı bırak)/i;
+const VOICEMAIL_RE = /(başka bir görüşmede|şu anda meşgul|hat meşgul|cevap veremiyor|daha sonra tekrar deneyin|aradığınız (kişiye|numaraya)|şu anda ulaşılamıyor|ulaşılamamaktadır|sesli mesaj|telesekreter|sinyal sesinden sonra|kapsama alanı dışında|numara kullanılmamaktadır|geçici olarak hizmet dışı|mesajınızı bırak)/i;
+// Müşterinin veda/teşekkür cevabı (Ece vedalaştıktan sonra)
+const FAREWELL_RE = /(teşekkür|sağ ?ol|eyvallah|iyi çalışmalar|kolay gelsin|iyi günler|iyi akşamlar|görüşürüz|hoşça kal|tamam(dır)?|peki|anlaştık)/i;
 // Ece vedalaşınca görüşme biter
 const CLOSING_RE = /(kolay gelsin|iyi çalışmalar|iyi günler( dilerim)?|hoşça kalın|görüşmek üzere|iyi akşamlar)[.!]?\s*$/i;
 const OPENER_STATUS = "(Karşı taraf telefonu açtı ve “Alo” dedi.)";
@@ -95,7 +97,8 @@ export class PcmPlayer {
       buf.copyToChannel(f, 0);
       const src = o.ctx.createBufferSource();
       src.buffer = buf; src.connect(o.ctx.destination);
-      const t = Math.max(o.ctx.currentTime + 0.05, o.next);
+      const yeniBaslangic = o.next <= o.ctx.currentTime;
+      const t = yeniBaslangic ? o.ctx.currentTime + 0.25 : o.next;
       src.start(t); o.next = t + buf.duration;
       if (k === 0) this.endAt = o.next;
       this.sources.add(src);
@@ -580,7 +583,8 @@ export class CallEngine {
 
   private async transcribe(audio: string): Promise<string> {
     try {
-      const r = await fetch("/api/arama/yazi", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ audio }) });
+      const baglam = [...this.history].reverse().find((m) => m.role === "assistant")?.content ?? "";
+      const r = await fetch("/api/arama/yazi", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ audio, baglam }) });
       const j = (await r.json()) as { text?: string; maliyet?: number };
       if (!r.ok) return "";
       this.addCost(Number(j.maliyet) || 0);
@@ -590,6 +594,7 @@ export class CallEngine {
 
   private async customerSpoke(audio: string) {
     if (!this.active) return;
+    const vedaSonrasi = this.closing;
     const entry: HistMsg = { role: "user", content: "(Müşteri konuştu; sözü ses kaydı olarak iletildi.)" };
     const bubble = this.push("user", "…");
     this.lastUserAt = Date.now(); this.nudges = 0;
@@ -608,6 +613,16 @@ export class CallEngine {
       return t;
     });
     const heard: Heard = { audio, entry, text };
+    // Ece vedalaştıktan sonra müşteri "teşekkürler, iyi çalışmalar" dediyse konuşmayı yeniden başlatma
+    if (vedaSonrasi) {
+      const t = await Promise.race([text, sleep(3500).then(() => "")]);
+      if (!this.active) return;
+      if (!t || (t.length < 60 && FAREWELL_RE.test(t))) {
+        this.history.push(entry);
+        this.sys("Müşteri vedalaştı, görüşme bitirildi. Telefonu kapatabilirsin.");
+        return this.end("closing");
+      }
+    }
     if (this.openerBusy) { this.afterOpener.push(entry); this.afterOpenerHeard = heard; return; }
     if (this.opener && !this.history.some((m) => m.role === "assistant")) {
       this.openerBusy = true; this.afterOpener = []; this.afterOpenerHeard = null;
