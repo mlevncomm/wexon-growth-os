@@ -259,6 +259,24 @@ export default function AramaUi() {
     if (!eng || !target || phase === "live") return;
     if (!data?.keyReady) return setInfo("OpenRouter anahtarı yok. Sistem ekranında OpenRouter anahtarını kaydet.");
     if (cfg.hearing === "tarayici" && !speechRecognitionCtor()) return setInfo("Bu programda Chrome ses tanıma yok. Ses ayarlarında “Yapay zekâ dinlesin”i seç.");
+    // Kablo modunda doğru cihazları kendisi bul: Ece → Hi-Fi Cable (telefona), müşteri ← CABLE Output
+    let run = cfg;
+    if (cfg.mode === "cable") {
+      if (cfg.voiceMode === "browser") return setInfo("Ücretsiz tarayıcı sesi telefona gidemez. Ses ayarlarında “Doğal ses”i seç ya da Bağlantı'yı “Hoparlör” yap.");
+      try {
+        const st = await navigator.mediaDevices.getUserMedia({ audio: true }); st.getTracks().forEach((t) => t.stop());
+        const all = await navigator.mediaDevices.enumerateDevices();
+        const label = (id: string, kind: MediaDeviceKind) => all.find((d) => d.kind === kind && d.deviceId === id)?.label ?? "";
+        const find = (kind: MediaDeviceKind, re: RegExp) => all.find((d) => d.kind === kind && re.test(d.label))?.deviceId ?? "";
+        const patch: Partial<CallConfig> = {};
+        const ECE_OUT = /Hi-Fi Cable Input|CABLE-A Input|VoiceMeeter Input/i;
+        if (!ECE_OUT.test(label(cfg.outDev, "audiooutput"))) patch.outDev = find("audiooutput", ECE_OUT);
+        if (!/^CABLE Output|CABLE-B Output/i.test(label(cfg.inDev, "audioinput"))) patch.inDev = find("audioinput", /^CABLE Output/i);
+        if (patch.outDev === "") return setInfo("Ece'nin sesini telefona taşıyacak kablo (Hi-Fi Cable) bulunamadı. Araçlar → Kurulum sihirbazı'nı çalıştır.");
+        if (patch.inDev === "") return setInfo("Müşterinin sesini getiren kablo (CABLE Output) bulunamadı. Araçlar → Kurulum sihirbazı'nı çalıştır.");
+        if (Object.keys(patch).length) { run = { ...cfg, ...patch }; saveCfg(patch); }
+      } catch (e) { return setInfo("Ses cihazlarına erişilemedi: " + (e as Error).message); }
+    }
     resetResult(); setYetkili(contactFromNotes(target.notes)); setPhase("live");
     const note = [
       target.rating ? `Google’da ${target.rating} puan${target.reviewCount ? `, ${target.reviewCount} yorum` : ""}` : "",
@@ -266,7 +284,7 @@ export default function AramaUi() {
       target.status === "yazildi" ? "Daha önce WhatsApp’tan tanıtım mesajı gönderildi ama dönüş olmadı." : "",
     ].filter(Boolean).join(" · ");
     try {
-      await eng.start(cfg, { isletme: target.name, telefon: target.phone, sektor: target.sector, sehir: [target.district, target.city].filter(Boolean).join(", "), not: note });
+      await eng.start(run, { isletme: target.name, telefon: target.phone, sektor: target.sector, sehir: [target.district, target.city].filter(Boolean).join(", "), not: note });
     } catch (e) { setInfo((e as Error).message); setPhase("ready"); return; }
     // Netgsm ayarlıysa numarayı santral çevirir: önce bilgisayardaki dahili çalar, açınca müşteri aranır
     if (data.netgsmReady && cfg.autoDial) {

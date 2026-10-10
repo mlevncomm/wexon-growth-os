@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { badRequest, readJson } from "@/lib/http";
-import { budgetError, chatBody, cleanMessages, currentBrand, openRouterKey, openRouterStream, validAudio, type LeadContext } from "@/lib/arama/server";
+import { budgetError, chatBody, cleanMessages, currentBrand, openRouterError, openRouterKey, openRouterStream, validAudio, type LeadContext } from "@/lib/arama/server";
 import { withTenant } from "@/lib/tenant";
 
 export const runtime = "nodejs";
@@ -35,8 +35,8 @@ export async function POST(request: Request) {
       request.signal,
     );
     if (!upstream.ok || !upstream.body) {
-      const text = await upstream.text().catch(() => "");
-      return NextResponse.json({ error: `OpenRouter hatası (${upstream.status}): ${text.slice(0, 400)}` }, { status: upstream.status || 502 });
+      const e = openRouterError(upstream.status, await upstream.text().catch(() => ""));
+      return NextResponse.json({ error: e.error }, { status: e.status });
     }
     return new NextResponse(upstream.body, {
       headers: { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-store, no-transform" },

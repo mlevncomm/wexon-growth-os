@@ -145,6 +145,20 @@ export function chatBody(opts: { kind: "voice" | "text"; voice: string; premium?
   return { model, messages: [sys, ...opts.messages], stream: true, max_tokens: 220, temperature: 0.7, usage: { include: true } };
 }
 
+/** OpenRouter hata cevabını operatörün anlayacağı mesaja çevirir. Bütçe/bakiye sorunları 402 döner (tekrar denenmez). */
+export function openRouterError(status: number, raw: string): { status: number; error: string } {
+  if (/budget limit|limit exceeded|guardrail|insufficient|credits|payment required/i.test(raw) || status === 402) {
+    const reset = /resets?\s+(\d{4}-\d{2}-\d{2})/i.exec(raw)?.[1];
+    return {
+      status: 402,
+      error: "OpenRouter harcama sınırı doldu" + (reset ? ` (${reset} tarihinde sıfırlanır)` : "") +
+        ". openrouter.ai → Settings → Guardrails (veya Keys) bölümünden aylık bütçe sınırını artır ya da bakiye yükle.",
+    };
+  }
+  if (status === 401) return { status: 401, error: "OpenRouter anahtarı geçersiz. Vercel'deki OPENROUTER_API_KEY değerini kontrol et." };
+  return { status: status || 502, error: `OpenRouter hatası (${status}): ${raw.slice(0, 300)}` };
+}
+
 export async function openRouterStream(key: string, body: object, signal: AbortSignal): Promise<Response> {
   return fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST", signal, headers: headers(key), body: JSON.stringify(body),

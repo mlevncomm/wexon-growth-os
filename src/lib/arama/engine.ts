@@ -383,6 +383,13 @@ export class CallEngine {
       }
     }
 
+    // Kablo modunda tarayıcı sesi telefona ulaşamaz (Windows varsayılan çıkışına gider) → yedek sesi kullanma
+    if (this.cfg.voiceMode === "natural" && this.cfg.mode === "cable") {
+      this.sys("Ece şu an konuşamıyor (yapay zekâ sesine ulaşılamadı). Görüşmeyi sen devral ya da Bitir'e bas.");
+      this.on.onState("listening");
+      if (this.abort === ctrl) this.abort = null;
+      return;
+    }
     // 2) Yedek / ücretsiz mod: metin modeli + tarayıcı sesi (cümle cümle)
     let buf = "";
     const flush = (force: boolean) => {
