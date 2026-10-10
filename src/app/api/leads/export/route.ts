@@ -10,6 +10,8 @@ const STATUS_LABEL: Record<string, string> = {
   yeni: "Yeni",
   yazildi: "Yazıldı",
   donus_var: "Dönüş var",
+  geri_ara: "Geri aranacak",
+  ulasilamadi: "Açmadı",
   ilgilenmiyor: "İlgilenmiyor",
 };
 

@@ -3,12 +3,13 @@ import { prisma } from "@/lib/prisma";
 import { normalizePhone } from "@/lib/phone";
 import { resolveSearchLocations } from "@/lib/search-scope";
 import { badRequest, readJson } from "@/lib/http";
+import { LEAD_STATUSES } from "@/lib/lead-status";
 import { bustStatsCache } from "@/lib/stats";
 import { withTenant } from "@/lib/tenant";
 
 export const dynamic = "force-dynamic";
 
-const STATUSES = ["yeni", "yazildi", "donus_var", "ilgilenmiyor"] as const;
+const STATUSES = LEAD_STATUSES.map((s) => s.value);
 
 export async function PATCH(
   request: Request,
@@ -35,7 +36,7 @@ export async function PATCH(
     } = {};
 
     if (body.status) {
-      if (!STATUSES.includes(body.status as (typeof STATUSES)[number])) {
+      if (!(STATUSES as string[]).includes(body.status)) {
         return NextResponse.json({ error: "Geçersiz durum" }, { status: 400 });
       }
       data.status = body.status;

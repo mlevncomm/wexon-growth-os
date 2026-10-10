@@ -67,6 +67,16 @@ const MODULES = [
     ],
   },
   {
+    href: "/arama",
+    kicker: "Satış",
+    title: "Arama",
+    points: [
+      "Ece, Keşif'te bulunan ve sitesi olmayan işletmeleri telefonda arar; sen numarayı Phone Link'ten çevirirsin, konuşmayı Ece yapar.",
+      "İlk kez: Ses ayarları → sanal kablolar (VB-CABLE + A+B) ve Chrome mikrofonu = CABLE Output. OpenRouter anahtarı Sistem'de veya OPENROUTER_API_KEY ile.",
+      "Görüşme bitince özet otomatik çıkar; Kaydet sonucu Müşteriler'e yazar, takip mesajını onay kuyruğuna ekler. Görüşme başı ~3–4 sent.",
+    ],
+  },
+  {
     href: "/musteriler",
     kicker: "Satış",
     title: "Müşteriler",

@@ -1,0 +1,47 @@
+{
+  "name": "wexon-growth-os-masaustu",
+  "productName": "Wexon Growth OS",
+  "version": "1.0.0",
+  "description": "Wexon Growth OS — Ece ile yapay zekâ destekli telefon araması",
+  "author": "Wexon",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "yerel": "electron . --adres=http://127.0.0.1:3000",
+    "simge": "node simge.mjs",
+    "paketle": "electron-builder --win nsis --x64"
+  },
+  "devDependencies": {
+    "electron": "44.4.5",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "dev.wexon.growthos",
+    "productName": "Wexon Growth OS",
+    "copyright": "Wexon",
+    "directories": { "output": "dist", "buildResources": "build" },
+    "files": ["main.js", "preload.js", "sihirbaz.html", "sihirbaz.js", "hata.html", "hata.js", "build/icon.ico"],
+    "extraResources": [
+      { "from": "kurulum.ps1", "to": "kurulum/kurulum.ps1" },
+      { "from": "WexonSes.cs", "to": "kurulum/WexonSes.cs" }
+    ],
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "icon": "build/icon.ico",
+      "artifactName": "Wexon-Growth-OS-Kurulum-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "Wexon Growth OS",
+      "runAfterFinish": true,
+      "installerLanguages": ["tr_TR"],
+      "language": "1055",
+      "deleteAppDataOnUninstall": false
+    }
+  }
+}

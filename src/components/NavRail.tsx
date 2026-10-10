@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const MAIN = [
   { href: "/", label: "Panel" },
   { href: "/ara", label: "Keşif" },
+  { href: "/arama", label: "Arama" },
   { href: "/musteriler", label: "Müşteriler" },
   { href: "/whatsapp", label: "Mesaj" },
   { href: "/koc", label: "Koç" },
@@ -26,6 +27,13 @@ function Ico({ href }: { href: string }) {
       <svg {...p}>
         <path d="M4.5 11.2 12 4.6l7.5 6.6" />
         <path d="M6.2 10.4V19a1.2 1.2 0 0 0 1.2 1.2h3.1v-5.1h3V20.2h3.1A1.2 1.2 0 0 0 17.8 19v-8.6" />
+      </svg>
+    );
+  }
+  if (href === "/arama") {
+    return (
+      <svg {...p}>
+        <path d="M6.6 4.8h2.6l1.3 3.4-1.7 1.1a9.4 9.4 0 0 0 5.9 5.9l1.1-1.7 3.4 1.3v2.6a1.6 1.6 0 0 1-1.7 1.6A13.6 13.6 0 0 1 5 6.5a1.6 1.6 0 0 1 1.6-1.7z" />
       </svg>
     );
   }
@@ -79,7 +87,7 @@ function Ico({ href }: { href: string }) {
 }
 
 export function isActive(pathname: string, href: string) {
-  return href === "/" ? pathname === "/" : pathname.startsWith(href);
+  return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(href + "/");
 }
 
 function operatorLine(opts: { places: boolean; waCloud: boolean; waLocal: string }) {

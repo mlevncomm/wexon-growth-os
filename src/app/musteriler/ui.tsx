@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { formatPhoneDisplay, isWhatsAppCapablePhone } from "@/lib/phone";
@@ -332,6 +333,7 @@ export default function MusterilerPage() {
                       <div>{lead.phone ? formatPhoneDisplay(lead.phone) : "—"}</div>
                       {!canWhatsApp ? <div className="muted" style={{ fontSize: 12 }}>Sabit hat · WhatsApp yok</div> : null}
                       <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+                        {lead.phone ? <Link className="muted" href={`/arama?lead=${lead.id}`} style={{ color: "var(--teal)", fontWeight: 700 }}>Ece ile ara</Link> : null}
                         {lead.mapsUrl ? <a className="muted" href={lead.mapsUrl} target="_blank" rel="noreferrer">Maps</a> : null}
                         {lead.website ? <a className="muted" href={lead.website} target="_blank" rel="noreferrer">Web</a> : null}
                       </div>
