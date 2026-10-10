@@ -46,6 +46,8 @@ const COST_WARN_USD = 0.15;
 const COST_WARN_PREMIUM_USD = 0.6;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** Görüşme sürüyor mu? Masaüstü programı ve sürüm uyarısı güncellemeyi buna göre bekletir. */
+const aramaDurumu = (aktif: boolean) => { (window as unknown as { __wexonAramaAktif?: boolean }).__wexonAramaAktif = aktif; };
 type SinkCtx = AudioContext & { setSinkId?: (id: string) => Promise<void> };
 type SinkMedia = HTMLMediaElement & { setSinkId?: (id: string) => Promise<void> };
 
@@ -205,6 +207,7 @@ export class CallEngine {
     this.emitMsgs(); this.on.onCost(0); this.on.onState("preparing");
     if (cfg.voiceMode === "natural") await this.player.open(this.sinkIds());
     this.active = true;
+    aramaDurumu(true);
     this.prepareOpener();
     try {
       this.mic = await navigator.mediaDevices.getUserMedia({
@@ -719,6 +722,7 @@ export class CallEngine {
 
   private teardown() {
     this.active = false;
+    aramaDurumu(false);
     if (this.listenNode) { this.listenNode.onaudioprocess = null; this.listenNode.disconnect(); this.listenNode = null; }
     void this.listenCtx?.close().catch(() => undefined); this.listenCtx = null; this.vad = null;
     clearTimeout(this.commitTimer); clearTimeout(this.silenceTimer); clearTimeout(this.closingTimer);

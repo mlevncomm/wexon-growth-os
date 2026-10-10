@@ -7,6 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { OPEN_QUEUE, STATS_DIRTY } from "@/lib/os-events";
 import { fetchStats, invalidateStats } from "@/lib/stats-client";
 import { isActive, NavRail } from "./NavRail";
+import { SurumKontrol } from "./SurumKontrol";
 
 const QueuePanel = dynamic(
   () => import("./QueuePanel").then((m) => ({ default: m.QueuePanel })),
@@ -269,6 +270,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
         <div className="os-scan">{scanning ? <span style={{ width: `${scanPct}%` }} /> : null}</div>
         <main className="os-main">{children}</main>
+        <SurumKontrol />
       </div>
       <nav className="os-dock" aria-label="Hızlı menü">
         {DOCK.map((item) => (

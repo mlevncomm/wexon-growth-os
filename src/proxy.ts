@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { decodeSession, SESSION_COOKIE, authConfigured } from "@/lib/session-token";
 
-const PUBLIC = ["/giris", "/api/auth", "/api/instagram/webhook", "/api/outreach/tick"];
+const PUBLIC = ["/giris", "/api/auth", "/api/instagram/webhook", "/api/outreach/tick", "/api/surum"];
 
 function isPublic(pathname: string) {
   return PUBLIC.some((p) => pathname === p || pathname.startsWith(`${p}/`));

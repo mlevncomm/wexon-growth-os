@@ -1,6 +1,6 @@
 // Wexon Growth OS masaüstü programı (Electron).
 // Growth OS'u kendi penceresinde açar; ilk açılışta arama bilgisayarını hazırlayan kurulum sihirbazını gösterir.
-const { app, BrowserWindow, Menu, shell, session, ipcMain, powerSaveBlocker } = require("electron");
+const { app, BrowserWindow, Menu, shell, session, ipcMain, powerSaveBlocker, dialog } = require("electron");
 const path = require("node:path");
 const fs = require("node:fs");
 const { spawn } = require("node:child_process");
@@ -170,6 +170,59 @@ ipcMain.handle("sistem:yenidenBaslat", () => { spawn("shutdown.exe", ["/r", "/t"
 ipcMain.handle("sistem:telefon", () => telefonBaglantisi());
 ipcMain.handle("sistem:ses", () => sesAyarlari());
 
+// ---------- program güncellemesi (GitHub'daki en son sürüm) ----------
+let guncelleyici = null;
+let bekleyenSurum = null;
+let elleDenetim = false;
+
+async function aramaSuruyor() {
+  if (!ana) return false;
+  try { return Boolean(await ana.webContents.executeJavaScript("Boolean(window.__wexonAramaAktif)", true)); } catch { return false; }
+}
+
+// Görüşme sürerken asla sorma; bitince "yeniden başlat" teklif et
+async function guncellemeyiTeklifEt() {
+  if (!bekleyenSurum) return;
+  if (await aramaSuruyor()) { setTimeout(guncellemeyiTeklifEt, 60_000); return; }
+  const { response } = await dialog.showMessageBox(ana || sihirbaz || undefined, {
+    type: "info",
+    title: "Güncelleme hazır",
+    message: `Wexon Growth OS ${bekleyenSurum} indirildi.`,
+    detail: "Program birkaç saniye içinde yeniden açılır. \"Sonra\" dersen program kapanırken kendiliğinden kurulur.",
+    buttons: ["Şimdi yeniden başlat", "Sonra"],
+    defaultId: 0,
+    cancelId: 1,
+  });
+  if (response === 0) guncelleyici.quitAndInstall(true, true);
+}
+
+function guncellemeyiKur() {
+  if (!app.isPackaged) return; // geliştirme sırasında güncelleme yok
+  try { ({ autoUpdater: guncelleyici } = require("electron-updater")); } catch { return; }
+  guncelleyici.autoDownload = true;
+  guncelleyici.autoInstallOnAppQuit = true;
+  guncelleyici.on("update-downloaded", (bilgi) => { bekleyenSurum = bilgi.version; void guncellemeyiTeklifEt(); });
+  guncelleyici.on("update-not-available", () => {
+    if (elleDenetim) { elleDenetim = false; void dialog.showMessageBox({ type: "info", title: "Güncel", message: `Wexon Growth OS güncel (${app.getVersion()}).` }); }
+  });
+  guncelleyici.on("error", (e) => {
+    if (elleDenetim) { elleDenetim = false; void dialog.showMessageBox({ type: "warning", title: "Güncelleme denetlenemedi", message: "Güncelleme sunucusuna ulaşılamadı.", detail: String(e && e.message || e).slice(0, 300) }); }
+  });
+  const denetle = () => guncelleyici.checkForUpdates().catch(() => undefined);
+  setTimeout(denetle, 15_000);
+  setInterval(denetle, 4 * 60 * 60 * 1000);
+}
+
+function guncellemeleriDenetle() {
+  if (!guncelleyici) {
+    void dialog.showMessageBox({ type: "info", title: "Güncelleme", message: "Güncelleme sadece kurulu programda çalışır." });
+    return;
+  }
+  if (bekleyenSurum) { void guncellemeyiTeklifEt(); return; }
+  elleDenetim = true;
+  guncelleyici.checkForUpdates().catch(() => undefined);
+}
+
 function telefonBaglantisi() {
   spawn("explorer.exe", ["shell:AppsFolder\\Microsoft.YourPhone_8wekyb3d8bbwe!App"], { detached: true });
 }
@@ -220,6 +273,7 @@ function menuKur() {
       label: "Yardım",
       submenu: [
         { label: "Kullanım kılavuzu", click: git("/kilavuz") },
+        { label: "Güncellemeleri denetle", click: guncellemeleriDenetle },
         { label: `Wexon Growth OS ${app.getVersion()}`, enabled: false },
       ],
     },
@@ -231,6 +285,7 @@ app.whenReady().then(() => {
   menuKur();
   // Görüşme sürerken Windows programı uyutmasın
   powerSaveBlocker.start("prevent-app-suspension");
+  guncellemeyiKur();
   if (!ayarOku().kurulumTamam || kurulumDevam) sihirbazPencere();
   else anaPencere();
 });
