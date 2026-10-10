@@ -1,6 +1,6 @@
 // Wexon Growth OS masaüstü programı (Electron).
 // Growth OS'u kendi penceresinde açar; ilk açılışta arama bilgisayarını hazırlayan kurulum sihirbazını gösterir.
-const { app, BrowserWindow, Menu, shell, session, ipcMain, powerSaveBlocker, dialog } = require("electron");
+const { app, BrowserWindow, Menu, shell, session, ipcMain, powerSaveBlocker, dialog, powerMonitor } = require("electron");
 const path = require("node:path");
 const fs = require("node:fs");
 const { spawn } = require("node:child_process");
@@ -181,9 +181,14 @@ async function aramaSuruyor() {
 }
 
 // Görüşme sürerken asla sorma; bitince "yeniden başlat" teklif et
+let teklifAcik = false;
 async function guncellemeyiTeklifEt() {
-  if (!bekleyenSurum) return;
+  if (!bekleyenSurum || teklifAcik) return;
+  // Görüşme sürerken asla dokunma; dakikada bir tekrar bak
   if (await aramaSuruyor()) { setTimeout(guncellemeyiTeklifEt, 60_000); return; }
+  // Bilgisayar 2 dakikadır boştaysa sormadan sessizce güncelle ve yeniden aç
+  if (powerMonitor.getSystemIdleTime() >= 120) { guncelleyici.quitAndInstall(true, true); return; }
+  teklifAcik = true;
   const { response } = await dialog.showMessageBox(ana || sihirbaz || undefined, {
     type: "info",
     title: "Güncelleme hazır",
@@ -193,7 +198,9 @@ async function guncellemeyiTeklifEt() {
     defaultId: 0,
     cancelId: 1,
   });
+  teklifAcik = false;
   if (response === 0) guncelleyici.quitAndInstall(true, true);
+  else setTimeout(guncellemeyiTeklifEt, 30 * 60_000); // "Sonra" → boşta kalınca sessizce kurulur
 }
 
 function guncellemeyiKur() {
@@ -221,6 +228,16 @@ function guncellemeleriDenetle() {
   if (bekleyenSurum) { void guncellemeyiTeklifEt(); return; }
   elleDenetim = true;
   guncelleyici.checkForUpdates().catch(() => undefined);
+}
+
+// 1.0.0 "tüm kullanıcılar" kurulumundan kalan kopyayı bir kez kaldırır (yönetici izni bir kez istenir)
+function eskiKurulumuTemizle() {
+  if (!app.isPackaged || ayarOku().eskiKurulumTemizlendi) return;
+  const eski = path.join(process.env.ProgramFiles || "C:\\Program Files", "Wexon Growth OS", "Uninstall Wexon Growth OS.exe");
+  if (!fs.existsSync(eski) || process.execPath.startsWith(path.dirname(eski))) { ayarYaz({ eskiKurulumTemizlendi: true }); return; }
+  const ps = `Start-Process -FilePath '${eski.replace(/'/g, "''")}' -ArgumentList '/allusers','/S' -Verb RunAs -Wait`;
+  const p = spawn("powershell.exe", ["-NoProfile", "-Command", ps], { windowsHide: true });
+  p.on("close", () => { if (!fs.existsSync(eski)) ayarYaz({ eskiKurulumTemizlendi: true }); });
 }
 
 function telefonBaglantisi() {
@@ -286,6 +303,7 @@ app.whenReady().then(() => {
   // Görüşme sürerken Windows programı uyutmasın
   powerSaveBlocker.start("prevent-app-suspension");
   guncellemeyiKur();
+  setTimeout(eskiKurulumuTemizle, 5000);
   if (!ayarOku().kurulumTamam || kurulumDevam) sihirbazPencere();
   else anaPencere();
 });

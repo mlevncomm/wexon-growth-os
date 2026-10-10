@@ -1,7 +1,7 @@
 {
   "name": "wexon-growth-os-masaustu",
   "productName": "Wexon Growth OS",
-  "version": "1.0.1",
+  "version": "1.0.3",
   "description": "Wexon Growth OS — Ece ile yapay zekâ destekli telefon araması",
   "author": "Wexon",
   "private": true,
@@ -56,9 +56,8 @@
       "artifactName": "Wexon-Growth-OS-Kurulum-${version}.${ext}"
     },
     "nsis": {
-      "oneClick": false,
+      "oneClick": true,
       "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": "always",
       "createStartMenuShortcut": true,
       "shortcutName": "Wexon Growth OS",
