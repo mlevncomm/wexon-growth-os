@@ -35,7 +35,7 @@ export const REWRITE_BELOW = 85;
 const lower = (s: string) => s.toLocaleLowerCase("tr");
 
 // Yapılmamış işi yapılmış gibi gösteren ifadeler
-const WORK_CLAIMS = /(?<![\p{L}\p{N}])(hazırladım|hazırladık|tasarladım|tasarladık|tasarımını tamamladı[mk]|tasarım(ı)? hazır|taslağ?ı? hazırladı[mk]|örnek (bir )?(site|tasarım|sayfa)\p{L}* hazırladı[mk])(?![\p{L}\p{N}])/iu;
+const WORK_CLAIMS = /(?<![\p{L}\p{N}])(hazırladım|hazırladık|tasarladım|tasarladık|tasarımını tamamladı[mk]|tasarım(ı)? hazır|taslağ?ı? hazırladı[mk]|örnek (bir )?(site|tasarım|sayfa)\p{L}* hazırladı[mk]|hazırladığı(m|mız)|tasarladığı(m|mız)|kurguladığı(m|mız)|planladı[mk]|kurguladı[mk]|hazırlamış bulunuyoruz)(?![\p{L}\p{N}])/iu;
 const INSPECTION_CLAIMS = /(sitenizi (inceledim|inceledik|analiz ettim|analiz ettik)|sitenize (baktım|baktık|göz attım|göz attık)|sitesine (baktım|baktık|göz attım|göz attık)|sitesini (inceledim|inceledik)|\binceledim\b|\banaliz ettim\b|\banaliz ettik\b|eksiklik(ler)? (buldum|bulduk|tespit ettim|tespit ettik)|geliştirme alan(ı|ları) belirledi[mk]|sorun(lar)? tespit ettik)/iu;
 const PRIOR_CONTACT_CLAIMS = /(yazmıştım|yazmıştık|göndermiştim|göndermiştik|paylaşmıştım|paylaşmıştık|bahsetmiştim|bahsetmiştik|konuşmuştuk|önceki mesajım)/iu;
 const URGENCY = /(son fırsat|kaçırmayın|acele edin|hemen şimdi|sınırlı süre|bugüne özel|sadece bugün|son gün|stoklarla sınırlı|kontenjan sınırlı|garanti(li|liyoruz|ediyoruz)?\b|%\s?100|yüzde yüz)/iu;
@@ -268,7 +268,7 @@ export function evaluateMessage(message: string, ctx: CustomerContext, categoryI
     warnings.push("Playbook’ta kayıtlı bir fiyat yok; mesajdaki rakamı kontrol edin");
   }
   // Google puanı ve yorum sayısı aynen aktarılmalı; "310 hasta", "memnuniyet oranı" gibi yorumlar veriyi çarpıtır
-  if (ctx.reviewCount && (new RegExp(`${ctx.reviewCount}\\s+(hasta|müşteri|kişi|danışan)`, "iu").test(text) || /memnuniyet oran/iu.test(text))) {
+  if (ctx.reviewCount && (new RegExp(`${ctx.reviewCount}\\s+(hasta|müşteri|kişi|danışan)\\p{L}*\\s+(?!yorum)`, "iu").test(text) || /memnuniyet oran/iu.test(text))) {
     minus("guven", 6, "Google puanı ya da yorum sayısı çarpıtılmış");
     warnings.push("Google verisi olduğu gibi aktarılmalı (ör. “Google’da 4,9 puan ve 310 yorum”); yorum sayısı hasta ya da müşteri sayısı değildir.");
   }

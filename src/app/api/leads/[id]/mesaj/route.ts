@@ -75,8 +75,9 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 
     try {
       if (body.action === "generate") {
-        const result = await generateDrafts({ ctx, category, chat: await salesChat(), operatorPlaybook });
-        return NextResponse.json({ ctx, result });
+        const chat = await salesChat();
+        const result = await generateDrafts({ ctx, category, chat, operatorPlaybook });
+        return NextResponse.json({ ctx, result: { ...result, aiMeta: chat?.meta ?? [] } });
       }
 
       if (body.action === "refine") {

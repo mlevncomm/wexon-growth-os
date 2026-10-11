@@ -116,7 +116,8 @@ export async function leadContext(
 export async function salesChat(): Promise<ChatFn | undefined> {
   const settings = await getSettings();
   if (!settings.llmApiKey) return undefined;
-  return (messages, opts) =>
+  const meta: NonNullable<ChatFn["meta"]> = [];
+  const chat: ChatFn = (messages, opts) =>
     llmChat({
       apiKey: settings.llmApiKey,
       baseUrl: settings.llmBaseUrl,
@@ -125,7 +126,11 @@ export async function salesChat(): Promise<ChatFn | undefined> {
       json: true,
       temperature: opts?.temperature ?? 0.7,
       maxTokens: 2400,
+      timeoutMs: opts?.timeoutMs,
+      onMeta: (m) => meta.push(m),
     });
+  chat.meta = meta;
+  return chat;
 }
 
 /** Son 24 saatteki temaslar; arayüz aynı türde ikinci mesajda uyarır (mükerrer) */

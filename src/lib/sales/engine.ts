@@ -11,7 +11,14 @@ import { evaluateMessage, REWRITE_BELOW, type QualityResult } from "./quality";
 export const PROMPT_VERSION = "satis-v2.0";
 
 export type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
-export type ChatFn = (messages: ChatMessage[], opts?: { temperature?: number }) => Promise<string>;
+export type ChatFn = ((messages: ChatMessage[], opts?: { temperature?: number; timeoutMs?: number }) => Promise<string>) & {
+  /** Hangi modelin, ne kadar sürede yanıt verdiği (denetim için) */
+  meta?: { model: string; thinking: boolean; ms: number }[];
+};
+
+/** Sunucu fonksiyonu 60 sn'de kesilir: ilk üretim en fazla 32 sn, düzeltme turu yalnızca zaman kaldıysa */
+export const FIRST_CALL_MS = 32_000;
+export const TOTAL_BUDGET_MS = 50_000;
 
 export type Draft = {
   style: StyleId;
@@ -268,9 +275,10 @@ export async function generateDrafts(opts: {
   let calls = 0;
   let raw: RawVariant[] = [];
   const warnings: string[] = [];
+  const started = Date.now();
   try {
     calls += 1;
-    raw = parseVariants(await opts.chat(messages, { temperature: 0.8 }));
+    raw = parseVariants(await opts.chat(messages, { temperature: 0.8, timeoutMs: FIRST_CALL_MS }));
   } catch (err) {
     return localResult(ctx, category, [`AI yanıt vermedi (${err instanceof Error ? err.message.slice(0, 120) : "hata"}); kayıtlı bilgiyle hazırlanan taslaklar gösteriliyor.`]);
   }
@@ -299,7 +307,10 @@ export async function generateDrafts(opts: {
   const weak = drafts.filter(
     (d) => d.source === "ai" && (d.blockers.length || d.qualityScore < REWRITE_BELOW || d.qualityReasons.includes(SAME_OPENING) || pricey.indexOf(d) > 0),
   );
-  if (weak.length) {
+  const left = TOTAL_BUDGET_MS - (Date.now() - started);
+  if (weak.length && left < 8_000) {
+    warnings.push("AI yavaş yanıt verdiği için düzeltme turu atlandı; sorunlu taslaklar işaretli.");
+  } else if (weak.length) {
     try {
       calls += 1;
       const fixed = parseVariants(
@@ -313,7 +324,7 @@ export async function generateDrafts(opts: {
                 .join("\n\n")}\n\nÇıktı JSON: {"variants":[{"style":"...","message":"...","suggestedCTA":"...","customerContextUsed":["..."],"reason":"..."}]}`,
             },
           ],
-          { temperature: 0.4 },
+          { temperature: 0.4, timeoutMs: left },
         ),
       );
       drafts = drafts.map((d) => {
@@ -389,7 +400,7 @@ export async function refineDraft(opts: {
           content: `${contextBlock(ctx)}\n\n${strategyBlock(category, opts.operatorPlaybook ?? "")}\n\nİSTEK: ${REFINE_GUIDE[mode]}\nMevcut taslak:\n"""${original.message}"""\nÇıktı JSON: {"message":"...","reason":"ne değişti, tek cümle"}`,
         },
       ],
-      { temperature: 0.5 },
+      { temperature: 0.5, timeoutMs: FIRST_CALL_MS },
     );
     const parsed = parseVariants(raw)[0];
     const message = cleanMessage(parsed?.message);

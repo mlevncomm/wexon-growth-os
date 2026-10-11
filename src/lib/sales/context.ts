@@ -125,7 +125,8 @@ export function buildContext(input: ContextInput): CustomerContext {
     notes: lead.notes,
     campaignQuery: input.campaignQuery,
   });
-  const location = cleanExternal(lead.district || lead.city || "", 60);
+  const district = /^merkez$/i.test((lead.district ?? "").trim()) ? "" : lead.district;
+  const location = cleanExternal(district || lead.city || "", 60);
   const kind = siteKind(lead.website ?? "");
   const host = kind === "none" ? "" : websiteHost(lead.website ?? "");
   const designLink = cleanLink(input.designLink);

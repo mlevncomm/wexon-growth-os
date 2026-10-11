@@ -3,6 +3,8 @@ import { CATEGORIES, defaultCategory } from "../src/lib/sales/categories.ts";
 import { buildContext, startPriceFrom, type ContextInput } from "../src/lib/sales/context.ts";
 import { ablative, localDrafts } from "../src/lib/sales/drafts.ts";
 import { generateDrafts, refineDraft, SalesPolicyError, type ChatFn } from "../src/lib/sales/engine.ts";
+import { llmChat, type LlmMeta } from "../src/lib/llm.ts";
+import { DEFAULT_LLM } from "../src/lib/llm-providers.ts";
 import { SECTOR_PROFILES } from "../src/lib/sales/profiles.ts";
 import { evaluateMessage, mentionsName, similarity } from "../src/lib/sales/quality.ts";
 import { categoryFits, contactPolicy } from "../src/lib/sales/policy.ts";
@@ -322,6 +324,55 @@ const rSame = await generateDrafts({ ctx: aq, category: "ilk_temas", chat: sameC
 const openings = new Set(rSame.drafts.map((d) => d.message.split(/(?<=[.!?])\s+/)[0]));
 check(r6calls === 2 && openings.size === 3, "R6 açılışlar düzeltildi", rSame.drafts.map((d) => d.message));
 check(rSame.drafts.filter((d) => /4\.900 TL/.test(d.message)).length <= 1, "R6 en fazla bir taslakta fiyat", rSame.drafts.map((d) => d.message));
+
+// --- İkinci canlı Gemini turunda bulunanlar ---
+// R7: "143 müşteri yorumu" doğru aktarım, çarpıtma sayılmaz
+const oto = base({ name: "Usta Oto Servis", rating: 4.8, reviewCount: 143 });
+check(!evaluateMessage("İyi günler, Wexon.dev’den Mehmet. Usta Oto Servis’in Google’daki 4,8 puanı ve 143 müşteri yorumu güçlü bir itibar gösteriyor. Randevu taleplerini toplayan bir sayfa kurabiliriz. Kısaca anlatayım mı?", oto, "ilk_temas").reasons.includes("Google puanı ya da yorum sayısı çarpıtılmış"), "R7 '143 müşteri yorumu' yanlış alarm vermez");
+// R8: sıfat-fiil ve geçmiş zamanla yapılmış iş iddiası
+for (const claim of ["Bu yapı için hazırladığımız örnek çalışmayı paylaşmamı ister misiniz?", "Ege Metal için bir dijital akış planladık.", "Sizin için kurguladığımız ekranı göstereyim mi?"]) {
+  check(evaluateMessage(`Merhaba, Wexon.dev’den Mehmet. ${claim}`, aq, "ilk_temas").blockers.length > 0, `R8 yapılmamış iş iddiası engellenir: ${claim.slice(0, 40)}`);
+}
+check(!evaluateMessage("Merhaba, Wexon.dev’den Mehmet. Aquails için hazırlayacağımız örnek ilk ekranı paylaşmamı ister misiniz?", aq, "ilk_temas").blockers.length, "R8 gelecek zaman teklif serbest");
+// R9: "Merkez" ilçesi konum olarak kullanılmaz
+check(buildContext({ lead: { id: "r9", name: "Atlas Yazılım", district: "Merkez", city: "Afyonkarahisar" } }).location === "Afyonkarahisar", "R9 Merkez yerine il");
+// R10: süre bütçesi — ilk çağrı sınırlı, zaman kalmadıysa düzeltme turu atlanır (Vercel 60 sn sınırı)
+const realNow = Date.now;
+let fakeNow = realNow();
+Date.now = () => fakeNow;
+const timeouts: (number | undefined)[] = [];
+const slowChat: ChatFn = async (_m, o) => {
+  timeouts.push(o?.timeoutMs);
+  fakeNow += 45_000; // ilk yanıt 45 sn sürdü
+  return JSON.stringify({ variants: ["samimi", "profesyonel", "merak"].map((style) => ({ style, message: `Merhaba, ben Wexon.dev yazılım stüdyosundan Mehmet. Aquails için ${style} bir site kurgulayabiliriz. Başlangıç bedeli 4.900 TL. Anlatayım mı?` })) });
+};
+const slow = await generateDrafts({ ctx: aq, category: "ilk_temas", chat: slowChat });
+Date.now = realNow;
+check(timeouts.length === 1 && (timeouts[0] ?? 0) <= 32_000, "R10 ilk çağrı süre sınırlı, zaman kalmayınca ikinci çağrı yapılmaz", timeouts);
+check(slow.warnings.some((w) => w.includes("düzeltme turu atlandı")), "R10 kullanıcıya bildirilir", slow.warnings);
+const timeoutChat: ChatFn = async () => {
+  throw new Error("Gemini 32 sn içinde yanıt vermedi");
+};
+const timedOut = await generateDrafts({ ctx: aq, category: "ilk_temas", chat: timeoutChat });
+check(timedOut.source === "local" && timedOut.drafts.length === 3 && timedOut.warnings[0].includes("32 sn"), "R10 zaman aşımında yerel taslaklar döner (504 yok)", timedOut.warnings);
+
+// R11: Google "model yoğun" (503) dönerse sıradaki modelle denenir; anahtar URL'de değil başlıkta gider
+const realFetch = globalThis.fetch;
+const seen: { url: string; key: string | null; thinking: unknown }[] = [];
+globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+  const url = String(input);
+  const body = JSON.parse(String(init?.body ?? "{}"));
+  seen.push({ url, key: new Headers(init?.headers).get("x-goog-api-key"), thinking: body.generationConfig?.thinkingConfig?.thinkingLevel });
+  if (seen.length === 1) return new Response(JSON.stringify({ error: { code: 503, message: "This model is currently experiencing high demand.", status: "UNAVAILABLE" } }), { status: 503 });
+  return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "düşünce", thought: true }, { text: "{\"ok\":true}" }] } }] }), { status: 200 });
+}) as typeof fetch;
+const metas: LlmMeta[] = [];
+const txt = await llmChat({ apiKey: "AIzaTEST", baseUrl: DEFAULT_LLM.baseUrl, model: "gemini-3.8-flash", messages: [{ role: "user", content: "x" }], json: true, onMeta: (m) => metas.push(m) });
+globalThis.fetch = realFetch;
+check(seen[0].url.includes("gemini-3.8-flash") && seen[1].url.includes("gemini-3.6-flash"), "R11 yoğunlukta sıradaki model denenir", seen.map((s) => s.url.split("/models/")[1]));
+check(seen.every((s) => s.key === "AIzaTEST" && !s.url.includes("key=")), "R11 anahtar başlıkta, URL'de değil");
+check(seen[0].thinking === "low", "R11 Gemini 3 için düşük düşünme seviyesi gönderilir");
+check(txt === "{\"ok\":true}" && metas[0]?.model === "gemini-3.6-flash", "R11 düşünce parçası atılır, yanıt veren model kaydedilir", { txt, metas });
 
 console.log(`yerel taslak: ${localCount} adet, en düşük puan ${localMin}`);
 if (failed) {

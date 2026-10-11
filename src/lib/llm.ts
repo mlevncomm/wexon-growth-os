@@ -104,6 +104,13 @@ function extractGeminiText(json: {
     .trim();
 }
 
+export type LlmMeta = { model: string; thinking: boolean; ms: number };
+
+/** Geçici yoğunluk/kota hatası: sıradaki modelle denenir */
+function isOverloaded(status: number, message: string): boolean {
+  return status === 429 || status === 503 || /high demand|overloaded|unavailable|try again later|resource.?exhausted/i.test(message);
+}
+
 async function geminiGenerate(opts: {
   apiKey: string;
   model: string;
@@ -111,7 +118,12 @@ async function geminiGenerate(opts: {
   temperature?: number;
   maxTokens?: number;
   json?: boolean;
+  /** Tüm denemeler için toplam süre sınırı (ms) */
+  timeoutMs?: number;
+  onMeta?: (meta: LlmMeta) => void;
 }): Promise<string> {
+  const started = Date.now();
+  const deadline = started + (opts.timeoutMs ?? 55_000);
   const system = opts.messages
     .filter((m) => m.role === "system")
     .map((m) => m.content)
@@ -134,6 +146,7 @@ async function geminiGenerate(opts: {
   const send = (model: string, thinking: boolean) =>
     fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
       method: "POST",
+      signal: AbortSignal.timeout(Math.max(1_000, deadline - Date.now())),
       // Anahtar URL'de değil başlıkta: günlüklere ve hata mesajlarına düşmez
       headers: { "Content-Type": "application/json", "x-goog-api-key": opts.apiKey },
       body: JSON.stringify({
@@ -145,8 +158,17 @@ async function geminiGenerate(opts: {
 
   let last = "Gemini yanıt vermedi";
   for (const model of geminiModels(opts.model)) {
+    if (Date.now() > deadline - 1_000) break;
     let thinking = /^gemini-3/i.test(model);
-    let res = await send(model, thinking);
+    let res: Response;
+    try {
+      res = await send(model, thinking);
+    } catch (err) {
+      if (err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError")) {
+        throw new Error(`Gemini ${Math.round((opts.timeoutMs ?? 55_000) / 1000)} sn içinde yanıt vermedi`);
+      }
+      throw err;
+    }
     if (thinking && res.status === 400) {
       const body = await res.clone().text();
       if (/thinking/i.test(body)) {
@@ -165,10 +187,14 @@ async function geminiGenerate(opts: {
     if (!res.ok) {
       last = apiErrorMessage(json, res.status);
       if (res.status === 404 || /not found|not supported/i.test(last)) continue;
+      if (isOverloaded(res.status, last)) continue;
       throw new Error(last);
     }
     const text = extractGeminiText(json);
-    if (text) return text;
+    if (text) {
+      opts.onMeta?.({ model, thinking, ms: Date.now() - started });
+      return text;
+    }
     last = "Gemini boş yanıt verdi";
   }
   throw new Error(last);
@@ -182,6 +208,8 @@ export async function llmChat(opts: {
   temperature?: number;
   maxTokens?: number;
   json?: boolean;
+  timeoutMs?: number;
+  onMeta?: (meta: LlmMeta) => void;
 }): Promise<string> {
   if (isGeminiEndpoint(opts.baseUrl, opts.model, opts.apiKey)) {
     return geminiGenerate(opts);

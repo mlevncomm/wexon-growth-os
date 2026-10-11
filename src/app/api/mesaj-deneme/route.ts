@@ -45,8 +45,9 @@ export async function POST(request: Request) {
       playbookOffer: playbook.offer,
     });
     try {
-      const result = await generateDrafts({ ctx: customer, category, chat: await salesChat(), operatorPlaybook: playbookToPrompt(playbook) });
-      return NextResponse.json({ ctx: { sector: customer.sector, shortName: customer.shortName }, result });
+      const chat = await salesChat();
+      const result = await generateDrafts({ ctx: customer, category, chat, operatorPlaybook: playbookToPrompt(playbook) });
+      return NextResponse.json({ ctx: { sector: customer.sector, shortName: customer.shortName }, result: { ...result, aiMeta: chat?.meta ?? [] } });
     } catch (err) {
       if (err instanceof SalesPolicyError) return NextResponse.json({ error: err.message }, { status: 409 });
       throw err;
