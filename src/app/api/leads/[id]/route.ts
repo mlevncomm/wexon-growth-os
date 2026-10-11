@@ -49,6 +49,24 @@ export async function PATCH(
     }
 
     const lead = await prisma.lead.update({ where: { id: existing.id }, data });
+    // İleti onayı ve ret kayıtları kim, ne zaman sorusuna cevap verebilmek için denetim kaydına yazılır
+    const events: string[] = [];
+    if (typeof data.consented === "boolean" && data.consented !== existing.consented) {
+      events.push(data.consented ? "lead.consent.granted" : "lead.consent.revoked");
+    }
+    if (data.status === "ilgilenmiyor" && existing.status !== "ilgilenmiyor") events.push("lead.opt_out");
+    if (data.status && existing.status === "ilgilenmiyor" && data.status !== "ilgilenmiyor") events.push("lead.opt_out.cleared");
+    if (events.length) {
+      await prisma.auditLog.createMany({
+        data: events.map((action) => ({
+          actorId: ctx.userId,
+          actorEmail: ctx.email,
+          tenantId: ctx.tenantId,
+          action,
+          detail: JSON.stringify({ leadId: existing.id, kaynak: "musteriler-ekrani" }),
+        })),
+      });
+    }
     bustStatsCache(ctx.tenantId);
     return NextResponse.json(lead);
   });

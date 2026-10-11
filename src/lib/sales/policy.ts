@@ -63,16 +63,24 @@ export function contactPolicy(input: {
 
   if (replied) return { allowed: true, kind: "yanit", reason: "", warnings };
 
-  if (!input.history.count) {
+  // "Yazıldı" işaretli ama sistemde kaydı olmayan müşteri (ör. eski sürümden ya da elle işaretlenmiş):
+  // ilk temas tekrar gönderilmez, takip sayılır; tarih bilinmediği için bekleme süresi uygulanamaz.
+  const history =
+    input.status === "yazildi" && !input.history.count ? { ...input.history, count: 1 } : input.history;
+  if (input.status === "yazildi" && !input.history.count) {
+    warnings.push("Bu müşteri “Yazıldı” işaretli ama sistemde mesaj kaydı yok; son temas tarihi bilinmiyor.");
+  }
+
+  if (!history.count) {
     if (!input.consented) warnings.push("İletişim onayı kaydı yok: ilk mesaj kısa ve baskısız olsun; ret gelirse bir daha yazılmaz.");
     return { allowed: true, kind: "ilk", reason: "", warnings };
   }
 
-  const followups = input.history.count - 1;
+  const followups = history.count - 1;
   if (followups >= MAX_FOLLOWUPS) {
-    return deny("takip", `Bu müşteriye ${input.history.count} kez yazıldı ve dönüş olmadı; en fazla ${MAX_FOLLOWUPS} takip yapılır.`);
+    return deny("takip", `Bu müşteriye ${history.count} kez yazıldı ve dönüş olmadı; en fazla ${MAX_FOLLOWUPS} takip yapılır.`);
   }
-  const days = input.history.lastAt ? (now.getTime() - input.history.lastAt.getTime()) / 86_400_000 : Infinity;
+  const days = history.lastAt ? (now.getTime() - history.lastAt.getTime()) / 86_400_000 : Infinity;
   if (days < MIN_FOLLOWUP_DAYS) {
     const left = Math.ceil(MIN_FOLLOWUP_DAYS - days);
     return deny("takip", `Son mesajdan bu yana ${MIN_FOLLOWUP_DAYS} gün geçmedi; takip için ${left} gün daha bekleyin. Müşteri döndüyse durumunu “Dönüş var” yapın.`);

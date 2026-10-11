@@ -53,13 +53,6 @@ const SECTORS: { id: SectorId; label: string; keys: string[] }[] = [
   { id: "ofis", label: "ofis", keys: ["ofis", "danışman", "danisman", "sigorta", "mimar", "noter", "coworking", "plaza"] },
 ];
 
-function haystack(lead: SectorLead): string {
-  return [lead.name, lead.address, lead.notes, lead.campaignQuery, lead.district, lead.city]
-    .filter(Boolean)
-    .join(" ")
-    .toLocaleLowerCase("tr");
-}
-
 function hasKey(text: string, key: string): boolean {
   const k = key.toLocaleLowerCase("tr");
   if (k.length > 4 || k.includes(" ")) return text.includes(k);
@@ -67,10 +60,22 @@ function hasKey(text: string, key: string): boolean {
   return new RegExp(`(?:^|[^\\p{L}0-9])${escaped}(?:$|[^\\p{L}0-9])`, "iu").test(text);
 }
 
+/**
+ * Öncelik sırası: işletmenin adı → adres/not → arama sorgusu.
+ * Arama sorgusu ("diş kliniği", "emlak") sonuçlara başka sektörden işletmeler de getirebilir;
+ * işletmenin kendi adı daha güvenilir kanıttır.
+ */
 export function inferSector(lead: SectorLead): { id: SectorId; label: string } {
-  const text = haystack(lead);
-  for (const row of SECTORS) {
-    if (row.keys.some((k) => hasKey(text, k))) return { id: row.id, label: row.label };
+  const layers = [
+    lead.name,
+    [lead.address, lead.notes].filter(Boolean).join(" "),
+    [lead.campaignQuery, lead.district, lead.city].filter(Boolean).join(" "),
+  ].map((t) => (t ?? "").toLocaleLowerCase("tr"));
+  for (const text of layers) {
+    if (!text.trim()) continue;
+    for (const row of SECTORS) {
+      if (row.keys.some((k) => hasKey(text, k))) return { id: row.id, label: row.label };
+    }
   }
   return { id: "generic", label: "işletme" };
 }

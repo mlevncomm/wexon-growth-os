@@ -82,10 +82,13 @@ export function cleanLink(value: unknown): string {
   }
 }
 
-const DESCRIPTIVE = /^(su|arıtma|aritma|cihaz|cihazları|sistemleri|ltd|şti|san|tic|ve|a\.ş\.|limited|şirketi|hizmetleri|ürünleri|merkezi|restoran|kafe|cafe|kuaför|klinik|kliniği|otel|emlak|inşaat|mobilya|otomotiv|oto|servis|market|mağazası|ticaret|sanayi|gıda|tekstil|elektrik|tesisat|nakliyat|lojistik)$/iu;
+const DESCRIPTIVE = /^(su|arıtma|aritma|cihaz|cihazları|sistemleri|ltd|şti|san|tic|ve|a\.ş\.|limited|şirketi|hizmetleri|ürünleri|merkezi|restoran|kafe|cafe|kuaför|klinik|kliniği|otel|emlak|inşaat|mobilya|otomotiv|oto|servis|market|mağazası|ticaret|sanayi|gıda|tekstil|elektrik|tesisat|nakliyat|lojistik|ağız|diş|sağlığı|poliklinik|polikliniği|hastanesi|mali|müşavirlik|muhasebe|ofisi|bürosu|salonu|güzellik|emlak|gayrimenkul|danışmanlık|reklam|ajans|yazılım|bilişim|ltd.|şti.)$/iu;
 
 /** Uzun ticari unvanlardan konuşmada kullanılacak ayırt edici kısmı alır; emin değilse tam adı döndürür. */
 export function shortBusinessName(name: string): string {
+  // "Dr. X Clinic | Bariatric …", "SMMM Ali Doğan - Muhasebe …" → ayraçtan önceki kısım
+  const beforeSep = name.split(/\s[|–—-]\s|\s\(|,\s/)[0].trim();
+  if (beforeSep && beforeSep !== name && beforeSep.replace(/[^\p{L}]/gu, "").length >= 4) return shortBusinessName(beforeSep);
   const words = name.split(/\s+/).filter(Boolean);
   if (words.length < 4) return name;
   const head: string[] = [];

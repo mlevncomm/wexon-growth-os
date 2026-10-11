@@ -1,6 +1,6 @@
 import { composePitch, AUTO_TEMPLATE_ID, AUTO_TEMPLATE_MARKER } from "../pitch";
 import { isWhatsAppCapablePhone } from "../phone";
-import { buildContext, isOptedOut } from "../sales/context";
+import { buildContext } from "../sales/context";
 import { localDrafts } from "../sales/drafts";
 import { truthIssues } from "../sales/quality";
 import { leadPolicy, previousContacts } from "../sales/server";
@@ -475,7 +475,7 @@ export async function getQueueSnapshot() {
       where: { tenantId: owner, status: "pending" },
       orderBy: { createdAt: "asc" },
       take: 30,
-      include: { lead: { select: { name: true, phone: true, status: true, notes: true } } },
+      include: { lead: { select: { id: true, name: true, phone: true, status: true, notes: true, consented: true } } },
     }),
     prisma.outreachJob.findFirst({
       where: { tenantId: owner, status: "failed", error: { not: null } },
@@ -513,14 +513,18 @@ export async function getQueueSnapshot() {
           phone: current.lead.phone,
         }
       : null,
-    drafts: pendingJobs.map((job) => ({
+    drafts: (await Promise.all(pendingJobs.map(async (job) => {
+      const issues = currentTenant().vertical === "software" ? truthIssues(job.message) : [];
+      const policy = await leadPolicy(job.lead, "manual", undefined, job.id);
+      return { job, blocked: !policy.allowed ? policy.reason : issues.length ? `${issues[0]}; metni düzeltin ya da reddedin.` : null };
+    }))).map(({ job, blocked }) => ({
       id: job.id,
       name: job.lead.name,
       phone: job.lead.phone,
       message: job.message,
       channel: job.channel,
       firstContact: job.lead.status === "yeni",
-      blocked: isOptedOut(job.lead.status, job.lead.notes) ? "Müşteri iletişim istemediğini bildirdi; bu taslağı reddedin." : null,
+      blocked,
     })),
   };
 }

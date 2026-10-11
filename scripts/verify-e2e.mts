@@ -1,0 +1,224 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- test betiği tipsiz JSON yanıtlarını okur */
+// Uçtan uca entegrasyon testi: çalışan YEREL uygulamaya HTTP ile bağlanır, yerel SQLite veritabanında
+// yalnızca "E2E-" önekli test kayıtları açar ve sonunda onları siler. Canlı ortama asla bağlanmaz.
+//   1) Sunucu kilitli:   npx next dev            → npx tsx scripts/verify-e2e.mts
+//   2) Kilit açık:       WA_SENDING_ENABLED=1 npx next dev → npx tsx scripts/verify-e2e.mts --kilit-acik
+// Ortam: .env.development.local (DATABASE_URL=file:..., ADMIN_EMAIL, ADMIN_PASSWORD, CRON_SECRET). Değerler yazdırılmaz.
+import { readFileSync } from "node:fs";
+import { PrismaClient } from "@prisma/client";
+
+const env = Object.fromEntries(
+  readFileSync(".env.development.local", "utf8")
+    .split(/\r?\n/)
+    .filter((l) => /^[A-Z_]+=/.test(l))
+    .map((l) => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1).replace(/^"|"$/g, "")]),
+);
+if (!/^file:/.test(env.DATABASE_URL ?? "")) {
+  console.error("Güvenlik: bu test yalnızca yerel SQLite veritabanında çalışır.");
+  process.exit(2);
+}
+process.env.DATABASE_URL = env.DATABASE_URL;
+const BASE = process.env.E2E_URL ?? "http://127.0.0.1:3000";
+if (!/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(BASE)) {
+  console.error("Güvenlik: E2E_URL yalnızca yerel adres olabilir.");
+  process.exit(2);
+}
+const unlocked = process.argv.includes("--kilit-acik");
+const prisma = new PrismaClient();
+const TENANT = "tnt_wexon_dev";
+
+let failed = 0;
+let passed = 0;
+const results: string[] = [];
+function check(ok: boolean, label: string, detail?: unknown) {
+  if (ok) {
+    passed += 1;
+    results.push(`✔ ${label}`);
+    return;
+  }
+  failed += 1;
+  results.push(`✘ ${label}`);
+  console.error(`FAIL ${label}`, detail === undefined ? "" : JSON.stringify(detail).slice(0, 600));
+}
+
+let cookie = "";
+async function call(path: string, init: { method?: string; body?: unknown; headers?: Record<string, string> } = {}) {
+  const res = await fetch(BASE + path, {
+    method: init.method ?? (init.body ? "POST" : "GET"),
+    headers: { "Content-Type": "application/json", ...(cookie ? { cookie } : {}), ...(init.headers ?? {}) },
+    body: init.body ? JSON.stringify(init.body) : undefined,
+    redirect: "manual",
+  });
+  const set = res.headers.getSetCookie?.() ?? [];
+  if (set.length) {
+    const jar = new Map(cookie.split("; ").filter(Boolean).map((c) => [c.split("=")[0], c]));
+    for (const c of set) jar.set(c.split("=")[0], c.split(";")[0]);
+    cookie = [...jar.values()].join("; ");
+  }
+  let json: any = null;
+  try {
+    json = await res.json();
+  } catch {}
+  return { status: res.status, json };
+}
+
+const day = 86_400_000;
+async function cleanup() {
+  const leads = await prisma.lead.findMany({ where: { tenantId: TENANT, name: { startsWith: "E2E-" } }, select: { id: true } });
+  const ids = leads.map((l) => l.id);
+  await prisma.outreachJob.deleteMany({ where: { leadId: { in: ids } } });
+  await prisma.lead.deleteMany({ where: { id: { in: ids } } });
+  await prisma.template.deleteMany({ where: { tenantId: TENANT, name: { startsWith: "E2E-" } } });
+  await prisma.auditLog.deleteMany({ where: { tenantId: TENANT, detail: { contains: "\"leadId\":\"" }, action: { startsWith: "lead." }, createdAt: { gte: new Date(Date.now() - day) } } });
+}
+async function lead(name: string, extra: Record<string, unknown> = {}) {
+  return prisma.lead.create({
+    data: { tenantId: TENANT, placeId: `e2e-${name}-${Date.now()}`, name, phone: `+90555${String(Math.floor(Math.random() * 1e7)).padStart(7, "0")}`, district: "Merkez", city: "Afyonkarahisar", ...extra },
+  });
+}
+
+try {
+  await cleanup();
+  // Oturum
+  check((await call("/api/auth", { body: { email: env.ADMIN_EMAIL, password: env.ADMIN_PASSWORD } })).status === 200, "giriş");
+  check((await call("/api/platform", { body: { action: "impersonate", tenantId: TENANT } })).status === 200, "Wexon.dev işletmesine geçiş");
+
+  // Test kayıtları
+  const aq = await lead("E2E-Aquails Su Arıtma Cihazları", { rating: 4.9, reviewCount: 37 });
+  const yeni = await lead("E2E-Lezzet Kebap Restoran");
+  const onayli = await lead("E2E-Bella Güzellik Salonu", { consented: true, website: "https://bella-e2e.example" });
+  const ret = await lead("E2E-Kent Gayrimenkul", { status: "ilgilenmiyor" });
+  const eski = await lead("E2E-Usta Oto Servis", { status: "yazildi" });
+  const takip = await lead("E2E-Ege Metal Sanayi", { status: "yazildi", consented: true });
+  await prisma.outreachJob.create({ data: { tenantId: TENANT, leadId: takip.id, message: "E2E eski ilk mesaj", status: "sent", channel: "whatsapp", sentAt: new Date(Date.now() - 5 * day), createdAt: new Date(Date.now() - 5 * day) } });
+
+  // 1-4) Kayıt, veri ve sektör tanıma, hizmet seçimi
+  const g = await call(`/api/leads/${aq.id}/mesaj`);
+  check(g.status === 200 && g.json.ctx.sector.id === "teknik" && g.json.ctx.shortName === "E2E-Aquails", "sektör tanıma ve kısa ad", g.json?.ctx?.sector);
+  check(g.json.category === "ilk_temas" && g.json.policy.kind === "ilk", "yeni müşteri → ilk temas", g.json?.policy);
+  check(g.json.ctx.facts.some((f: string) => f.includes("4.9") || f.includes("4,9")), "Google puanı doğrulanmış bilgi olarak bağlamda", g.json.ctx.facts);
+  const gOto = await call(`/api/leads/${eski.id}/mesaj`);
+  check(gOto.json.policy.kind === "takip" && gOto.json.category === "takip", "kaydı olmayan Yazıldı müşteri → takip (ilk temas tekrar edilmez)", gOto.json.policy);
+  const gTakip = await call(`/api/leads/${takip.id}/mesaj`);
+  check(gTakip.json.policy.allowed && gTakip.json.policy.kind === "takip" && gTakip.json.ctx.previousContacts.length === 1, "5 gün önce yazılmış müşteri → izinli takip", gTakip.json.policy);
+
+  // 5-7) Üretim, üç alternatif, kalite
+  const gen = await call(`/api/leads/${aq.id}/mesaj`, { body: { action: "generate", category: "ilk_temas", senderName: "Mehmet" } });
+  check(gen.status === 200 && gen.json.result.drafts.length === 3, "üç alternatif üretildi", gen.status);
+  check(gen.json.result.drafts.every((d: any) => !d.blockers.length && d.qualityScore >= 85), "taslaklar engelsiz ve ≥85", gen.json.result.drafts.map((d: any) => [d.qualityScore, d.qualityReasons]));
+  check(new Set(gen.json.result.drafts.map((d: any) => d.message.split(/(?<=[.!?])\s+/)[0])).size === 3, "üç taslağın açılışı farklı");
+  check(gen.json.result.source === (gen.json.result.aiCalls ? "ai" : "local") || gen.json.result.source === "karma", "kaynak bilgisi tutarlı", gen.json.result.source);
+  const genRet = await call(`/api/leads/${ret.id}/mesaj`, { body: { action: "generate", category: "ilk_temas" } });
+  check(genRet.status === 409, "ret bildirene satış taslağı üretilmez", genRet.status);
+  check((await call(`/api/leads/${ret.id}/mesaj`, { body: { action: "generate", category: "kapanis" } })).status === 200, "ret bildirene kapanış taslağı üretilir");
+
+  // 8) Düzenleme ve kaydetme
+  const kisa = await call(`/api/leads/${aq.id}/mesaj`, { body: { action: "refine", category: "ilk_temas", style: "samimi", mode: "kisa", message: gen.json.result.drafts[0].message } });
+  check(kisa.status === 200 && kisa.json.draft.message.length <= gen.json.result.drafts[0].message.length, "kısaltma çalışır", kisa.status);
+  const sahte = await call(`/api/leads/${aq.id}/mesaj`, { body: { action: "record", category: "ilk_temas", style: "elle", message: "Merhaba, E2E-Aquails sitenizi inceledim ve tasarım hazırladım. Son fırsat!" } });
+  check(sahte.status === 422, "yalan iddialı mesaj kaydedilmez", sahte.status);
+  const mesaj = gen.json.result.drafts[gen.json.result.recommended].message;
+  const kayit = await call(`/api/leads/${aq.id}/mesaj`, { body: { action: "record", category: "ilk_temas", style: gen.json.result.drafts[gen.json.result.recommended].style, message: mesaj, phone: "0555 111 22 33" } });
+  check(kayit.status === 200 && kayit.json.lead.status === "yazildi" && kayit.json.lead.phone === "+905551112233", "kayıt: durum Yazıldı ve numara güncellendi", kayit.json?.lead?.status);
+  const ikinci = await call(`/api/leads/${aq.id}/mesaj`, { body: { action: "record", category: "takip", style: "samimi", message: "Merhaba, Wexon.dev’den. Geçen gün E2E-Aquails için kısa bir mesaj göndermiştim; gündeminizde değilse sorun değil." } });
+  check(ikinci.status === 409, "aynı müşteriye 3 gün dolmadan ikinci mesaj kaydedilmez (mükerrer koruması)", ikinci.status);
+  const retKayit = await call(`/api/leads/${ret.id}/mesaj`, { body: { action: "record", category: "ilk_temas", style: "elle", message: "Merhaba, Wexon.dev’den yazıyorum. E2E-Kent için kısa bir fikrim var, anlatayım mı?" } });
+  check(retKayit.status === 409, "ret bildirene satış mesajı kaydedilmez", retKayit.status);
+  const kapanis = await call(`/api/leads/${ret.id}/mesaj`, { body: { action: "record", category: "kapanis", style: "samimi", message: "Anladım, bilgi verdiğiniz için teşekkür ederim. Sizi bir daha bu konuda rahatsız etmeyeceğim. İyi çalışmalar dilerim." } });
+  check(kapanis.status === 200, "ret bildirene bir kez kapanış mesajı");
+  const kapanis2 = await call(`/api/leads/${ret.id}/mesaj`, { body: { action: "record", category: "kapanis", style: "samimi", message: "Tamamdır, teşekkürler. İyi çalışmalar." } });
+  check(kapanis2.status === 409, "ikinci kapanış mesajı engellenir", kapanis2.status);
+  const takipKayit = await call(`/api/leads/${takip.id}/mesaj`, { body: { action: "record", category: "takip", style: "samimi", message: "Merhaba, Mehmet ben, Wexon.dev’den. Geçen hafta E2E-Ege Metal için kısa bir mesaj göndermiştim. Şu an gündeminizde değilse sorun değil; ileride ihtiyaç olursa buradayım." } });
+  check(takipKayit.status === 200, "izinli takip mesajı kaydedilir", takipKayit.json);
+
+  // 9) Şablon kaydetme (önizleme kaynağı)
+  const sablon = await call("/api/templates", { body: { name: "E2E-şablon", body: "Merhaba, Wexon.dev’den yazıyorum. {ad} için kısa bir fikrim var. Kısaca anlatayım mı?" } });
+  check(sablon.status === 200 || sablon.status === 201, "şablon kaydedilir", sablon.status);
+
+  // 13) İzin değişikliği denetim kaydı
+  await call(`/api/leads/${yeni.id}`, { method: "PATCH", body: { consented: true } });
+  await call(`/api/leads/${yeni.id}`, { method: "PATCH", body: { consented: false } });
+  const audits = await prisma.auditLog.findMany({ where: { tenantId: TENANT, detail: { contains: yeni.id } }, orderBy: { createdAt: "asc" } });
+  check(audits.map((a) => a.action).join(",") === "lead.consent.granted,lead.consent.revoked", "onay verme/geri alma denetim kaydına yazılır", audits.map((a) => a.action));
+
+  // 10) Kuyruğa ekleme
+  const q1 = await call("/api/outreach", { body: { leadIds: [yeni.id, ret.id, onayli.id], templateId: "auto" } });
+  check(q1.status === 200 && q1.json.queued === 1 && q1.json.skipped === 2, "kuyruk: yalnızca onaylı müşteri girer", q1.json);
+  check(Object.keys(q1.json.reasons).some((r) => r.includes("İletişim onayı")) && Object.keys(q1.json.reasons).some((r) => r.includes("iletişim istemediğini")), "kuyruk: atlama nedenleri raporlanır", q1.json.reasons);
+  const kotuSablon = await call("/api/templates", { body: { name: "E2E-kötü", body: "Merhaba, {ad} için web sitesi tasarımı hazırladım." } });
+  const q2 = await call("/api/outreach", { body: { leadIds: [onayli.id], templateId: kotuSablon.json?.id } });
+  check(q2.status === 400, "yalan iddialı şablon kuyruğa alınmaz", q2.status);
+
+  // Eski taslak: kontroller öncesi oluşmuş gibi, ret bildiren müşteriye bekleyen taslak
+  await prisma.outreachJob.create({ data: { tenantId: TENANT, leadId: ret.id, message: "E2E eski taslak: Merhaba, ücretsiz örnek göndereyim mi?", status: "pending", channel: "whatsapp" } });
+  let snap = await call("/api/outreach");
+  const eskiTaslak = snap.json.drafts.find((d: any) => d.name === "E2E-Kent Gayrimenkul");
+  check(Boolean(eskiTaslak?.blocked), "eski taslak panelde engelli görünür", eskiTaslak);
+  const manuel = await call("/api/outreach/approve", { body: { id: eskiTaslak.id, action: "manual-sent" } });
+  check(manuel.status === 400, "eski taslak elle 'Gönderdim' ile kaydedilemez", manuel.status);
+  const onayRet = await call("/api/outreach/approve", { body: { id: eskiTaslak.id, action: "approve" } });
+  check(onayRet.status === 200 && onayRet.json.updated === 0 && onayRet.json.blocked.length === 1, "eski taslak onaylanamaz", onayRet.json);
+
+  // 11) Kuyruk onayı + 15) zamanlanmış görev
+  const bekleyen = snap.json.drafts.find((d: any) => d.name === "E2E-Bella Güzellik Salonu");
+  const onay = await call("/api/outreach/approve", { body: { id: bekleyen.id, action: "approve" } });
+  check(onay.status === 200 && onay.json.updated === 1, "onaylı müşterinin taslağı onaylanır", onay.json);
+  const cronYetkisiz = await call("/api/outreach/tick", { headers: { authorization: "Bearer yanlis" } });
+  check(cronYetkisiz.status === 401, "zamanlanmış görev yetkisiz çağrılamaz", cronYetkisiz.status);
+
+  if (!unlocked) {
+    const cron = await call("/api/outreach/tick", { headers: { authorization: `Bearer ${env.CRON_SECRET}` } });
+    check(cron.status === 200 && cron.json.results.every((r: any) => r.result.every((x: string) => x === "paused")), "kilit kapalıyken zamanlanmış görev hiçbir şey göndermez", cron.json?.results);
+    snap = await call("/api/outreach");
+    check(snap.json.sendingLocked === true && snap.json.queued >= 1 && snap.json.sentToday === 0, "onaylı mesaj kilit nedeniyle sırada bekler", { locked: snap.json.sendingLocked, queued: snap.json.queued });
+  } else {
+    // Onaydan sonra ret: gönderim anında yakalanmalı (bu bilgisayarda WhatsApp bağlı olmadığı için gerçek gönderim zaten imkânsız)
+    await prisma.lead.update({ where: { id: onayli.id }, data: { status: "ilgilenmiyor" } });
+    const cron = await call("/api/outreach/tick", { headers: { authorization: `Bearer ${env.CRON_SECRET}` } });
+    check(cron.status === 200, "kilit açıkken zamanlanmış görev çalışır");
+    const job = await prisma.outreachJob.findFirst({ where: { leadId: onayli.id }, orderBy: { createdAt: "desc" } });
+    check(job?.status === "skipped" && /iletişim istemediğini/.test(job?.error ?? ""), "onaydan sonra ret: gönderim anında engellendi", job);
+
+    // Meta 24 saat kuralı: Cloud API tanımlıyken, müşteri yazmamışsa serbest metin Meta'ya hiç gönderilmez.
+    // Sahte token kullanılır; istek Meta'ya gitseydi iş "failed" ve Meta hata mesajıyla düşerdi.
+    const before = await prisma.appSettings.findUnique({ where: { tenantId: TENANT } });
+    // Ayar API'si üzerinden: sunucunun ayar önbelleği de temizlenir
+    await call("/api/settings", { method: "PUT", body: { waCloudToken: "E2E-SAHTE-TOKEN", waPhoneNumberId: "000000000000000" } });
+    try {
+      const cloudLead = await lead("E2E-Cloud Kuaför", { consented: true });
+      await prisma.outreachJob.create({ data: { tenantId: TENANT, leadId: cloudLead.id, message: "Merhaba, Wexon.dev’den yazıyorum. E2E-Cloud için kısa bir fikrim var; anlatayım mı?", status: "queued", channel: "whatsapp", scheduledAt: new Date(Date.now() - 1000) } });
+      await call("/api/outreach/tick", { headers: { authorization: `Bearer ${env.CRON_SECRET}` } });
+      const cj = await prisma.outreachJob.findFirst({ where: { leadId: cloudLead.id } });
+      check(cj?.status === "skipped" && /24 saat/.test(cj?.error ?? ""), "Cloud API: müşteri yazmadan serbest metin gönderilmez (24 saat kuralı)", cj);
+    } finally {
+      await call("/api/settings", { method: "PUT", body: { waCloudToken: before?.waCloudToken ?? "", waPhoneNumberId: before?.waPhoneNumberId ?? "" } });
+      const after = await prisma.appSettings.findUnique({ where: { tenantId: TENANT } });
+      check(after?.waCloudToken === (before?.waCloudToken ?? "") && after?.waPhoneNumberId === (before?.waPhoneNumberId ?? ""), "test sonrası WhatsApp ayarları eski haline döndü");
+    }
+  }
+
+  // 16) Mesaj sonuçları
+  const sonuc = await call("/api/mesaj-sonuc");
+  check(sonuc.status === 200 && sonuc.json.whatsappAcilan >= 3, "sonuçlar WhatsApp'ta açılan mesajları sayar", sonuc.json?.whatsappAcilan);
+
+  // Deneme modu: kayıt açmadan taslak
+  const before = await prisma.lead.count({ where: { tenantId: TENANT } });
+  const deneme = await call("/api/mesaj-deneme", { body: { lead: { name: "Göl Otel", rating: 4.7, reviewCount: 120 }, senderName: "Mehmet" } });
+  check(deneme.status === 200 && deneme.json.result.drafts.length === 3 && deneme.json.ctx.sector.id === "otel", "deneme modu üç taslak üretir", deneme.json?.ctx);
+  check((await prisma.lead.count({ where: { tenantId: TENANT } })) === before, "deneme modu kayıt oluşturmaz");
+  const anon = await fetch(BASE + "/api/mesaj-deneme", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+  check(anon.status === 401, "deneme modu girişsiz kullanılamaz", anon.status);
+} catch (err) {
+  failed += 1;
+  console.error("HATA", err);
+} finally {
+  await cleanup();
+  await prisma.$disconnect();
+}
+
+console.log(results.join("\n"));
+if (failed) {
+  console.error(`verify-e2e: ${failed} başarısız, ${passed} geçti`);
+  process.exit(1);
+}
+console.log(`verify-e2e (${unlocked ? "kilit açık" : "kilit kapalı"}): ${passed} kontrol geçti`);

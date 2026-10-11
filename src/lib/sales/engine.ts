@@ -76,6 +76,7 @@ function contextBlock(ctx: CustomerContext): string {
   const profile = profileFor(ctx.sector.id);
   const data = {
     isletme: ctx.name,
+    hitapIcinKisaAd: ctx.shortName,
     konum: ctx.location || "bilinmiyor",
     webSitesi: ctx.website.kind === "site" ? `${ctx.website.host} (içeriği incelenmedi)` : ctx.website.kind === "social" ? "yalnızca sosyal medya bağlantısı" : "kayıtlı değil",
     tasarimLinki: ctx.designLink || "yok",
@@ -112,9 +113,12 @@ function strategyBlock(categoryId: CategoryId, operatorPlaybook: string): string
     `Ton: ${c.tone}. Uzunluk: ${c.words[0]}-${c.words[1]} kelime. En fazla ${c.maxQuestions} soru işareti.`,
     "Her mesaj şu dört soruyu doğal biçimde cevaplasın (katı kalıp olmadan): Ben kimim? Bu işletmeye neden yazıyorum? Ne değer sağlayabilirim? Karşı tarafın atabileceği en kolay adım ne?",
     "Tek teklif, tek eylem çağrısı. Klişe yok: “dijital dünyada”, “bir üst seviyeye”, “harika fırsat”, “satışlarınızı artırın”.",
+    "İşletmeye mesajda “hitapIcinKisaAd” ile hitap et; uzun ticari unvanı ve ek açıklamaları yazma.",
+    "Google puanı ve yorum sayısı varsa aynen aktar (ör. “Google’da 4,9 puan ve 310 yorum”); yorum sayısını hasta/müşteri sayısı, puanı “memnuniyet oranı” gibi yorumlama. Ondalıkta virgül kullan.",
+    "Üç taslağın ilk cümleleri birbirinden farklı olsun.",
     "Mesaj, işletmenin adı değiştirilince başka bir işletmeye de gönderilebilecek bir kalıp olmasın. Doğrulanmış bilgide işletmeye özgü bir ayrıntı (Google puanı ve yorum sayısı, konum, web sitesi durumu, tasarım linki, önceki temas) varsa en az birini doğal biçimde kullan; yoksa bunu uydurma, sektöre özgü somut bir durumla yetin.",
     operatorPlaybook
-      ? `OPERATÖR PLAYBOOK (ton ve teklif için kullan; doğruluk kurallarıyla çelişirse doğruluk kuralları geçerli; açılış cümlesini üç varyasyonda aynı yapma):\n${operatorPlaybook}`
+      ? `OPERATÖR PLAYBOOK (ton ve teklif için kullan; doğruluk kurallarıyla çelişirse doğruluk kuralları geçerli):\n${operatorPlaybook}\nPlaybook'ta sabit bir açılış cümlesi ya da fiyat varsa bunları EN FAZLA BİR taslakta kullan; diğer iki taslak farklı açılsın ve ilk temasta fiyat vermesin.`
       : "",
   ].filter(Boolean).join("\n");
 }
@@ -190,7 +194,25 @@ function pickStyle(value: unknown, fallback: StyleId): StyleId {
   return STYLES.some((s) => s.id === value) ? (value as StyleId) : fallback;
 }
 
+const SAME_OPENING = "Açılış cümlesi başka bir taslakla aynı";
+
+const firstSentence = (m: string) => m.split(/(?<=[.!?])\s+/)[0].toLocaleLowerCase("tr").replace(/\s+/g, " ").trim();
+
+/** Üç taslaktan açılışı öncekiyle aynı olanları işaretler (puandan 4 düşer) */
+function markSameOpenings(drafts: Draft[]) {
+  const seen = new Set<string>();
+  for (const d of drafts) {
+    const first = firstSentence(d.message);
+    if (seen.has(first) && !d.qualityReasons.includes(SAME_OPENING)) {
+      d.qualityReasons = [...d.qualityReasons, SAME_OPENING];
+      d.qualityScore = Math.max(0, d.qualityScore - 4);
+    }
+    seen.add(first);
+  }
+}
+
 function finish(ctx: CustomerContext, drafts: Draft[], aiCalls: number, warnings: string[]): DraftResult {
+  markSameOpenings(drafts);
   const sources = new Set(drafts.map((d) => d.source));
   let recommended = 0;
   drafts.forEach((d, i) => {
@@ -270,7 +292,13 @@ export async function generateDrafts(opts: {
   });
 
   // Tek düzeltme turu: engelli ya da 85 altı AI taslakları
-  const weak = drafts.filter((d) => d.source === "ai" && (d.blockers.length || d.qualityScore < REWRITE_BELOW));
+  // Aynı açılış ve ilk temasta birden fazla taslakta fiyat da düzeltme turuna girer
+  // (playbook'taki sabit cümle ya da fiyat her taslağa kopyalanmasın)
+  markSameOpenings(drafts);
+  const pricey = drafts.filter((d) => d.source === "ai" && categoryById(category).sales && category !== "fiyat" && /\d[\d.]*\s?(tl|₺)/iu.test(d.message));
+  const weak = drafts.filter(
+    (d) => d.source === "ai" && (d.blockers.length || d.qualityScore < REWRITE_BELOW || d.qualityReasons.includes(SAME_OPENING) || pricey.indexOf(d) > 0),
+  );
   if (weak.length) {
     try {
       calls += 1;
@@ -301,8 +329,8 @@ export async function generateDrafts(opts: {
         });
         return next.blockers.length <= d.blockers.length && next.qualityScore >= d.qualityScore ? next : d;
       });
-    } catch {
-      warnings.push("Düzeltme turu yapılamadı.");
+    } catch (err) {
+      warnings.push(`Düzeltme turu yapılamadı (${err instanceof Error ? err.message.slice(0, 120) : "hata"}).`);
     }
   }
 

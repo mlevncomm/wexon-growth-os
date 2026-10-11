@@ -86,11 +86,12 @@ function sentences(text: string): string[] {
 }
 
 /** İşletme adının mesajda geçip geçmediği (tam ad ya da ayırt edici ilk kelimeler) */
-export function mentionsName(message: string, name: string): boolean {
+export function mentionsName(message: string, name: string, shortName = ""): boolean {
   const m = lower(message);
   const n = lower(name).trim();
   if (!n || n === "işletmeniz") return true;
   if (m.includes(n)) return true;
+  if (shortName && shortName.length >= 3 && m.includes(lower(shortName))) return true;
   const words = n.split(/\s+/).filter((w) => w.length >= 3 && !STOP_WORDS.has(w));
   if (!words.length) return false;
   const head = words.slice(0, Math.min(2, words.length)).join(" ");
@@ -192,7 +193,7 @@ export function evaluateMessage(message: string, ctx: CustomerContext, categoryI
   }
 
   // --- Müşteriye uygunluk (20) ---
-  if (category.needsName && !mentionsName(text, ctx.name)) {
+  if (category.needsName && !mentionsName(text, ctx.name, ctx.shortName)) {
     minus("uygunluk", 8, "İşletme adı geçmiyor; mesaj kime yazıldığı belli olmayan bir kalıp gibi");
   }
   if (["ilk_temas", "otomasyon", "huni", "bakim"].includes(category.id) && ctx.sector.id !== "generic" && !ctx.designLink) {
@@ -260,11 +261,16 @@ export function evaluateMessage(message: string, ctx: CustomerContext, categoryI
   if (LOW_VALUE.test(text)) minus("guven", 4, "“Ücretsiz/beğenmezseniz” dili teklifin değerini düşürüyor");
   if (SUPERLATIVE.test(text)) minus("guven", 5, "Kanıtlanmamış üstünlük iddiası");
   if (PRICE.test(text) && category.id !== "fiyat") {
-    minus("guven", 3, "Fiyat bu mesaj türünde erken");
+    minus("guven", cold ? 6 : 3, "Fiyat bu mesaj türünde erken");
     warnings.push("Mesajda fiyat geçiyor; fiyatın güncel olduğundan emin olun");
   }
   if (PRICE.test(text) && category.id === "fiyat" && !ctx.startPrice) {
     warnings.push("Playbook’ta kayıtlı bir fiyat yok; mesajdaki rakamı kontrol edin");
+  }
+  // Google puanı ve yorum sayısı aynen aktarılmalı; "310 hasta", "memnuniyet oranı" gibi yorumlar veriyi çarpıtır
+  if (ctx.reviewCount && (new RegExp(`${ctx.reviewCount}\\s+(hasta|müşteri|kişi|danışan)`, "iu").test(text) || /memnuniyet oran/iu.test(text))) {
+    minus("guven", 6, "Google puanı ya da yorum sayısı çarpıtılmış");
+    warnings.push("Google verisi olduğu gibi aktarılmalı (ör. “Google’da 4,9 puan ve 310 yorum”); yorum sayısı hasta ya da müşteri sayısı değildir.");
   }
   if (profile.sensitive && /(tedavi garanti|iyileştir|şifa|hasta sayınızı|kesin çözüm|önce.?sonra)/iu.test(text)) {
     minus("guven", 6, "Sağlık alanında uygunsuz vaat");

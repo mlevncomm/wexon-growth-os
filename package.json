@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "verify:logic": "tsx scripts/verify-logic.mts",
     "verify:sales": "tsx scripts/verify-sales.mts",
+    "verify:e2e": "tsx scripts/verify-e2e.mts",
     "check": "npm run lint && npm run typecheck && npm run verify:logic && npm run verify:sales && npm run build",
     "postinstall": "prisma generate",
     "db": "prisma migrate dev"

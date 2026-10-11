@@ -279,6 +279,50 @@ const meanSim = sims.reduce((s, x) => s + x, 0) / sims.length;
 console.log(`aynı sektör, farklı işletme benzerliği: ortalama ${meanSim.toFixed(2)}, en yüksek ${Math.max(...sims).toFixed(2)} (önce ~0.95)`);
 check(meanSim < 0.55 && Math.max(...sims) < 0.85, "4) aynı sektörde ortalama benzerlik < 0.55, en yüksek < 0.85", { meanSim, max: Math.max(...sims) });
 
+// --- Canlı Gemini testinde bulunan hataların regresyon testleri ---
+// R1: arama sorgusu işletmenin kendi adını ezmemeli ("emlak" aramasında çıkan mali müşavir)
+check(inferSector({ name: "SMMM Yasin Doğan - Muhasebe ve Mali Müşavirlik Ofisi", campaignQuery: "emlak" }).id === "muhasebe", "R1 ad, arama sorgusundan önce gelir");
+check(inferSector({ name: "Kent Gayrimenkul", campaignQuery: "diş kliniği" }).id === "emlak", "R1 ad önceliği (emlak)");
+check(inferSector({ name: "Yıldız Ticaret", campaignQuery: "diş kliniği" }).id === "dis", "R1 ad sektör vermiyorsa arama sorgusu kullanılır");
+// R2: uzun ticari unvan yerine kısa ad
+check(buildContext({ lead: { id: "r2", name: "SMMM Yasin DOĞAN - Muhasebe ve Mali Müşavirlik Ofisi" } }).shortName === "SMMM Yasin DOĞAN", "R2 ayraçtan önceki ad");
+check(buildContext({ lead: { id: "r2b", name: "Dr. HE Clinic | Bariatric & Plastic Surgeries, Genital Aesthetics" } }).shortName === "Dr. HE Clinic", "R2 dikey çizgi ayracı");
+check(buildContext({ lead: { id: "r2c", name: "Adent Ağız ve Diş Sağlığı Polikliniği" } }).shortName === "Adent", "R2 açıklayıcı kelimeler atılır");
+const clinic = buildContext({ lead: { id: "r2d", name: "Dr. HE Clinic | Bariatric & Plastic Surgeries, Genital Aesthetics" } });
+check(mentionsName("Dr. HE Clinic için bir fikrim var", clinic.name, clinic.shortName), "R2 kısa adla hitap ad geçti sayılır");
+// R3: ilk temasta fiyat belirgin puan kaybettirir
+const priced = "Merhaba, ben Mehmet, Wexon.dev’den yazıyorum. Aquails için ürünleri sade anlatan ve teklif istemeyi kolaylaştıran bir site kurgulayabiliriz. Başlangıç bedeli 4.900 TL. Uygun olursa kısaca anlatayım mı?";
+const unpriced = priced.replace(" Başlangıç bedeli 4.900 TL.", "");
+check(evaluateMessage(unpriced, aq, "ilk_temas").breakdown.guven - evaluateMessage(priced, aq, "ilk_temas").breakdown.guven >= 6, "R3 ilk temasta fiyat güven puanından ≥6 düşürür");
+// R4: Google verisini çarpıtmak ("310 hastanın", "memnuniyet oranı")
+const adent = base({ name: "Adent Ağız ve Diş Sağlığı Polikliniği", rating: 4.9, reviewCount: 310 });
+const distorted = evaluateMessage("Merhaba, Wexon.dev’den Mehmet. 310 hastanın 4,9 puanla değerlendirdiği Adent için randevu almayı kolaylaştıran bir sayfa düşündük. Kısaca anlatayım mı?", adent, "ilk_temas");
+check(distorted.reasons.includes("Google puanı ya da yorum sayısı çarpıtılmış") && distorted.warnings.length > 0, "R4 yorum sayısı hasta sayısı gibi yazılamaz", distorted);
+const faithful = evaluateMessage("Merhaba, Wexon.dev’den Mehmet. Google’da 4,9 puan ve 310 yorumla öne çıkan Adent için randevu almayı kolaylaştıran bir sayfa düşündük. Kısaca anlatayım mı?", adent, "ilk_temas");
+check(!faithful.reasons.includes("Google puanı ya da yorum sayısı çarpıtılmış"), "R4 doğru aktarım cezalandırılmaz", faithful);
+// R5: "Yazıldı" işaretli ama kaydı olmayan müşteriye ilk temas tekrar gitmez
+const legacy = pol({ status: "yazildi", history: { count: 0, lastAt: null } });
+check(legacy.allowed && legacy.kind === "takip" && legacy.warnings.length > 0, "R5 kaydı olmayan Yazıldı = takip", legacy);
+check(!categoryFits(legacy.kind, "ilk_temas"), "R5 ilk temas seçilemez");
+// R6: AI üç taslağı aynı cümleyle açarsa ve hepsine fiyat koyarsa düzeltme turuna girer
+let r6calls = 0;
+const sameOpen = "Merhaba, ben Wexon.dev yazılım stüdyosundan Mehmet.";
+const sameChat: ChatFn = async (messages) => {
+  r6calls += 1;
+  if (r6calls === 1) {
+    return JSON.stringify({ variants: ["samimi", "profesyonel", "merak"].map((style, i) => ({ style, message: `${sameOpen} Aquails için ürünlerinizi sade anlatan, teklif istemeyi kolaylaştıran ${["bir site", "tek sayfalık bir yapı", "mobil bir sayfa"][i]} kurgulayabiliriz. Başlangıç bedeli 4.900 TL. Uygun olursa kısaca anlatayım mı?` })) });
+  }
+  check(/Açılış cümlesi başka bir taslakla aynı/.test(messages[1].content) && /Fiyat bu mesaj türünde erken/.test(messages[1].content), "R6 düzeltme isteği sorunları içerir");
+  return JSON.stringify({ variants: [
+    { style: "profesyonel", message: "İyi günler, Wexon.dev’den Mehmet; işletmelere web sitesi geliştiriyoruz. Aquails için cihaz seçeneklerini ve servis taleplerini tek yerde toplayan bir sayfa, teklif isteyen müşterinin işini kolaylaştırır. İsterseniz kısa bir örnek göstereyim." },
+    { style: "merak", message: "Merhaba, Mehmet ben (Wexon.dev). Aquails için teklif talepleri şu an daha çok telefonla mı geliyor, WhatsApp’tan mı? Bu talepleri tek yerde toplayan sade bir sayfa üzerine bir fikrim var; isterseniz iki cümleyle anlatayım." },
+  ] });
+};
+const rSame = await generateDrafts({ ctx: aq, category: "ilk_temas", chat: sameChat });
+const openings = new Set(rSame.drafts.map((d) => d.message.split(/(?<=[.!?])\s+/)[0]));
+check(r6calls === 2 && openings.size === 3, "R6 açılışlar düzeltildi", rSame.drafts.map((d) => d.message));
+check(rSame.drafts.filter((d) => /4\.900 TL/.test(d.message)).length <= 1, "R6 en fazla bir taslakta fiyat", rSame.drafts.map((d) => d.message));
+
 console.log(`yerel taslak: ${localCount} adet, en düşük puan ${localMin}`);
 if (failed) {
   console.error(`${failed} kontrol başarısız, ${passed} geçti`);
