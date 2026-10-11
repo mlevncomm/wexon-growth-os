@@ -36,7 +36,7 @@ const lower = (s: string) => s.toLocaleLowerCase("tr");
 
 // Yapılmamış işi yapılmış gibi gösteren ifadeler
 const WORK_CLAIMS = /(?<![\p{L}\p{N}])(hazırladım|hazırladık|tasarladım|tasarladık|tasarımını tamamladı[mk]|tasarım(ı)? hazır|taslağ?ı? hazırladı[mk]|örnek (bir )?(site|tasarım|sayfa)\p{L}* hazırladı[mk]|hazırladığı(m|mız)|tasarladığı(m|mız)|kurguladığı(m|mız)|planladı[mk]|kurguladı[mk]|hazırlamış bulunuyoruz)(?![\p{L}\p{N}])/iu;
-const INSPECTION_CLAIMS = /(sitenizi (inceledim|inceledik|analiz ettim|analiz ettik)|sitenize (baktım|baktık|göz attım|göz attık)|sitesine (baktım|baktık|göz attım|göz attık)|sitesini (inceledim|inceledik)|\binceledim\b|\banaliz ettim\b|\banaliz ettik\b|eksiklik(ler)? (buldum|bulduk|tespit ettim|tespit ettik)|geliştirme alan(ı|ları) belirledi[mk]|sorun(lar)? tespit ettik)/iu;
+const INSPECTION_CLAIMS = /(sitenizi (inceledim|inceledik|analiz ettim|analiz ettik)|sitenize (baktım|baktık|göz attım|göz attık)|sitesine (baktım|baktık|göz attım|göz attık)|sitesini (inceledim|inceledik)|\binceledim\b|incelediğim(iz)?de|yorumlarınızı (okudum|inceledi)|\banaliz ettim\b|\banaliz ettik\b|eksiklik(ler)? (buldum|bulduk|tespit ettim|tespit ettik)|geliştirme alan(ı|ları) belirledi[mk]|sorun(lar)? tespit ettik)/iu;
 const PRIOR_CONTACT_CLAIMS = /(yazmıştım|yazmıştık|göndermiştim|göndermiştik|paylaşmıştım|paylaşmıştık|bahsetmiştim|bahsetmiştik|konuşmuştuk|önceki mesajım)/iu;
 const URGENCY = /(son fırsat|kaçırmayın|acele edin|hemen şimdi|sınırlı süre|bugüne özel|sadece bugün|son gün|stoklarla sınırlı|kontenjan sınırlı|garanti(li|liyoruz|ediyoruz)?\b|%\s?100|yüzde yüz)/iu;
 const RUDE_FOLLOWUP = /(mesajımı gördünüz mü|neden dönüş|dönüş yapmadınız|cevap vermediniz|son kez yazıyorum|hala bekliyorum|hâlâ bekliyorum)/iu;
@@ -187,9 +187,23 @@ export function evaluateMessage(message: string, ctx: CustomerContext, categoryI
   if (/(?<!\p{L})\p{Lu}{5,}(?!\p{L})/u.test(withoutName.replace(/WEXON|WHATSAPP|GOOGLE/g, ""))) minus("dogallik", 2, "Büyük harfle yazılmış kelime");
   if (repeatedTrigram(text)) minus("dogallik", 4, "Tekrarlanan ifade");
   if (SLANG.test(text)) minus("marka", 5, "Laubali hitap");
-  const nameLower = lower(ctx.name);
-  if (nameLower && new RegExp(`^merhaba\\s+${nameLower.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "iu").test(lower(text))) {
-    minus("dogallik", 3, "İşletme adı selamlamaya yapıştırılmış (kişi adı gibi)");
+  const esc = (v: string) => v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  for (const n of [lower(ctx.name), lower(ctx.shortName)].filter((v, i, a) => v && a.indexOf(v) === i)) {
+    // "Merhaba Berrak," (virgülsüz, kişi adı gibi) yanlış; "Merhaba, Berrak için…" doğru
+    if (new RegExp(`^(merhaba|selam\\p{L}*|iyi günler)\\s+${esc(n)}`, "iu").test(lower(text))) {
+      minus("dogallik", 4, "İşletme adı selamlamaya yapıştırılmış (kişi adı gibi)");
+      warnings.push("“Merhaba <işletme adı>” kişi adı gibi okunur; “Merhaba, … için yazıyorum” biçimini kullanın.");
+      break;
+    }
+  }
+  // Selamlama mesajın başında olmalı; ilk cümleden sonra gelirse kalıp ve dağınık görünür
+  if (!/^(merhaba|selam|iyi günler|günaydın|iyi çalışmalar)/iu.test(text) && /[.!?]\s+(merhaba|selamlar|iyi günler)\b/iu.test(text)) {
+    minus("dogallik", 4, "Selamlama mesajın ortasında");
+  }
+  // Eksikliği yüze vurmak (doğru bilgi olsa da marka kuralı)
+  if (/(web ?siten?iz(in)? (yok|olmadığını|bulunmadığını|görünmediğini)|web sitesi(nin)? (olmadığını|bulunmadığını|görünmediğini)|sitesi olmadığını|bağlantısının olmadığını)/iu.test(text)) {
+    minus("uygunluk", 6, "Eksikliği yüze vuruyor (site yok demek)");
+    warnings.push("Müşterinin eksiğini doğrudan söylemek savunmaya iter; sunacağınız faydayı anlatın.");
   }
 
   // --- Müşteriye uygunluk (20) ---
@@ -288,6 +302,7 @@ export function evaluateMessage(message: string, ctx: CustomerContext, categoryI
   // --- Marka tonu (5) ---
   if (["ilk_temas", "otomasyon", "huni", "bakim"].includes(category.id) && !lower(text).includes(lower(ctx.brand).replace(/\.dev$/, ""))) {
     minus("marka", 3, "Kimin yazdığı belli değil");
+    warnings.push("Mesajda kimin, hangi firmadan yazdığı geçmiyor; ilk mesajda kendinizi tanıtın.");
   }
 
   let score = Object.values(b).reduce((s, n) => s + n, 0);

@@ -123,6 +123,8 @@ function strategyBlock(categoryId: CategoryId, operatorPlaybook: string): string
     "İşletmeye mesajda “hitapIcinKisaAd” ile hitap et; uzun ticari unvanı ve ek açıklamaları yazma.",
     "Google puanı ve yorum sayısı varsa aynen aktar (ör. “Google’da 4,9 puan ve 310 yorum”); yorum sayısını hasta/müşteri sayısı, puanı “memnuniyet oranı” gibi yorumlama. Ondalıkta virgül kullan.",
     "Üç taslağın ilk cümleleri birbirinden farklı olsun.",
+    "Mesaj selamlamayla başlasın ve ilk iki cümle içinde kim olduğunu ve hangi firmadan yazdığını söyle. İşletme adını selamlamaya yapıştırma (“Merhaba Berrak,” değil, “Merhaba, … Berrak için yazıyorum”).",
+    "Eksiği yüze vurma: “web siteniz yok / sitenizin olmadığını fark ettim” deme; sunacağın faydayı anlat. Yorumları okumuş ya da incelemiş gibi yazma; yalnızca puan ve yorum sayısını aktarabilirsin.",
     "Mesaj, işletmenin adı değiştirilince başka bir işletmeye de gönderilebilecek bir kalıp olmasın. Doğrulanmış bilgide işletmeye özgü bir ayrıntı (Google puanı ve yorum sayısı, konum, web sitesi durumu, tasarım linki, önceki temas) varsa en az birini doğal biçimde kullan; yoksa bunu uydurma, sektöre özgü somut bir durumla yetin.",
     operatorPlaybook
       ? `OPERATÖR PLAYBOOK (ton ve teklif için kullan; doğruluk kurallarıyla çelişirse doğruluk kuralları geçerli):\n${operatorPlaybook}\nPlaybook'ta sabit bir açılış cümlesi ya da fiyat varsa bunları EN FAZLA BİR taslakta kullan; diğer iki taslak farklı açılsın ve ilk temasta fiyat vermesin.`

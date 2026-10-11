@@ -374,6 +374,22 @@ check(seen.every((s) => s.key === "AIzaTEST" && !s.url.includes("key=")), "R11 a
 check(seen[0].thinking === "low", "R11 Gemini 3 için düşük düşünme seviyesi gönderilir");
 check(txt === "{\"ok\":true}" && metas[0]?.model === "gemini-3.6-flash", "R11 düşünce parçası atılır, yanıt veren model kaydedilir", { txt, metas });
 
+// --- Üçüncü canlı Gemini turunda bulunanlar (gerçek çıktılardan) ---
+const kent = base({ name: "Kent Gayrimenkul", district: "Karşıyaka", city: "İzmir" });
+const r12 = evaluateMessage("Merhaba, ben Wexon.dev yazılım stüdyosundan Mehmet. Karşıyaka bölgesindeki Kent Gayrimenkul için Google'da arama yaparken web sitesi olmadığını fark ettim. Portföyünüze rahatça ulaşılabilecek bir mobil site hazırlamak isterseniz örnek ilk ekranı paylaşmamı ister misiniz?", kent, "ilk_temas");
+check(r12.reasons.includes("Eksikliği yüze vuruyor (site yok demek)") && r12.warnings.length > 0, "R12 'site yok' demek uyarı verir", r12);
+const berrak = base({ name: "Berrak Su Arıtma Sistemleri" });
+check(berrak.shortName === "Berrak", "R13 kısa ad");
+const r13 = evaluateMessage("Merhaba Berrak, ben Wexon.dev yazılım stüdyosundan Mehmet. Berrak için teklif ve servis talebi alınabilecek sade bir mobil sayfa taslağı hazırlamamı ister misiniz?", berrak, "ilk_temas");
+check(r13.reasons.includes("İşletme adı selamlamaya yapıştırılmış (kişi adı gibi)"), "R13 'Merhaba Berrak,' yakalanır", r13.reasons);
+check(!evaluateMessage("Merhaba, Berrak için yazıyorum; ben Wexon.dev’den Mehmet. Teklif ve servis taleplerini kolaylaştıran bir sayfa önerim var. Kısaca anlatayım mı?", berrak, "ilk_temas").reasons.includes("İşletme adı selamlamaya yapıştırılmış (kişi adı gibi)"), "R13 virgüllü doğru biçim cezalandırılmaz");
+const bella = base({ name: "Bella Güzellik Salonu", rating: 4.7, reviewCount: 61 });
+check(evaluateMessage("Bella Güzellik Salonu'nun Google'daki 4,7 puanını ve 61 yorumunu incelediğimizde güçlü bir memnuniyet görüyoruz. Randevu talebine dönüştüren bir web deneyimi hakkında fikir vermemizi ister misiniz?", bella, "ilk_temas").blockers.length > 0, "R14 yorumları 'incelediğimizde' iddiası engellenir");
+const r15 = evaluateMessage("Köşe Ocakbaşı gibi Kadıköy'de öne çıkan işletmeler için menü ve rezervasyonu kolaylaştıran çalışmalar yapıyoruz. Merhaba, ben Wexon.dev yazılım stüdyosundan Mehmet. Örnek bir ilk ekran hazırlamamı ister misiniz?", base({ name: "Köşe Ocakbaşı Restoran", district: "Kadıköy" }), "ilk_temas");
+check(r15.reasons.includes("Selamlama mesajın ortasında"), "R15 selamlama ortadaysa puan düşer", r15.reasons);
+const r16 = evaluateMessage("Nilüfer'de hizmet veren Usta Oto Servis için servis randevusunu kolaylaştıran bir sayfa düşündüm. Kısaca anlatayım mı?", oto, "ilk_temas");
+check(r16.warnings.some((w) => w.includes("kimin")), "R16 gönderen belli değilse uyarı", r16.warnings);
+
 console.log(`yerel taslak: ${localCount} adet, en düşük puan ${localMin}`);
 if (failed) {
   console.error(`${failed} kontrol başarısız, ${passed} geçti`);
