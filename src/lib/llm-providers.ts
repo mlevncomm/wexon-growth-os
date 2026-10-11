@@ -3,7 +3,7 @@ export const LLM_PROVIDERS = [
     id: "gemini",
     label: "Google Gemini",
     baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
-    model: "gemini-3.7-flash",
+    model: "gemini-3.8-flash",
     hint: "aistudio.google.com/apikey — AIza… ile başlayan Google AI Studio anahtarı",
   },
   {
@@ -31,15 +31,16 @@ export const LLM_PROVIDERS = [
 
 export const DEFAULT_LLM = LLM_PROVIDERS[0];
 
-/** Tried in order when Gemini returns 404 for a retired model id. */
+/**
+ * Tried in order when Gemini returns 404 for a retired model id.
+ * Google model list (Oct 2026): stable gemini-3.8-flash, gemini-3.6-flash, gemini-3.5-flash-lite;
+ * gemini-3.7-flash and gemini-3.5-flash were never published, gemini-2.0-flash is shut down.
+ */
 export const GEMINI_MODEL_FALLBACKS = [
   "gemini-3.8-flash",
-  "gemini-3.7-flash",
   "gemini-3.6-flash",
-  "gemini-3.5-flash",
   "gemini-3.5-flash-lite",
   "gemini-2.5-flash",
-  "gemini-2.0-flash",
 ] as const;
 
 export function isRetiredGroqKey(key: string): boolean {
@@ -50,8 +51,14 @@ export function isGeminiApiKey(key: string): boolean {
   return /^AIza/i.test(key.trim());
 }
 
+/** Shut down, never published, or older than the current default; such saved ids are bumped on read. */
 export function isStaleGeminiModel(model: string): boolean {
-  return /^(gemini-2\.0-flash|gemini-2\.5-flash|gemini-1\.5-flash|gemini-pro)(-[a-z0-9]+)?$/i.test(model.trim());
+  const m = model.trim();
+  return (
+    /^(gemini-2\.0-flash|gemini-2\.5-flash|gemini-1\.5-flash|gemini-pro)(-[a-z0-9]+)?$/i.test(m) ||
+    /^gemini-3\.(5|7)-flash$/i.test(m) ||
+    /^gemini-3\.1-flash-lite-preview$/i.test(m)
+  );
 }
 
 export function isGeminiEndpoint(baseUrl: string, model: string, apiKey = ""): boolean {

@@ -84,7 +84,7 @@ const softwarePitch = composePitch("software", {
   website: "",
   campaignQuery: "diş kliniği",
 });
-check(softwarePitch.body.startsWith("Merhaba, Wexon.dev’den yazıyorum."), "pitch identifies sender", softwarePitch.body);
+check(/^(Merhaba|İyi günler), Wexon.dev’den yazıyorum./.test(softwarePitch.body), "pitch identifies sender", softwarePitch.body);
 check(!softwarePitch.body.includes("TL") && !/hazırladım|inceledim|baktım/.test(softwarePitch.body), "first pitch has no price or unverified claims", softwarePitch.body);
 check(softwarePitch.body.includes("randevu") && softwarePitch.body.includes("Test Diş Kliniği"), "pitch uses sector value and name", softwarePitch.body);
 check(softwarePitch.body.length < 420, "pitch remains concise", softwarePitch.body.length);
@@ -169,15 +169,22 @@ const remapped = normalizeLlmConfig({
 check(remapped.llmApiKey === "", "groq key stripped");
 check(remapped.llmProvider === "gemini", "groq provider remapped");
 check(remapped.llmBaseUrl.includes("generativelanguage.googleapis.com"), "gemini url");
-check(remapped.llmModel === "gemini-3.5-flash", "gemini model");
+// Google model listesi (Ekim 2026): kararlı gemini-3.8-flash; 3.7-flash ve 3.5-flash hiç yayınlanmadı
+check(remapped.llmModel === "gemini-3.8-flash", "gemini model", remapped.llmModel);
 check(isStaleGeminiModel("gemini-2.5-flash"), "2.5 flash stale");
+check(isStaleGeminiModel("gemini-3.7-flash") && isStaleGeminiModel("gemini-3.5-flash"), "unpublished 3.x ids stale");
+check(!isStaleGeminiModel("gemini-3.8-flash") && !isStaleGeminiModel("gemini-3.6-flash") && !isStaleGeminiModel("gemini-3.5-flash-lite"), "published 3.x ids kept");
+const keyed = (llmModel: string) =>
+  normalizeLlmConfig({ llmApiKey: "AIzaSyTestKeyNotReal", llmBaseUrl: "", llmModel, llmProvider: "gemini" }).llmModel;
+check(keyed("gemini-3.7-flash") === "gemini-3.8-flash", "saved 3.7 id bumped on read", keyed("gemini-3.7-flash"));
+check(keyed("gemini-3.6-flash") === "gemini-3.6-flash", "operator choice kept", keyed("gemini-3.6-flash"));
 check(
   normalizeLlmConfig({
     llmApiKey: "AIzaSyTestKeyNotReal",
     llmBaseUrl: "https://api.groq.com/openai/v1",
     llmModel: "gemini-2.5-flash",
     llmProvider: "gemini",
-  }).llmModel === "gemini-3.5-flash",
+  }).llmModel === "gemini-3.8-flash",
   "stale gemini model bumped",
 );
 

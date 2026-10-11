@@ -13,6 +13,7 @@ export type SectorId =
   | "insaat"
   | "oto"
   | "teknik"
+  | "yazilim"
   | "uretim"
   | "magaza"
   | "lojistik"
@@ -31,6 +32,7 @@ export type SectorLead = {
 };
 
 const SECTORS: { id: SectorId; label: string; keys: string[] }[] = [
+  { id: "yazilim", label: "yazılım ve ajans", keys: ["yazılım", "yazilim", "software", "bilişim", "bilisim", "web tasarım", "web tasarim", "dijital ajans", "reklam ajansı", "reklam ajansi", "medya ajansı", "sosyal medya ajansı"] },
   { id: "dis", label: "diş kliniği", keys: ["diş", "dis klinik", "dental", "ortodont"] },
   { id: "teknik", label: "teknik ürün ve servis", keys: ["su arıtma", "arıtma", "aritma", "klima", "kombi", "doğalgaz", "dogalgaz", "tesisat", "güneş enerji", "gunes enerji", "solar", "asansör", "asansor", "jeneratör", "jenerator", "beyaz eşya", "beyaz esya", "elektrik", "filtre"] },
   { id: "kuafor", label: "kuaför", keys: ["kuaför", "kuafor", "coiffeur", "coiffure", "hair", "berber", "güzellik", "guzellik", "nail", "protez tırnak", "spa", "hamam"] },

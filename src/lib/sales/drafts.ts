@@ -54,12 +54,175 @@ export function objectionType(reply: string): Objection {
   return "genel";
 }
 
+/** Deterministik seçim: aynı müşteri hep aynı metni, farklı müşteriler farklı ifadeleri alır */
+function hash(text: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i += 1) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function pick<T>(items: T[], seed: string): T {
+  return items[hash(seed) % items.length];
+}
+
+const SOCIAL_NAMES: [RegExp, string][] = [
+  [/instagram/i, "Instagram"], [/facebook|fb\.com/i, "Facebook"], [/tiktok/i, "TikTok"], [/linktr/i, "Linktree"], [/youtube|youtu\.be/i, "YouTube"],
+];
+function socialName(host: string): string {
+  return SOCIAL_NAMES.find(([re]) => re.test(host))?.[1] ?? "sosyal medya";
+}
+
+const trNumber = (n: number) => n.toLocaleString("tr-TR", { maximumFractionDigits: 1 });
+
+/**
+ * İlk temas: üç tarzın yapısı farklıdır; her tarzın içinde açılış, gerekçe, fikir ve kapanış
+ * ifadeleri müşteriye göre seçilir. Böylece aynı sektördeki iki işletme aynı metni almaz.
+ * Doğrulanmış bir ayrıntı (Google puanı ve yorum sayısı) varsa mesajda kullanılır.
+ */
+function firstContact(ctx: CustomerContext, p: SectorProfile): LocalDraft[] {
+  const seed = ctx.leadId || ctx.name;
+  const n = ctx.shortName;
+  const s = ctx.senderName;
+  const from = ablative(ctx.brand);
+  const wexon = /wexon/i.test(ctx.brand);
+  const hasSite = ctx.website.kind === "site";
+  const strongReviews = ctx.rating !== null && ctx.rating >= 4.5 && (ctx.reviewCount ?? 0) >= 15;
+  const reviewNote = strongReviews
+    ? pick([
+        `Google’da ${ctx.reviewCount} yorum ve ${trNumber(ctx.rating!)} puanla öne çıkıyorsunuz; `,
+        `Google’daki ${trNumber(ctx.rating!)} puanınızı (${ctx.reviewCount} yorum) görünce yazmak istedim; `,
+      ], `${seed}:review`)
+    : "";
+  const host = ctx.website.host;
+  const social = ctx.website.kind === "social" ? socialName(host) : "";
+
+  if (p.partner) {
+    const pi = (a: string[], k: string) => pick(a, `${seed}:partner:${k}`);
+    const hi1 = s ? pi([`Merhaba, ben ${s}, ${from} yazıyorum.`, `İyi günler, ${s} ben, ${from}.`], "i1") : pi([`Merhaba, ${from} yazıyorum.`, `İyi günler, ${from} yazıyorum.`], "i1");
+    const hi2 = s ? pi([`Merhaba, ${ctx.brand} ekibinden ${s}.`, `İyi günler, ${ctx.brand} tarafından ${s}.`], "i2") : `Merhaba, ${ctx.brand} ekibinden yazıyorum.`;
+    const hi3 = s ? pi([`Selamlar, ${s} ben (${ctx.brand}).`, `Merhaba, ben ${s}; ${ctx.brand} ekibindenim.`], "i3") : `Selamlar, ${ctx.brand} ekibinden yazıyorum.`;
+    return [
+      {
+        style: "samimi",
+        message: `${hi1} ${pi([
+          `Biz de web ve yazılım tarafında çalışıyoruz; ${n} ile rakipten çok iş ortağı olabileceğimizi düşündüm.`,
+          `Aynı alanda çalışıyoruz ama ${n} için rakip değil, yoğun dönemlerde güvenilecek bir ek ekip olabiliriz.`,
+        ], "b1")} ${pi([
+          "Yoğun dönemlerde ek geliştirme ya da tasarım desteğine ihtiyaç olursa birlikte çalışabiliriz.",
+          "Kapasitenin dolduğu projelerde geliştirme ya da tasarım tarafında destek verebiliriz.",
+        ], "b2")} ${pi(["Böyle bir iş birliği ilginizi çeker mi?", "Bu konuyu kısaca konuşmak ister misiniz?"], "c1")}`,
+        suggestedCTA: "İş birliği sorusu",
+      },
+      {
+        style: "profesyonel",
+        message: `${hi2} ${pi([
+          `Web sitesi ve özel yazılım geliştiriyoruz. ${n} gibi firmalarla, kapasitenin dolduğu dönemlerde projeleri birlikte yürütmek üzerine konuşmak isterim.`,
+          `Web ve özel yazılım projeleri geliştiriyoruz; ${n} ile taşeron ya da ortak proje şeklinde çalışma imkânlarını konuşmak isterim.`,
+        ], "b3")} ${p.benefit} ${pi(["Uygun olursa kısaca nasıl çalışabileceğimizi anlatayım.", "Uygun bir zamanınızda kısa bir görüşme yapabilir miyiz?"], "c2")}`,
+        suggestedCTA: "Çalışma modeli anlatma",
+      },
+      {
+        style: "merak",
+        message: `${hi3} ${pi([`Kısa bir sorum olacak: ${q(p, n, "question")}`, `${n} için merak ettiğim bir şey var: ${q(p, n, "funnelQuestion")}`], "q")} ${pi([
+          "Biz de web ve yazılım geliştiriyoruz; ihtiyaç olursa destek olabilir, iş birliği seçeneklerini konuşabiliriz.",
+          "Bu tür dönemlerde yanınızda olabilecek bir geliştirme ekibiyiz; uygun olursa nasıl çalıştığımızı anlatayım.",
+        ], "b4")} ${p.benefit}`,
+        suggestedCTA: "Kapasite sorusu",
+      },
+    ];
+  }
+
+  // V1 samimi: kişisel açılış + somut fikir + fayda + yumuşak soru
+  const samimiIntro = pick(
+    s
+      ? [`Merhaba, ben ${s}, ${from} yazıyorum.`, `Merhaba, ${s} ben, ${from}.`, `İyi günler, ben ${s}. ${from} yazıyorum.`]
+      : [`Merhaba, ${from} yazıyorum.`, `İyi günler, ${from} yazıyorum.`],
+    `${seed}:s:intro`,
+  );
+  const samimiIdea = hasSite
+    ? pick([
+        `${n} için ${host} sitenizin yanında ${p.flow} almayı kolaylaştıran küçük bir düzen önerim var.`,
+        `${host} adresindeki sitenize ${p.flow} için daha kısa bir yol eklemek üzerine bir fikrim var.`,
+      ], `${seed}:s:idea`)
+    : social
+      ? `${reviewNote}${n} için Google kaydınızda ${social} bağlantınız görünüyor; buna ek olarak ${p.web} bir web sitesi iyi bir tamamlayıcı olabilir.`
+      : pick([
+        `${reviewNote}${n} için aklımda ${p.web} bir web sitesi fikri var.`,
+        `${reviewNote}${n} için ${p.web} sade bir site kurgulayabiliriz.`,
+        `${reviewNote}${reviewNote ? p.web : cap(p.web)} tek sayfalık bir site ${n} için iyi bir başlangıç olabilir.`,
+      ], `${seed}:s:idea`);
+  const benefit = pick([
+    p.benefit,
+    `Böylece ${p.flow} size telefon trafiğine karışmadan, daha düzenli ulaşır.`,
+    "Sizi araştıran kişi aradığını hızlıca bulur ve doğrudan size yazabilir.",
+  ], `${seed}:s:benefit`);
+  const samimiCta = pick(["Uygun olursa kısaca anlatayım mı?", "İlginizi çekerse iki cümleyle anlatayım.", "Kısaca anlatmamı ister misiniz?"], `${seed}:s:cta`);
+
+  // V2 profesyonel: kim olduğumuz + hizmetin değeri + teklif edilen net adım
+  const proIntro = pick(
+    s
+      ? [`Merhaba, ${wexon ? `${ctx.brand} yazılım stüdyosundan` : from} ${s} ben.`, `İyi günler, ${from} ${s}; işletmelere web sitesi ve yazılım geliştiriyoruz.`]
+      : [`Merhaba, ${wexon ? `${ctx.brand} yazılım stüdyosundan` : from} yazıyorum.`, `İyi günler, ${ctx.brand} olarak işletmelere web sitesi ve yazılım geliştiriyoruz.`],
+    `${seed}:p:intro`,
+  );
+  const proBody = hasSite
+    ? `${n} için mevcut sitenizle birlikte çalışan bir ${p.flow} akışının, gelen talepleri tek yerde toplamayı kolaylaştırabileceğini düşündüm.`
+    : pick([
+        `${n} için ${p.web} bir web sitesinin işinize yarayabileceğini düşündüm.`,
+        `${cap(p.audience)} için siteler hazırlıyoruz; ${n} için ${p.web} bir yapı kurabiliriz.`,
+        `${n} gibi ${p.audience} için en çok işe yarayan şey, ${p.flow} almayı kolaylaştıran sade bir site oluyor.`,
+      ], `${seed}:p:body`);
+  const proExtra = pick([
+    p.benefit,
+    "Tasarımı işletmenize göre çıkarıyor, yayına alma ve sonraki güncellemeleri de üstleniyoruz.",
+    "Siteyi telefonda rahat kullanılacak şekilde kuruyor, içerikleri sizinle birlikte hazırlıyoruz.",
+  ], `${seed}:p:extra`);
+  const proCta = pick([
+    "İsterseniz kısa bir örnek üzerinden göstereyim.",
+    "Uygun görürseniz size örnek bir ilk ekran taslağı hazırlayıp göndereyim mi?",
+    "Bu konuyu kısaca konuşmak için uygun bir zamanınız olur mu?",
+  ], `${seed}:p:cta`);
+
+  // V3 merak: tek bir gerçek soru + neden sorduğumuz + baskısız kapanış
+  const merakIntro = pick(
+    s ? [`Merhaba, ${s} ben (${ctx.brand}).`, `Selamlar, ben ${s}; ${ctx.brand} ekibindenim.`, `Merhaba, ${ctx.brand} ekibinden ${s}.`] : [`Merhaba, ${ctx.brand} ekibinden yazıyorum.`, `Selamlar, ${ctx.brand} ekibinden yazıyorum.`],
+    `${seed}:m:intro`,
+  );
+  const merakQ = pick([
+    `Kısa bir sorum olacak: ${q(p, n, "question")}`,
+    `${n} için merak ettiğim bir şey var: ${q(p, n, "funnelQuestion")}`,
+    `Size tek bir şey sormak istiyorum: ${q(p, n, "question")}`,
+  ], `${seed}:m:q`);
+  const merakWhy = pick([
+    `Sorma sebebim, ${p.audience} için bu talepleri tek yerde toplayan sade web yapıları kurmamız.`,
+    `Bunu soruyorum çünkü ${p.audience} için ${p.flow} sürecini kolaylaştıran siteler hazırlıyoruz.`,
+    "Bu tür işletmelerde talepler çoğu zaman farklı kanallara dağılabiliyor; biz bunu sadeleştiren siteler kuruyoruz.",
+  ], `${seed}:m:why`);
+  const merakCta = pick([
+    "İsterseniz nasıl işe yarayabileceğini iki cümleyle anlatayım.",
+    "Cevabınıza göre size uygun bir fikir paylaşabilirim.",
+    "Uygun olursa kısa bir örnekle anlatayım.",
+  ], `${seed}:m:cta`);
+
+  return [
+    { style: "samimi", message: `${samimiIntro} ${samimiIdea} ${benefit} ${samimiCta}`, suggestedCTA: "Kısaca anlatmak için izin isteme" },
+    { style: "profesyonel", message: `${proIntro} ${proBody} ${proExtra === p.benefit && hasSite ? "" : `${proExtra} `}${proCta}`.replace(/\s+/g, " "), suggestedCTA: "Örnek gösterme teklifi" },
+    { style: "merak", message: `${merakIntro} ${merakQ} ${merakWhy} ${merakCta}`, suggestedCTA: "Keşif sorusu" },
+  ];
+}
+
 export function localDrafts(ctx: CustomerContext, category: CategoryId): LocalDraft[] {
   const p = profileFor(ctx.sector.id);
   const i = intros(ctx);
   const n = ctx.shortName;
   const brand = ctx.brand;
   const hasSite = ctx.website.kind === "site";
+
+  // Aynı işi yapan firmalara otomasyon/bakım/huni satılmaz; iş birliği mesajı kullanılır
+  if (p.partner && (category === "otomasyon" || category === "bakim" || category === "huni")) category = "ilk_temas";
 
   switch (category) {
     case "ilk_temas": {
@@ -71,20 +234,7 @@ export function localDrafts(ctx: CustomerContext, category: CategoryId): LocalDr
           { style: "merak", message: `${i.merak} ${n} için bir taslak hazırladım: ${l} En çok ${p.flow} bölümüne özen gösterdim. Bir bakıp ilk izleniminizi yazarsanız ona göre düzenleyebilirim.`, suggestedCTA: "İlk izlenim isteme" },
         ];
       }
-      const idea = hasSite
-        ? `mevcut sitenize ek olarak ziyaretçinin ${p.flow} bırakmasını kolaylaştıran küçük bir düzen`
-        : `${p.web} bir web sitesi`;
-      return [
-        { style: "samimi", message: `${i.samimi} ${n} için aklımda ${idea} fikri var. ${p.benefit} Uygun olursa kısaca anlatayım mı?`, suggestedCTA: "Kısaca anlatmak için izin isteme" },
-        {
-          style: "profesyonel",
-          message: hasSite
-            ? `${i.profesyonel} ${n} için mevcut sitenizle birlikte çalışan bir ${p.flow} akışının gelen talepleri tek yerde toplamayı kolaylaştırabileceğini düşündüm. Bu tür yapıları ${p.audience} için kuruyoruz; isterseniz kısa bir örnek üzerinden göstereyim.`
-            : `${i.profesyonel} ${n} için ${p.web} bir web sitesinin işinize yarayabileceğini düşündüm. Bu tür siteleri ${p.audience} için hazırlıyoruz; isterseniz kısa bir örnek üzerinden göstereyim.`,
-          suggestedCTA: "Örnek gösterme teklifi",
-        },
-        { style: "merak", message: `${i.merak} Kısa bir sorum olacak: ${q(p, n, "question")} Sorma sebebim, ${p.audience} için bu talepleri tek yerde toplayan sade web yapıları kurmamız. İsterseniz nasıl işe yarayabileceğini iki cümleyle anlatayım.`, suggestedCTA: "Keşif sorusu" },
-      ];
+      return firstContact(ctx, p);
     }
     case "otomasyon":
       return [

@@ -4,7 +4,8 @@ import { buildContext, startPriceFrom, type ContextInput } from "../src/lib/sale
 import { ablative, localDrafts } from "../src/lib/sales/drafts.ts";
 import { generateDrafts, refineDraft, SalesPolicyError, type ChatFn } from "../src/lib/sales/engine.ts";
 import { SECTOR_PROFILES } from "../src/lib/sales/profiles.ts";
-import { evaluateMessage, mentionsName } from "../src/lib/sales/quality.ts";
+import { evaluateMessage, mentionsName, similarity } from "../src/lib/sales/quality.ts";
+import { categoryFits, contactPolicy } from "../src/lib/sales/policy.ts";
 import { inferSector, type SectorId } from "../src/lib/sales/sector.ts";
 
 let failed = 0;
@@ -60,7 +61,7 @@ const sectorNames: Record<SectorId, string> = {
   generic: "Yıldız Ticaret", teknik: "Aquails Su Arıtma Cihazları", restoran: "Lezzet Restoran", kafe: "Kafe Mola", kuafor: "Gülşen Kuaför",
   klinik: "Merkez Fizyo Klinik", dis: "Diş Kliniği Gülüş", emlak: "Doğan Emlak", muhasebe: "Kaya Mali Müşavirlik", avukat: "Arslan Hukuk Bürosu",
   otel: "Göl Otel", insaat: "Usta İnşaat Tadilat", oto: "Hızlı Oto Servis", uretim: "Yılmaz Mobilya İmalat", magaza: "Moda Butik",
-  lojistik: "Ekspres Nakliyat", spor: "Güç Fitness", egitim: "Başarı Kurs", ofis: "Deniz Danışmanlık",
+  lojistik: "Ekspres Nakliyat", spor: "Güç Fitness", egitim: "Başarı Kurs", ofis: "Deniz Danışmanlık", yazilim: "Atlas Yazılım",
 };
 let localCount = 0;
 let localMin = 100;
@@ -97,7 +98,7 @@ const onlyName = buildContext({ lead: { id: "a", name: "Yıldız Ticaret" } });
 check(onlyName.sector.id === "generic" && onlyName.unknowns.includes("Sektör belirlenemedi"), "1) yalnızca ad: sektör bilinmiyor");
 const r1 = await generateDrafts({ ctx: onlyName, category: "ilk_temas" });
 check(r1.source === "local" && r1.drafts.length === 3 && r1.drafts.every((d) => !d.blockers.length), "1) yalnızca ad: AI'sız 3 temiz taslak", r1.drafts.map((d) => d.message));
-check(r1.drafts.every((d) => d.message.includes("Wexon.dev’den") || d.message.includes("Wexon.dev yazılım")), "1) isim yokken gönderen adı uydurulmaz", r1.drafts.map((d) => d.message));
+check(r1.drafts.every((d) => /Wexon\.dev(’den| yazılım| ekibinden| olarak)/.test(d.message) && !/(?<!\p{L})ben [A-ZÇĞİÖŞÜ]/u.test(d.message)), "1) isim yokken gönderen adı uydurulmaz", r1.drafts.map((d) => d.message));
 
 // 2) Ad + sektör
 check(aq.sector.id === "teknik" && aq.assumptions[0]?.includes("teknik"), "2) sektör varsayım olarak işaretli");
@@ -207,6 +208,76 @@ const noAi = await refineDraft({ ctx: aq, category: "ilk_temas", style: "samimi"
 check(noAi.warnings.length === 1 && noAi.draft.message === long, "refine AI yoksa değişmez");
 const lyingRefine = await refineDraft({ ctx: aq, category: "ilk_temas", style: "samimi", message: long, mode: "ozel", chat: async () => '{"message":"Aquails sitenizi inceledim, eksikleri buldum."}' });
 check(lyingRefine.draft.message === long && lyingRefine.warnings.length === 1, "refine uydurma sonucu reddeder");
+
+// --- İletişim politikası (üretim, kayıt, kuyruk, onay ve gönderimde aynı kural) ---
+const day = 86_400_000;
+const nowP = new Date("2026-10-11T12:00:00Z");
+const pol = (o: Partial<Parameters<typeof contactPolicy>[0]>) =>
+  contactPolicy({ status: "yeni", notes: "", consented: false, history: { count: 0, lastAt: null }, mode: "manual", now: nowP, ...o });
+check(!pol({ status: "ilgilenmiyor" }).allowed, "politika: ret → elle satış yok");
+check(!pol({ status: "ilgilenmiyor", mode: "queue", consented: true }).allowed, "politika: ret → kuyruk yok (onay olsa bile)");
+check(pol({ status: "ilgilenmiyor", category: "kapanis" }).allowed, "politika: ret → bir kez kapanış serbest");
+check(!pol({ status: "ilgilenmiyor", category: "kapanis", history: { count: 2, lastAt: nowP, closed: true } }).allowed, "politika: ikinci kapanış yok");
+check(!pol({ status: "yazildi", notes: "Müşteri iletişim istemiyor" }).allowed, "politika: notta ret");
+check(!pol({ mode: "queue" }).allowed && pol({ mode: "queue", consented: true }).allowed, "politika: kuyruk yalnızca onay kaydıyla");
+check(pol({}).allowed && pol({}).warnings.length === 1, "politika: elle ilk temas serbest ama onay uyarısı var");
+check(!pol({ status: "yazildi", history: { count: 1, lastAt: new Date(nowP.getTime() - day) } }).allowed, "politika: takip 3 günden önce yok");
+const fu = pol({ status: "yazildi", history: { count: 1, lastAt: new Date(nowP.getTime() - 4 * day) } });
+check(fu.allowed && fu.kind === "takip", "6) politika: daha önce yazılan müşteriye izinli takip", fu);
+check(pol({ status: "yazildi", consented: true, mode: "queue", history: { count: 2, lastAt: new Date(nowP.getTime() - 5 * day) } }).allowed, "politika: onaylı müşteriye kuyruktan 2. takip");
+check(!pol({ status: "yazildi", consented: true, mode: "queue", history: { count: 3, lastAt: new Date(nowP.getTime() - 9 * day) } }).allowed, "politika: en fazla 2 takip");
+check(pol({ status: "donus_var", history: { count: 1, lastAt: nowP } }).kind === "yanit", "politika: dönen müşteriyle konuşma beklemesiz");
+check(!categoryFits("takip", "ilk_temas") && categoryFits("takip", "takip") && categoryFits("ilk", "ilk_temas"), "politika: yazılmış müşteriye ilk temas tekrar gitmez");
+
+// --- Kalite puanı kalibrasyonu: farklı kalitedeki mesajlar doğru sıralanmalı ---
+const rated = base({ rating: 4.8, reviewCount: 64, district: "Bolvadin" });
+const tiers: Record<string, string[]> = {
+  iyi: [
+    "Merhaba, ben Mehmet, Wexon.dev’den yazıyorum. Aquails’i Google’da 64 yorum ve 4,8 puanla görünce yazmak istedim. Su arıtmada müşteriler genelde önce model ve servis seçeneklerine bakıyor; bunları sade anlatan, teklif istemeyi tek adıma indiren bir site kurgulayabiliriz. Uygun olursa kısaca anlatayım mı?",
+    "Merhaba, Wexon.dev’den Mehmet. Bolvadin’de su arıtma için Aquails’e ulaşmak isteyen biri şu an daha çok telefonla mı arıyor, yoksa WhatsApp’tan mı yazıyor? Teklif ve servis taleplerini tek yerde toplayan sade bir sayfa üzerine bir fikrim var; isterseniz iki cümleyle anlatayım.",
+  ],
+  vasat: [
+    "Merhaba, Wexon.dev’den yazıyorum. İşletmelere web sitesi yapıyoruz, sizin için de yapabiliriz. İlgilenir misiniz?",
+    "Merhaba, Wexon.dev olarak modern ve hızlı web siteleri, e-ticaret, otomasyon ve yapay zekâ çözümleri sunuyoruz. Aquails için de uygun bir paket hazırlayabiliriz. Görüşmek ister misiniz?",
+  ],
+  kotu: [
+    "Merhaba Aquails Su Arıtma Cihazları!! İşletmenizi dijital dünyada bir üst seviyeye taşıyoruz, satışlarınızı artıracak harika bir fırsat sizi bekliyor. En iyi fiyat bizde, hemen yazın!!",
+    "Sayın yetkili, firmanız için harika çözümlerimiz mevcuttur. Bilgilerinize sunarız. Saygılarımızla.",
+  ],
+  yalan: [old, "Merhaba, Aquails sitenizi inceledim ve birkaç ciddi eksiklik buldum. Son fırsat, kaçırmayın."],
+};
+const avg = (xs: string[]) => xs.reduce((s, m) => s + evaluateMessage(m, rated, "ilk_temas").score, 0) / xs.length;
+const tierAvg = Object.fromEntries(Object.entries(tiers).map(([k, v]) => [k, avg(v)]));
+console.log("kalite kalibrasyonu (ortalama puan):", tierAvg);
+check(tierAvg.iyi > tierAvg.vasat && tierAvg.vasat > tierAvg.kotu && tierAvg.kotu > tierAvg.yalan, "7) kalite sıralaması iyi > vasat > kötü > yalan", tierAvg);
+check(tiers.iyi.every((m) => evaluateMessage(m, rated, "ilk_temas").score >= 90), "7) özenli mesaj ≥90", tiers.iyi.map((m) => evaluateMessage(m, rated, "ilk_temas")));
+check(tiers.vasat.every((m) => evaluateMessage(m, rated, "ilk_temas").score < 85), "7) genel geçer mesaj <85 (yeniden yazılır)", tiers.vasat.map((m) => evaluateMessage(m, rated, "ilk_temas")));
+check(tiers.kotu.every((m) => evaluateMessage(m, rated, "ilk_temas").score < 70), "7) klişe/robotik mesaj <70", tiers.kotu.map((m) => evaluateMessage(m, rated, "ilk_temas")));
+// Yerel şablon taslağı, işletmeye özgü ayrıntı içeren özenli mesajdan yüksek puan alamaz
+const plainLocal = localDrafts(aq, "ilk_temas").map((d) => evaluateMessage(d.message, aq, "ilk_temas").score);
+check(Math.max(...plainLocal) < Math.min(...tiers.iyi.map((m) => evaluateMessage(m, rated, "ilk_temas").score)) + 1 && plainLocal.every((s) => s <= 96), "7) ayrıntısız yerel taslak tam puan almaz", plainLocal);
+// Aynı metni isim değiştirerek göndermek cezalandırılır
+const sent = localDrafts(base({ name: "Berrak Su Arıtma" }), "ilk_temas")[0].message;
+const cloneMsg = sent.split("Berrak").join("Aquails");
+const withOthers = base({}, { recentOthers: [sent] });
+const cloneQ = evaluateMessage(cloneMsg, withOthers, "ilk_temas");
+check(cloneQ.warnings.some((w) => w.includes("neredeyse aynı")) && cloneQ.score < evaluateMessage(cloneMsg, aq, "ilk_temas").score, "4) isim değiştirilmiş kopya yakalanır", cloneQ);
+
+// --- 4) Aynı sektördeki farklı işletmelere giden yerel taslaklar kopya olmamalı ---
+const pairs: [string, string][] = [
+  ["Aquails Su Arıtma Cihazları", "Berrak Su Arıtma"], ["Lezzet Restoran", "Köşe Kebap Restoran"], ["Hızlı Oto Servis", "Usta Oto Tamir"],
+  ["Gülşen Kuaför", "Bella Güzellik Salonu"], ["Doğan Emlak", "Kent Gayrimenkul"], ["Yılmaz Mobilya İmalat", "Ege Metal Sanayi"], ["Atlas Yazılım", "Pixel Dijital Ajans"],
+];
+const sims: number[] = [];
+for (const [a, b] of pairs) {
+  const A = localDrafts(buildContext({ lead: { id: `a-${a}`, name: a }, senderName: "Mehmet" }), "ilk_temas");
+  const B = localDrafts(buildContext({ lead: { id: `b-${b}`, name: b }, senderName: "Mehmet" }), "ilk_temas");
+  const strip = (m: string, n: string) => n.split(" ").reduce((acc, w) => acc.split(w).join(" "), m);
+  A.forEach((d, i) => sims.push(similarity(strip(d.message, a), strip(B[i].message, b))));
+}
+const meanSim = sims.reduce((s, x) => s + x, 0) / sims.length;
+console.log(`aynı sektör, farklı işletme benzerliği: ortalama ${meanSim.toFixed(2)}, en yüksek ${Math.max(...sims).toFixed(2)} (önce ~0.95)`);
+check(meanSim < 0.55 && Math.max(...sims) < 0.85, "4) aynı sektörde ortalama benzerlik < 0.55, en yüksek < 0.85", { meanSim, max: Math.max(...sims) });
 
 console.log(`yerel taslak: ${localCount} adet, en düşük puan ${localMin}`);
 if (failed) {

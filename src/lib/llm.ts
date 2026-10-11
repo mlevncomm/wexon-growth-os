@@ -43,7 +43,7 @@ function apiErrorMessage(json: unknown, status: number): string {
     if (typeof msg === "string" && msg.trim()) return msg.trim();
   }
   if (status === 404) {
-    return "Gemini model bulunamadı (404). Ayarlar’da gemini-3.5-flash kaydedip Kontrol et’e basın.";
+    return "Gemini model bulunamadı (404). Ayarlar’da gemini-3.8-flash kaydedip Kontrol et’e basın.";
   }
   return `AI hata ${status}`;
 }
@@ -90,13 +90,14 @@ function geminiModels(preferred: string): string[] {
 }
 
 function extractGeminiText(json: {
-  candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+  candidates?: Array<{ content?: { parts?: Array<{ text?: string; thought?: boolean }> } }>;
   promptFeedback?: { blockReason?: string };
 }): string {
   const blocked = json.promptFeedback?.blockReason;
   if (blocked) throw new Error(`Gemini güvenlik filtresi: ${blocked}`);
   return (json.candidates ?? [])
     .flatMap((c) => c.content?.parts ?? [])
+    .filter((p) => !p.thought)
     .map((p) => p.text)
     .filter((t): t is string => Boolean(t && t.trim()))
     .join("\n")
@@ -122,24 +123,37 @@ async function geminiGenerate(opts: {
       role: m.role === "assistant" ? "model" : "user",
       parts: [{ text: m.content }],
     }));
+  // Gemini 3.x varsayılan olarak "medium" düşünür ve düşünme tokenları maxOutputTokens'tan düşer;
+  // kısa metin işleri için "low" yeterli, çıktı limiti de düşünmeye yer kalacak kadar geniş tutulur.
   const generationConfig: Record<string, unknown> = {
     temperature: opts.temperature ?? 0.6,
-    maxOutputTokens: opts.maxTokens ?? 900,
+    maxOutputTokens: Math.max(opts.maxTokens ?? 900, 2048),
   };
   if (opts.json) generationConfig.responseMimeType = "application/json";
 
-  let last = "Gemini yanıt vermedi";
-  for (const model of geminiModels(opts.model)) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(opts.apiKey)}`;
-    const res = await fetch(url, {
+  const send = (model: string, thinking: boolean) =>
+    fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      // Anahtar URL'de değil başlıkta: günlüklere ve hata mesajlarına düşmez
+      headers: { "Content-Type": "application/json", "x-goog-api-key": opts.apiKey },
       body: JSON.stringify({
         contents: contents.length ? contents : [{ role: "user", parts: [{ text: "OK" }] }],
         ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
-        generationConfig,
+        generationConfig: thinking ? { ...generationConfig, thinkingConfig: { thinkingLevel: "low" } } : generationConfig,
       }),
     });
+
+  let last = "Gemini yanıt vermedi";
+  for (const model of geminiModels(opts.model)) {
+    let thinking = /^gemini-3/i.test(model);
+    let res = await send(model, thinking);
+    if (thinking && res.status === 400) {
+      const body = await res.clone().text();
+      if (/thinking/i.test(body)) {
+        thinking = false;
+        res = await send(model, false);
+      }
+    }
     const raw = await res.text();
     let json: Parameters<typeof extractGeminiText>[0] & { error?: { message?: string } } = {};
     try {

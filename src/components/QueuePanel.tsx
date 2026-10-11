@@ -12,9 +12,11 @@ type Draft = {
   message: string;
   channel: string;
   firstContact: boolean;
+  blocked?: string | null;
 };
 
 type Snapshot = {
+  sendingLocked?: boolean;
   paused: boolean;
   stopped: boolean;
   dailyCap: number;
@@ -96,7 +98,17 @@ export function QueuePanel({ onClose, open = false }: { onClose?: () => void; op
     const next = await fetch("/api/outreach", { cache: "no-store" });
     if (next.ok) setSnap(await next.json());
     markStatsDirty();
-    toast.push(action === "reject" ? "Reddedildi" : action === "edit" ? "Düzenlenip kuyruğa alındı" : "Onaylandı, gönderim deneniyor");
+    if (Array.isArray(json.blocked) && json.blocked.length) {
+      toast.push(`Onaylanmadı: ${json.blocked[0]}`, "bad");
+      return;
+    }
+    toast.push(
+      action === "reject"
+        ? "Reddedildi"
+        : snap?.sendingLocked
+          ? "Onaylandı; otomatik gönderim kilitli olduğu için sırada bekliyor"
+          : action === "edit" ? "Düzenlenip kuyruğa alındı" : "Onaylandı, gönderim deneniyor",
+    );
   }
 
   async function tickNow() {
@@ -163,6 +175,11 @@ export function QueuePanel({ onClose, open = false }: { onClose?: () => void; op
               : "Kanal: QR yedek (Cloud yok)"}
           {pending > 0 ? " Her kart sektör ve siteye göre yazıldı." : ""}
         </div>
+        {snap?.sendingLocked && snap?.cloud ? (
+          <div className="notice" style={{ marginTop: 10, fontSize: 13 }}>
+            Otomatik gönderim güvenlik kilidiyle kapalı. Onayladığınız taslaklar sırada bekler, hiçbiri kendiliğinden gönderilmez.
+          </div>
+        ) : null}
       </div>
       {pending > 0 ? (
         <div className="pending-list">
@@ -171,6 +188,7 @@ export function QueuePanel({ onClose, open = false }: { onClose?: () => void; op
             <div key={d.id} className="pending-item">
               <strong>{d.name}</strong>
               <div className="muted" style={{ fontSize: 12 }}>{d.phone}</div>
+              {d.blocked ? <div className="error-box" style={{ fontSize: 12.5 }}>{d.blocked}</div> : null}
               <textarea
                 rows={4}
                 value={editing[d.id] ?? d.message}
@@ -188,7 +206,7 @@ export function QueuePanel({ onClose, open = false }: { onClose?: () => void; op
                 </div>
               ) : null}
               <div className="pending-actions">
-                {snap?.cloud ? (
+                {d.blocked ? null : snap?.cloud ? (
                   <button className="btn btn-wexon" type="button" onClick={() => void moderate(d.id, "approve")}>
                     Onayla
                   </button>

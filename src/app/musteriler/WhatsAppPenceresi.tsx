@@ -9,7 +9,8 @@ import { evaluateMessage, TARGET_SCORE } from "@/lib/sales/quality";
 
 export type MesajLead = { id: string; name: string; phone: string; notes: string; status: string };
 type Recent = { at: string; status: string; category: string };
-type Boot = { ctx: CustomerContext; category: CategoryId; hasLlm: boolean; recent: Recent[] };
+type Policy = { allowed: boolean; kind: "ilk" | "takip" | "yanit" | "kapanis"; reason: string; warnings: string[] };
+type Boot = { ctx: CustomerContext; policy: Policy; kapanisAllowed: boolean; category: CategoryId; hasLlm: boolean; recent: Recent[] };
 
 const AD_KEY = "growth-os:mesaj:ad";
 
@@ -88,7 +89,17 @@ export function WhatsAppPenceresi({ lead, onClose, onSent }: {
   const quality = useMemo(() => (ctx && mesaj ? evaluateMessage(mesaj, ctx, cat) : null), [mesaj, ctx, cat]);
   const digits = waDigits(numara);
   const duplicate = boot?.recent.find((r) => r.category === cat);
-  const blockedQuality = Boolean(quality?.blockers.length);
+  // Politika: ret, takip aralığı ve takip sınırı sunucuda da ayrıca uygulanır
+  const policyBlock = !boot
+    ? ""
+    : cat === "kapanis"
+      ? boot.kapanisAllowed ? "" : "Bu müşteriye kapanış mesajı zaten gönderildi."
+      : !boot.policy.allowed
+        ? boot.policy.reason
+        : boot.policy.kind === "takip" && cat !== "takip"
+          ? "Bu müşteriye daha önce yazıldı ve dönüş olmadı; ilk temas tekrar gönderilmez. “Nazik takip” türünü seçin."
+          : "";
+  const blockedQuality = Boolean(quality?.blockers.length) || Boolean(policyBlock);
 
   function resetDrafts() {
     setAiResult(null);
@@ -209,6 +220,8 @@ export function WhatsAppPenceresi({ lead, onClose, onSent }: {
             {ctx.optedOut ? (
               <p className="error-box" style={{ margin: 0 }}>Bu müşteri iletişim istemediğini belirtmiş. Satış mesajı hazırlanmaz; yalnızca kapanış mesajı gönderebilirsin.</p>
             ) : null}
+            {policyBlock && !ctx.optedOut ? <p className="error-box" style={{ margin: 0 }}>{policyBlock}</p> : null}
+            {boot?.policy.warnings.map((w) => <p key={w} className="notice" style={{ margin: 0 }}>{w}</p>)}
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
               <label className="field">

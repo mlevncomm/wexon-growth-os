@@ -7,6 +7,7 @@ import { currentTenant, tenantId } from "../tenant";
 import { categoryById, type CategoryId, type StyleId } from "./categories";
 import { buildContext, type ContactRecord } from "./context";
 import type { ChatFn } from "./engine";
+import { contactPolicy, type ContactHistory, type SendMode } from "./policy";
 
 // Satış mesajı katmanının veritabanı ve AI bağlantısı. Mesaj göndermez.
 
@@ -40,17 +41,69 @@ export async function previousContacts(leadId: string): Promise<ContactRecord[]>
   }));
 }
 
+/** Politika için temas geçmişi: gönderilen ya da WhatsApp'ta açılan mesajlar (istenirse bir iş hariç) */
+export async function contactHistory(leadId: string, excludeJobId?: string): Promise<ContactHistory> {
+  const jobs = await prisma.outreachJob.findMany({
+    where: {
+      tenantId: tenantId(),
+      leadId,
+      status: { in: ["sent", OPENED_STATUS] },
+      ...(excludeJobId ? { id: { not: excludeJobId } } : {}),
+    },
+    orderBy: { createdAt: "desc" },
+    select: { sentAt: true, createdAt: true, templateId: true },
+  });
+  return {
+    count: jobs.length,
+    lastAt: jobs[0] ? jobs[0].sentAt ?? jobs[0].createdAt : null,
+    closed: jobs.some((j) => j.templateId === `${SALES_TAG}:kapanis` || j.templateId?.startsWith(`${SALES_TAG}:kapanis:`)),
+  };
+}
+
+/** Son 14 günde başka müşterilere giden mesajlar (isim değiştirilmiş kopya mesajı yakalamak için) */
+export async function recentOtherMessages(leadId: string): Promise<string[]> {
+  const jobs = await prisma.outreachJob.findMany({
+    where: {
+      tenantId: tenantId(),
+      leadId: { not: leadId },
+      status: { in: ["sent", OPENED_STATUS, "queued", "pending"] },
+      createdAt: { gte: new Date(Date.now() - 14 * 86_400_000) },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 15,
+    select: { message: true },
+  });
+  return jobs.map((j) => j.message);
+}
+
+export async function leadPolicy(
+  lead: { id: string; status: string; notes: string; consented: boolean },
+  mode: SendMode,
+  category?: string,
+  excludeJobId?: string,
+) {
+  return contactPolicy({
+    status: lead.status,
+    notes: lead.notes,
+    consented: lead.consented,
+    history: await contactHistory(lead.id, excludeJobId),
+    mode,
+    category,
+  });
+}
+
 export async function leadContext(
   leadId: string,
   input: { senderName?: string; designLink?: string; customerReply?: string },
 ) {
   const lead = await loadLead(leadId);
   if (!lead) return null;
-  const [contacts, playbook] = await Promise.all([previousContacts(lead.id), getPlaybook()]);
+  const [contacts, playbook, others] = await Promise.all([previousContacts(lead.id), getPlaybook(), recentOtherMessages(lead.id)]);
   const ctx = buildContext({
     lead,
     campaignQuery: lead.campaign?.query ?? "",
     previousContacts: contacts,
+    recentOthers: others,
     designLink: input.designLink,
     customerReply: input.customerReply,
     brand: currentTenant().tenantName,

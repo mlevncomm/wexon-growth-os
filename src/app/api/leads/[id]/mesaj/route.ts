@@ -6,8 +6,10 @@ import { categoryById, defaultCategory, isCategoryId, REFINE_MODES, STYLES, type
 import { cleanExternal } from "@/lib/sales/context";
 import { generateDrafts, refineDraft, SalesPolicyError } from "@/lib/sales/engine";
 import { evaluateMessage } from "@/lib/sales/quality";
+import { categoryFits } from "@/lib/sales/policy";
 import {
   leadContext,
+  leadPolicy,
   nextStatus,
   OPENED_STATUS,
   recentContacts,
@@ -43,9 +45,13 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     const found = await leadContext(id, {});
     if (!found) return NextResponse.json({ error: "Müşteri bulunamadı" }, { status: 404 });
     const { lead, ctx } = found;
+    const policy = await leadPolicy(lead, "manual");
+    const byKind = { takip: "takip", yanit: "ilgili", kapanis: "kapanis" } as const;
     return NextResponse.json({
       ctx,
-      category: defaultCategory(lead.status, ctx.website.kind === "site"),
+      policy,
+      kapanisAllowed: (await leadPolicy(lead, "manual", "kapanis")).allowed,
+      category: policy.kind === "ilk" ? defaultCategory(lead.status, ctx.website.kind === "site") : byKind[policy.kind],
       hasLlm: Boolean(await salesChat()),
       recent: await recentContacts(lead.id),
     });
@@ -92,6 +98,11 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       if (body.action === "record") {
         // Operatör mesajı WhatsApp'ta açtı. Sunucu kuralları yeniden uygular; engelli mesaj kaydedilmez.
         const message = String(body.message ?? "").trim().slice(0, 1500);
+        const policy = await leadPolicy(lead, "manual", category);
+        if (!policy.allowed) return NextResponse.json({ error: policy.reason, policy }, { status: 409 });
+        if (!categoryFits(policy.kind, category)) {
+          return NextResponse.json({ error: "Bu müşteriye daha önce yazıldı ve dönüş olmadı; ilk temas mesajı tekrar gönderilmez. “Nazik takip” türünü seçin." }, { status: 409 });
+        }
         const q = evaluateMessage(message, ctx, category);
         if (q.blockers.length) {
           return NextResponse.json({ error: q.blockers[0], quality: q }, { status: 422 });

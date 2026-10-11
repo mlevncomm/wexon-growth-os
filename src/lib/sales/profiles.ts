@@ -30,6 +30,8 @@ export type SectorProfile = {
   b2b?: boolean;
   /** Sağlık gibi reklam ve gizlilik kuralları olan alan */
   sensitive?: boolean;
+  /** Aynı işi yapan firma: web sitesi satılmaz, iş birliği konuşulur */
+  partner?: boolean;
 };
 
 const GENERIC: SectorProfile = {
@@ -50,6 +52,23 @@ const GENERIC: SectorProfile = {
 
 export const SECTOR_PROFILES: Record<SectorId, SectorProfile> = {
   generic: GENERIC,
+  yazilim: {
+    audience: "yazılım firmaları ve ajanslar",
+    web: "yoğun dönemlerde ek geliştirme kapasitesi sağlayan",
+    benefit: "Yoğun dönemde yeni kişi almadan projeleri zamanında teslim etmek kolaylaşır.",
+    flow: "geliştirme desteği",
+    question: "{isim} olarak yoğun dönemlerde dışarıdan geliştirme desteği alıyor musunuz?",
+    automation: "proje ve müşteri taleplerini tek panelde toplayan",
+    automationQuestion: "Müşteri taleplerini ve proje adımlarını şu an tek bir yerde takip edebiliyor musunuz?",
+    funnel: "ortak projelerde işlerin tek bir takip düzeninde ilerlemesini",
+    funnelQuestion: "Kapasiteniz dolduğunda gelen işleri nasıl yönetiyorsunuz?",
+    care: "müşteri sitelerinin bakım işlerinin",
+    tip: "bakım ve küçük geliştirme işlerini dışarıya vermek, ekibin yeni projelere odaklanmasını kolaylaştırıyor",
+    discovery: "Daha çok hangi teknolojilerle ve ne tür projelerde çalışıyorsunuz?",
+    signals: ["iş birliği", "destek", "geliştirme", "ortak", "kapasite"],
+    b2b: true,
+    partner: true,
+  },
   teknik: {
     audience: "teknik ürün ve servis firmaları",
     web: "ürünlerinizi anlaşılır tanıtan ve müşterilerinizin kolayca teklif isteyebildiği",

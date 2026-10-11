@@ -56,3 +56,6 @@ next-env.d.ts
 # masaüstü programı (Electron)
 /masaustu/node_modules
 /masaustu/dist
+
+# Veritabanı yedekleri (gizli bilgi içerir)
+yedekler/

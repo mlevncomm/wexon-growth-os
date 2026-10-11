@@ -122,8 +122,11 @@ function repeatedTrigram(text: string): boolean {
 }
 
 export function evaluateMessage(message: string, ctx: CustomerContext, categoryId: CategoryId): QualityResult {
-  const category = categoryById(categoryId);
   const profile = profileFor(ctx.sector.id);
+  // Aynı işi yapan firmaya otomasyon/bakım/huni yerine iş birliği ilk teması yazılır
+  const category = categoryById(
+    profile.partner && ["otomasyon", "bakim", "huni"].includes(categoryId) ? "ilk_temas" : categoryId,
+  );
   const text = message.trim();
   const b: QualityBreakdown = { ...MAX };
   const reasons: string[] = [];
@@ -196,6 +199,32 @@ export function evaluateMessage(message: string, ctx: CustomerContext, categoryI
     const m = lower(text);
     if (!profile.signals.some((s) => m.includes(lower(s)))) minus("uygunluk", 5, "Sektöre özgü bir fayda anılmıyor");
   }
+  // Kişiselleştirme: yalnızca ad + sektör kalıbı tam puan almaz; işletmeye özgü doğrulanmış bir ayrıntı gerekir
+  const cold = ["ilk_temas", "otomasyon", "huni", "bakim"].includes(category.id);
+  if (cold) {
+    const m = lower(text);
+    const specific =
+      (ctx.designLink && text.includes(ctx.designLink)) ||
+      (ctx.reviewCount && m.includes(String(ctx.reviewCount))) ||
+      (ctx.location && ctx.location.length > 3 && !/^merkez$/i.test(ctx.location) && m.includes(lower(ctx.location))) ||
+      (ctx.website.host && (m.includes(lower(ctx.website.host)) || m.includes(lower(ctx.website.host.split(".")[0]))));
+    if (!specific) minus("uygunluk", 4, "İşletmeye özgü bir ayrıntı yok; yalnızca ad ve sektör kullanılmış");
+  }
+  // Aynı metni isim değiştirerek başka müşterilere göndermek
+  const strip = (t: string) => {
+    let out = lower(t);
+    for (const w of lower(ctx.name).split(/\s+/)) if (w.length > 2) out = out.split(w).join(" ");
+    return out;
+  };
+  const clone = ctx.recentOthers.find((o) => similarity(strip(text), lower(o)) > 0.7);
+  if (clone) {
+    minus("uygunluk", 10, "Başka müşterilere giden mesajla neredeyse aynı");
+    warnings.push("Bu metin son günlerde başka işletmelere gönderilen bir mesajla neredeyse aynı. İşletmeye özgü bir ayrıntı ekleyin ya da başka bir taslak seçin.");
+  }
+  if (profile.partner && cold && /(web sitesi fikr|site kurgula|sitenizi yenile|web siteniz için)/iu.test(text)) {
+    minus("uygunluk", 8, "Aynı işi yapan firmaya web sitesi satılmaya çalışılıyor");
+    warnings.push("Bu işletme yazılım ya da ajans görünüyor; web sitesi satmak yerine iş birliği önerin.");
+  }
   if (category.id === "bakim" && ctx.website.kind !== "site") {
     minus("uygunluk", 8, "Kayıtlı web sitesi yok; bakım teklifi bu müşteriye uygun olmayabilir");
     warnings.push("Bu müşterinin kayıtlı bir web sitesi yok; bakım mesajı yerine ilk temas daha uygun");
@@ -216,7 +245,7 @@ export function evaluateMessage(message: string, ctx: CustomerContext, categoryI
   if (words < lo) minus("aciklik", Math.min(6, Math.ceil((lo - words) / 3)), `Çok kısa (${words} kelime; hedef ${lo}-${hi})`);
   const ss = sentences(text);
   if (ss.length > 5) minus("aciklik", 3, "Çok fazla cümle");
-  if (ss.some((s) => wordCount(s) > 32)) minus("aciklik", 3, "Fazla uzun cümle");
+  if (ss.some((s) => wordCount(s) > 28)) minus("aciklik", 3, "Fazla uzun cümle");
 
   // --- Değer önerisi (15) ---
   if (category.sales && ["ilk_temas", "otomasyon", "huni", "bakim"].includes(category.id) && !BENEFIT.test(text)) {

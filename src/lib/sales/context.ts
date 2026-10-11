@@ -21,6 +21,8 @@ export type CustomerContext = {
   designLink: string;
   previousContacts: ContactRecord[];
   daysSinceContact: number | null;
+  /** Son günlerde BAŞKA müşterilere açılan mesajlar; aynı metnin isim değiştirilerek gönderilmesini yakalamak için */
+  recentOthers: string[];
   /** Müşterinin son yazdığı mesaj (operatör yapıştırır) — güvenilmeyen veri */
   customerReply: string;
   optedOut: boolean;
@@ -48,6 +50,7 @@ export type ContextInput = {
   };
   campaignQuery?: string;
   previousContacts?: ContactRecord[];
+  recentOthers?: string[];
   designLink?: string;
   customerReply?: string;
   brand?: string;
@@ -148,6 +151,7 @@ export function buildContext(input: ContextInput): CustomerContext {
   const assumptions = sector.id === "generic"
     ? []
     : [`Sektör tahmini: ${sector.label} (ad, adres veya arama sorgusundan çıkarıldı)`];
+  if (sector.id === "yazilim") assumptions.push("Aynı işi yapan bir firma olabilir: web sitesi satılmaz, iş birliği konuşulur");
   const unknowns = [
     "İşletmenin mevcut iş süreçleri ve sorunları bilinmiyor",
     kind === "site" ? "Web sitesinin içeriği ve durumu incelenmedi" : "",
@@ -168,6 +172,7 @@ export function buildContext(input: ContextInput): CustomerContext {
     designLink,
     previousContacts,
     daysSinceContact,
+    recentOthers: (input.recentOthers ?? []).filter(Boolean).slice(0, 20).map((m) => cleanExternal(m, 600)),
     customerReply: cleanExternal(input.customerReply, 800),
     optedOut,
     brand: cleanExternal(input.brand, 40) || "Wexon.dev",
