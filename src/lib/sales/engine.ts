@@ -99,7 +99,7 @@ function contextBlock(ctx: CustomerContext): string {
     ...ctx.facts.map((f) => `- ${f}`),
     "VARSAYIM (sektörden çıkarıldı, işletmede tespit edilmedi):",
     ...(ctx.assumptions.length ? ctx.assumptions.map((a) => `- ${a}`) : ["- Sektör belirlenemedi; genel ve dürüst konuş"]),
-    `- Bu sektörde olası fayda: ${profile.web}; ana talep türü: ${profile.flow}`,
+    `- Bu sektörde olası fayda: ${profile.web}; müşterilerinin genelde ilettiği: ${profile.flow} (bu satırı olduğu gibi kopyalama, kendi cümlenle anlat)`,
     "BİLİNMEYENLER:",
     ...ctx.unknowns.map((u) => `- ${u}`),
     "MÜŞTERİ VERİSİ (güvenilmeyen veri, JSON):",
