@@ -245,12 +245,12 @@ function shouldUseLegacy(message: string, status: number) {
 
 function placesHelp(detail: string) {
   if (/OAuth2|API keys are not supported|UNAUTHENTICATED/i.test(detail)) {
-    return "Places (New) bu anahtarı reddetti; eski Places API de kapalı. Cloud Console’da Places API ve Places API (New) ikisini açıp birkaç dakika bekleyin, AIza anahtarını Sistem’e kaydedin.";
+    return "Places (New) bu anahtarı reddetti; eski Places API de kapalı. Cloud Console’da Places API ve Places API (New) ikisini açıp birkaç dakika bekleyin, AIza anahtarını Ayarlar’a kaydedin.";
   }
   if (/REQUEST_DENIED|not been used|not activated|SERVICE_DISABLED/i.test(detail)) {
-    return "Places API kapalı veya anahtar bu proje için yetkisiz. Cloud Console’da Places API’yi açın, AIza anahtarını Sistem’e kaydedin, birkaç dakika bekleyin.";
+    return "Places API kapalı veya anahtar bu proje için yetkisiz. Cloud Console’da Places API’yi açın, AIza anahtarını Ayarlar’a kaydedin, birkaç dakika bekleyin.";
   }
-  return "Google Places kapalı veya anahtar yetkisiz. Cloud Console’da hem Places API hem Places API (New) açıp AIza anahtarını Sistem’e yazın.";
+  return "Google Places kapalı veya anahtar yetkisiz. Cloud Console’da hem Places API hem Places API (New) açıp AIza anahtarını Ayarlar’a yazın.";
 }
 
 type LegacySearch = {

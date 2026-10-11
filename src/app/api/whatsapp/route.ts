@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     if (body?.action === "connect") {
       if (isServerless()) {
         return badRequest(
-          "Vercel'de QR oturumu kalıcı çalışmaz. Sistem ekranından WhatsApp Cloud API bağlayın.",
+          "Vercel'de QR oturumu kalıcı çalışmaz. Ayarlar ekranından WhatsApp Cloud API bağlayın.",
         );
       }
       // Socket must stay in this request until the phone scan finishes.

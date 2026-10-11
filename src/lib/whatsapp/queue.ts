@@ -1,5 +1,7 @@
 import { composePitch, AUTO_TEMPLATE_ID, AUTO_TEMPLATE_MARKER } from "../pitch";
 import { isWhatsAppCapablePhone } from "../phone";
+import { isOptedOut } from "../sales/context";
+import { truthIssues } from "../sales/quality";
 import { prisma } from "../prisma";
 import { isServerless } from "../platform";
 import { getSettings, updateSettings } from "../settings";
@@ -114,7 +116,7 @@ async function tick(): Promise<"idle" | "sent" | "wait" | "paused" | "capped"> {
     return "sent";
   }
 
-  if (job.lead.status === "yazildi" || job.lead.status === "ilgilenmiyor") {
+  if (job.lead.status === "yazildi" || isOptedOut(job.lead.status, job.lead.notes)) {
     await prisma.outreachJob.update({
       where: { id: job.id },
       data: { status: "skipped", error: "Bu müşteri zaten işlendi" },
@@ -216,7 +218,8 @@ function isGenericDraft(message: string): boolean {
     t.includes("aktif bir web sitesi göremedim") ||
     t.includes("ben wexon.dev’den mehmet") ||
     t.includes("daha rafine bir web deneyimi üzerine") ||
-    t.includes("sade, mobil odaklı bir web deneyimi üzerine")
+    t.includes("sade, mobil odaklı bir web deneyimi üzerine") ||
+    t.includes("işletmenize özel örnek ana ekranı")
   );
 }
 
@@ -272,6 +275,9 @@ export async function enqueueLeads(opts: {
       : null;
   if (rawId && rawId !== AUTO_TEMPLATE_ID && !template) throw new Error("Şablon bulunamadı");
   const useAuto = wantsAuto(rawId, template?.body);
+  // Toplu ilk temasta "hazırladım / inceledim / yazmıştım" gibi doğrulanamayan iddialar kuyruğa giremez
+  const issues = vertical === "software" && !useAuto && template ? truthIssues(template.body) : [];
+  if (issues.length) throw new Error(`Bu şablon toplu gönderime uygun değil: ${issues[0]}. Şablonu Mesaj ekranında düzeltin.`);
 
   const { renderTemplate } = await import("../templates");
   let queued = 0;
@@ -286,12 +292,13 @@ export async function enqueueLeads(opts: {
       skipped += 1;
       continue;
     }
-    if (lead.status === "yazildi" || lead.status === "ilgilenmiyor") {
+    if (lead.status === "yazildi" || isOptedOut(lead.status, lead.notes)) {
       skipped += 1;
       continue;
     }
+    // WhatsApp'ta elle açılan mesajlar da temas sayılır; aynı müşteriye ikinci kez ilk mesaj gitmez
     const open = await prisma.outreachJob.findFirst({
-      where: { tenantId: owner, leadId, status: { in: ["pending", "queued", "sending"] } },
+      where: { tenantId: owner, leadId, status: { in: ["pending", "queued", "sending", "sent", "opened"] } },
     });
     if (open) {
       skipped += 1;
@@ -344,6 +351,8 @@ export async function moderateJobs(opts: {
     }
     const message = (opts.message ?? job.message).trim();
     if (!message) continue;
+    const issues = currentTenant().vertical === "software" ? truthIssues(message) : [];
+    if (issues.length) throw new Error(`Onaylanmadı: ${issues[0]}. Metni düzeltip tekrar onaylayın.`);
     const wait = isServerless() ? 0 : jitter(settings.delayMinSec, settings.delayMaxSec) + offsetSec;
     if (!isServerless()) offsetSec += jitter(settings.delayMinSec, settings.delayMaxSec);
     await prisma.outreachJob.update({

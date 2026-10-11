@@ -5,6 +5,7 @@ import { renderTemplate } from "@/lib/templates";
 import { ChipStrip } from "@/components/ChipStrip";
 import { ConnectGuide } from "@/components/ConnectGuide";
 import { useToast } from "@/components/Toast";
+import { MesajSonuclari } from "./MesajSonuclari";
 
 type CopyAngle = { id: string; label: string };
 type Template = { id: string; name: string; body: string };
@@ -204,7 +205,7 @@ export default function OutreachPage() {
 
       <div className="notice" style={{ marginTop: 16 }}>
         {wa?.serverless
-          ? "Bu uygulama Vercel'de çalışıyor. Kesintisiz ve güvenilir gönderim için Sistem ekranına Meta WhatsApp Cloud token'ı ile Phone number ID girin; QR bağlantısı canlı sunucuda devre dışıdır."
+          ? "Bu uygulama Vercel'de çalışıyor. Kesintisiz ve güvenilir gönderim için Ayarlar ekranına Meta WhatsApp Cloud token'ı ile Phone number ID girin; QR bağlantısı canlı sunucuda devre dışıdır."
           : "“QR oturumu aç”a basın. Kod görünür görünmez WhatsApp Business → Ayarlar → Cihazlar → Cihaz bağla ile okutun."}
       </div>
 
@@ -232,8 +233,8 @@ export default function OutreachPage() {
             </div>
             <p className="panel-note">
               Açı seçin veya AI’ya not yazın. {`{ad}`} ve {`{ilçe}`} gönderimde dolar.
-              {hasLlm ? " Sistem’deki Gemini playbook ile yazar." : " AI için Sistem’e Google Gemini anahtarı yazın."}
-              {playbookActive ? " Koç’ta öğretilen kurallar uygulanır." : " Koç ekranından markayı öğretebilirsiniz."}
+              {hasLlm ? " Ayarlar’daki Gemini playbook ile yazar." : " AI için Ayarlar’a Google Gemini anahtarı yazın."}
+              {playbookActive ? " Marka playbook’u uygulanır." : ""}
             </p>
             <div className="field">
               <span>Açı</span>
@@ -332,8 +333,8 @@ export default function OutreachPage() {
             </p>
             <p className="panel-note" style={{ marginTop: 8 }}>
               {wa?.serverless
-                ? "Cloud API Meta'nın resmi canlı bağlantısıdır. Instagram gelen kutusu ayrı ekrandadır."
-                : "WhatsApp Business uygulaması bağlı cihaz kabul eder. Instagram gelen kutusu ayrı ekrandadır."}
+                ? "Cloud API Meta'nın resmi canlı bağlantısıdır."
+                : "WhatsApp Business uygulaması bağlı cihaz kabul eder."}
             </p>
             {wa?.local.error ? <p className="error-box">{wa.local.error}</p> : null}
             {wa?.local.qrDataUrl ? (
@@ -376,6 +377,8 @@ export default function OutreachPage() {
         </div>
       )}
 
+      <MesajSonuclari />
+
       <div style={{ marginTop: 18 }}>
         <ConnectGuide
           kicker="WhatsApp Business"
@@ -395,7 +398,7 @@ export default function OutreachPage() {
             },
             {
               title: "Sistem'e kaydedin",
-              body: "Cloud token ve Phone number ID'yi Sistem ekranına yazın. Bağlantı rozeti Cloud olunca onay kuyruğu canlı gönderime hazırdır.",
+              body: "Cloud token ve Phone number ID'yi Ayarlar ekranına yazın. Bağlantı rozeti Cloud olunca onay kuyruğu canlı gönderime hazırdır.",
             },
           ] : [
             {

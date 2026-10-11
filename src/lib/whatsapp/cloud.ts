@@ -40,10 +40,22 @@ export async function sendCloudMessage(e164: string, text: string, media?: Campa
     },
   );
 
-  const json = (await res.json()) as { error?: { message?: string } };
+  const json = (await res.json()) as { error?: { message?: string; code?: number } };
   if (!res.ok) {
-    throw new Error(json.error?.message || `Cloud API ${res.status}`);
+    throw new Error(cloudErrorMessage(json.error, res.status));
   }
+}
+
+/** Meta hata kodlarını operatörün anlayacağı dile çevirir */
+export function cloudErrorMessage(error: { message?: string; code?: number } | undefined, status: number): string {
+  const code = error?.code;
+  if (code === 131047 || code === 470) {
+    return "WhatsApp 24 saat kuralı: müşteri son 24 saatte size yazmadıysa Meta yalnızca onaylı mesaj şablonu göndermeye izin veriyor. Bu müşteriye Müşteriler ekranından WhatsApp’ta elle yazın.";
+  }
+  if (code === 131026) return "Mesaj teslim edilemedi: numara WhatsApp kullanmıyor olabilir.";
+  if (code === 131048 || code === 131049) return "Meta bu mesajı sınırladı (spam koruması). Bir süre bekleyip daha az mesaj gönderin.";
+  if (code === 190) return "WhatsApp Cloud token süresi dolmuş ya da geçersiz. Ayarlar’dan yenileyin.";
+  return error?.message || `Cloud API ${status}`;
 }
 
 export async function cloudConfigured(): Promise<boolean> {

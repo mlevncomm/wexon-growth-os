@@ -285,7 +285,7 @@ export default function AyarlarPage() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Gemini yanıt vermedi");
       setLlmCheck("ok");
-      setLlmCheckMsg("Gemini bağlandı. Koç ve mesaj şablonları bu anahtarı kullanır.");
+      setLlmCheckMsg("Gemini bağlandı. Mesaj asistanı ve şablonlar bu anahtarı kullanır.");
       toast.push("Gemini çalışıyor");
     } catch (err) {
       const message = err instanceof Error ? err.message : "Gemini bağlanamadı";
@@ -324,7 +324,7 @@ export default function AyarlarPage() {
             note="Wexon size Gemini, Places veya WhatsApp vermez. Google / Meta hesabınızdan ücretsiz veya kendi kotanızla alın. Başka işletmenin anahtarını yapıştırmayın."
             steps={[
               {
-                title: "Google Gemini (Koç ve metin)",
+                title: "Google Gemini (mesaj asistanı)",
                 body: "Google hesabıyla AI Studio’ya girin. Create API key → anahtarı kopyalayın (AIza…). Bu sayfada Google Gemini alanına yapıştırıp kaydedin, sonra Kontrol et’e basın. Kart istemez; ücretsiz kota vardır.",
                 href: "https://aistudio.google.com/apikey",
                 linkLabel: "AI Studio’da anahtar al",
@@ -516,7 +516,7 @@ export default function AyarlarPage() {
             </span>
           </div>
           <p className="panel-note">
-            Koç ve akıllı metin Google Gemini kullanır. Anahtarı{" "}
+            Mesaj asistanı Google Gemini kullanır. Anahtarı{" "}
             <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">
               Google AI Studio
             </a>{" "}
@@ -588,7 +588,7 @@ export default function AyarlarPage() {
                 Kontrol et
               </div>
               <p className="panel-note" style={{ marginTop: 6 }}>
-                Kaydettikten sonra Google’a kısa bir ping atar. Koç ancak bu geçince yazar.
+                Kaydettikten sonra Google’a kısa bir ping atar. Mesaj asistanı ancak bu geçince yazar.
               </p>
               <div className="save-row" style={{ marginTop: 10 }}>
                 <button className="btn btn-wexon" type="button" disabled={llmBusy} onClick={() => void testLlm()}>

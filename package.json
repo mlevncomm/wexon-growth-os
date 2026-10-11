@@ -9,7 +9,8 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "verify:logic": "tsx scripts/verify-logic.mts",
-    "check": "npm run lint && npm run typecheck && npm run verify:logic && npm run build",
+    "verify:sales": "tsx scripts/verify-sales.mts",
+    "check": "npm run lint && npm run typecheck && npm run verify:logic && npm run verify:sales && npm run build",
     "postinstall": "prisma generate",
     "db": "prisma migrate dev"
   },

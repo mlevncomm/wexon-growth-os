@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { formatPhoneDisplay, isWhatsAppCapablePhone } from "@/lib/phone";
 import { LEAD_STATUSES } from "@/lib/lead-status";
@@ -38,7 +38,8 @@ export default function MusterilerPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [mesajLead, setMesajLead] = useState<Lead | null>(null);
-  const [firma, setFirma] = useState("");
+  // Sabit referans: pencere Escape dinleyicisini her çizimde yeniden kurmasın
+  const closeMesaj = useCallback(() => setMesajLead(null), []);
 
   async function load(nextQ = q, nextStatus = status) {
     const params = new URLSearchParams();
@@ -63,13 +64,6 @@ export default function MusterilerPage() {
     return () => window.clearTimeout(boot);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlQ]);
-
-  useEffect(() => {
-    fetch("/api/me").then((r) => r.json()).then((m: { tenantName?: string | null }) => {
-      const ad = (m.tenantName || "").replace(/\.dev$/i, "");
-      setFirma(ad ? `${ad} yazılım stüdyosundan` : "");
-    }).catch(() => undefined);
-  }, []);
 
   useEffect(() => {
     fetch("/api/templates")
@@ -402,9 +396,8 @@ export default function MusterilerPage() {
       {mesajLead ? (
         <WhatsAppPenceresi
           lead={mesajLead as MesajLead}
-          firma={firma}
-          onClose={() => setMesajLead(null)}
-          onSent={(u) => { setLeads((prev) => prev.map((l) => (l.id === u.id ? { ...l, ...u } : l))); toast.push("WhatsApp açıldı, müşteri “Yazıldı” olarak işaretlendi"); }}
+          onClose={closeMesaj}
+          onSent={(u, info) => { setLeads((prev) => prev.map((l) => (l.id === u.id ? { ...l, ...u } : l))); toast.push(info); }}
         />
       ) : null}
     </div>

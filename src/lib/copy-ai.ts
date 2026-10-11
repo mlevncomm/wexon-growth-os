@@ -29,6 +29,11 @@ export const COPY_ANGLES = WATER_ANGLES;
 export type CopyAngle = string;
 
 export const LEGACY_SOFTWARE_TEMPLATE_BODIES = new Set([
+  "Merhaba, ben Wexon.dev yazılım stüdyosundan Mehmet. {ad} için teklif, sipariş ve müşteri takibini tek merkezde toplayan yalın bir otomasyon kurgulayabiliriz. İşletmenize uygun kısa bir çözüm taslağı paylaşmamı ister misiniz?",
+  "Merhaba, ben Wexon.dev yazılım stüdyosundan Mehmet. {ad} için mobil deneyimi, içerik düzenini ve iletişim akışını güçlendirecek birkaç net geliştirme alanı belirledik. Kısa değerlendirmemizi paylaşmamı ister misiniz?",
+  "Merhaba, ben Wexon.dev yazılım stüdyosundan Mehmet. {ad} için marka anlatımını güçlendiren ve ziyaretçiyi doğrudan WhatsApp iletişimine yönlendiren tek sayfalık bir web deneyimi tasarlayabiliriz. İşletmenize özel örnek ana ekranı paylaşayım mı?",
+  "Merhaba, ben Wexon.dev yazılım stüdyosundan Mehmet. Geçtiğimiz günlerde {ad} için hazırlayabileceğimiz web deneyimine ilişkin kısa bir not paylaşmıştım. Şu an gündeminizde değilse tekrar rahatsız etmeyeyim; örnek ana ekranı iletmemi ister misiniz?",
+  "Merhaba, ben Wexon.dev yazılım stüdyosundan Mehmet. {ad} için hizmetleri güçlü biçimde sunan ve ziyaretçiyi doğrudan WhatsApp iletişimine yönlendiren mobil odaklı bir web sayfası tasarlayabiliriz. Lansman dönemine özel başlangıç bedeli 4.900 TL. İşletmenize özel örnek ana ekranı paylaşayım mı?",
   "Merhaba, ben Wexon.dev yazılım stüdyosundan Mehmet. {ad} için tekrarlayan teklif, sipariş veya müşteri takip işlerini tek panelde toplayan bir yapı önerebiliriz. İşletmenize uygun kısa bir otomasyon fikri paylaşmamı ister misiniz?",
   "Merhaba, ben Wexon.dev yazılım stüdyosundan Mehmet. {ad} için mevcut web deneyiminin mobil görünümünü ve iletişim akışını güçlendirecek birkaç iyileştirme önerim var. Kısa bir değerlendirme paylaşmamı ister misiniz?",
   "Merhaba, ben Wexon.dev yazılım stüdyosundan Mehmet. {ad} için müşterilerin işletmeyi tanıyıp WhatsApp üzerinden kolayca iletişime geçmesini sağlayan tek sayfalık bir web deneyimi önerebiliriz. Örnek ilk ekranı paylaşmamı ister misiniz?",
@@ -63,27 +68,27 @@ export function generateSalesCopy(angle: CopyAngle, vertical: Vertical = "water"
       case "otomasyon":
         return {
           name: "Yazılım — otomasyon",
-          body: "Merhaba, ben Wexon.dev yazılım stüdyosundan Mehmet. {ad} için teklif, sipariş ve müşteri takibini tek merkezde toplayan yalın bir otomasyon kurgulayabiliriz. İşletmenize uygun kısa bir çözüm taslağı paylaşmamı ister misiniz?",
+          body: "Merhaba, ben Mehmet, Wexon.dev’den yazıyorum. {ad} için gelen müşteri taleplerini tek listede toplayıp kimin dönüş beklediğini hatırlatan küçük bir sistem kurabiliriz. Böylece hiçbir talep mesajların arasında kaybolmaz. Talepleri şu an nerede takip ediyorsunuz, WhatsApp’ta mı, bir defterde mi?",
         };
       case "bakim":
         return {
           name: "Yazılım — bakım",
-          body: "Merhaba, ben Wexon.dev yazılım stüdyosundan Mehmet. {ad} için mobil deneyimi, içerik düzenini ve iletişim akışını güçlendirecek birkaç net geliştirme alanı belirledik. Kısa değerlendirmemizi paylaşmamı ister misiniz?",
+          body: "Merhaba, ben Mehmet, Wexon.dev’den yazıyorum. Web sitesi olan işletmelere bakım desteği veriyoruz; içeriklerin güncel kalması, yedekleme ve küçük düzeltmelerle biz ilgileniyoruz. {ad} için böyle bir desteğe ihtiyaç olursa yardımcı olabilirim. Şu an sitenizi kim güncelliyor?",
         };
       case "satis":
         return {
           name: "Yazılım — satış",
-          body: "Merhaba, ben Wexon.dev yazılım stüdyosundan Mehmet. {ad} için marka anlatımını güçlendiren ve ziyaretçiyi doğrudan WhatsApp iletişimine yönlendiren tek sayfalık bir web deneyimi tasarlayabiliriz. İşletmenize özel örnek ana ekranı paylaşayım mı?",
+          body: "Merhaba, ben Mehmet, Wexon.dev’den yazıyorum. Google, Instagram ve WhatsApp’tan gelen taleplerin tek yerde toplanmasını sağlayan sade akışlar kuruyoruz; böylece hangi müşterinin nereden geldiğini görürsünüz. {ad} için de işe yarayabilir. İsterseniz kısaca nasıl çalıştığını anlatayım.",
         };
       case "takip":
         return {
           name: "Yazılım — takip",
-          body: "Merhaba, ben Wexon.dev yazılım stüdyosundan Mehmet. Geçtiğimiz günlerde {ad} için hazırlayabileceğimiz web deneyimine ilişkin kısa bir not paylaşmıştım. Şu an gündeminizde değilse tekrar rahatsız etmeyeyim; örnek ana ekranı iletmemi ister misiniz?",
+          body: "Merhaba, ben Mehmet, Wexon.dev’den. {ad} için web sitesi ve müşteri talepleri konusunda kısa bir fikrim var. Şu an gündeminizde değilse hiç sorun değil; ileride ihtiyaç olursa bu numaradan bana yazabilirsiniz. Uygun olursa iki cümleyle anlatayım mı?",
         };
       default:
         return {
           name: "Yazılım — web",
-          body: "Merhaba, ben Wexon.dev yazılım stüdyosundan Mehmet. {ad} için hizmetleri güçlü biçimde sunan ve ziyaretçiyi doğrudan WhatsApp iletişimine yönlendiren mobil odaklı bir web sayfası tasarlayabiliriz. Lansman dönemine özel başlangıç bedeli 4.900 TL. İşletmenize özel örnek ana ekranı paylaşayım mı?",
+          body: "Merhaba, ben Mehmet, Wexon.dev’den yazıyorum. {ad} için hizmetlerinizi, konumunuzu ve size nasıl ulaşılacağını tek bakışta gösteren sade bir web sitesi fikrim var. Sizi araştıran müşteri aradığını kolayca bulur, size de doğrudan yazabilir. Uygun olursa kısaca anlatayım mı?",
         };
     }
   }

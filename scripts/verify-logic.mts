@@ -84,9 +84,10 @@ const softwarePitch = composePitch("software", {
   website: "",
   campaignQuery: "diş kliniği",
 });
-check(softwarePitch.body.startsWith("Merhaba, ben Wexon.dev yazılım stüdyosundan Mehmet."), "pitch identifies sender professionally", softwarePitch.body);
-check(softwarePitch.body.includes("4.900 TL"), "pitch contains offer price", softwarePitch.body);
-check(softwarePitch.body.length < 360, "pitch remains concise", softwarePitch.body.length);
+check(softwarePitch.body.startsWith("Merhaba, Wexon.dev’den yazıyorum."), "pitch identifies sender", softwarePitch.body);
+check(!softwarePitch.body.includes("TL") && !/hazırladım|inceledim|baktım/.test(softwarePitch.body), "first pitch has no price or unverified claims", softwarePitch.body);
+check(softwarePitch.body.includes("randevu") && softwarePitch.body.includes("Test Diş Kliniği"), "pitch uses sector value and name", softwarePitch.body);
+check(softwarePitch.body.length < 420, "pitch remains concise", softwarePitch.body.length);
 
 check(englishQuery("restoran") === "restaurant", "en restoran");
 check(englishQuery("klinik") === "clinic", "en klinik");

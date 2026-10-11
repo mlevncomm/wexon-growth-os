@@ -5,6 +5,7 @@ import {
   LLM_PROVIDERS,
 } from "./llm-providers";
 import { playbookToPrompt, type Playbook } from "./playbook";
+import { truthIssues } from "./sales/quality";
 import { productLine, type Vertical } from "./verticals";
 
 export { LLM_PROVIDERS } from "./llm-providers";
@@ -42,7 +43,7 @@ function apiErrorMessage(json: unknown, status: number): string {
     if (typeof msg === "string" && msg.trim()) return msg.trim();
   }
   if (status === 404) {
-    return "Gemini model bulunamadı (404). Sistem’de gemini-3.5-flash kaydedip Kontrol et’e basın.";
+    return "Gemini model bulunamadı (404). Ayarlar’da gemini-3.5-flash kaydedip Kontrol et’e basın.";
   }
   return `AI hata ${status}`;
 }
@@ -247,10 +248,8 @@ export function sanitizeCopy(input: { name: string; body: string }, angle: CopyA
   const name = input.name.replace(/\s+/g, " ").trim().slice(0, 80) || fallback.name;
   let body = input.body.replace(/\s+\n/g, "\n").trim();
   if (!body) body = fallback.body;
-  if (!body.includes("{ad}")) body = `Merhaba {ad}, ${body}`;
-  if (!body.includes("{ilçe}") && !body.includes("{il}")) {
-    body = body.replace(/\{ad\}/, "{ad}, {ilçe} bölgesinde");
-  }
+  // {ad} işletme adıdır; selamlamaya kişi adı gibi yapıştırılmaz, {ilçe} zorla eklenmez
+  if (!body.includes("{ad}")) body = `Merhaba, {ad} için yazıyorum. ${body}`;
   if (body.length > 900) body = `${body.slice(0, 897).trim()}…`;
   return { name, body };
 }
@@ -258,7 +257,7 @@ export function sanitizeCopy(input: { name: string; body: string }, angle: CopyA
 export function copyNeedsRewrite(body: string, playbook?: Playbook): boolean {
   const text = body.trim();
   if (!text.includes("{ad}")) return true;
-  if (!text.includes("{ilçe}") && !text.includes("{il}")) return true;
+  if (truthIssues(text).length) return true;
   if (/[!]{3,}/.test(text) || /\b(ucuz|bedava|iys|onayınız|spam)\b/i.test(text)) return true;
   if (text.length > 520) return true;
   const sentences = text.split(/[.!?]+/).filter((s) => s.trim());
@@ -279,20 +278,24 @@ function angleLabel(angle: CopyAngle, vertical: Vertical = "water"): string {
 function buildPrompt(angle: CopyAngle, brief: string, playbook?: Playbook, vertical: Vertical = "water"): string {
   const extra = brief.trim() ? `Ek istek: ${brief.trim().slice(0, 400)}` : "";
   const book = playbookToPrompt(playbook ?? { tone: "", rules: "", forbidden: "", offer: "", cta: "" });
-  return `WhatsApp B2B satış mesajı yaz. Ürün: ${productLine(vertical)}.
+  return `Çok sayıda işletmeye gidebilecek bir WhatsApp ilk temas şablonu yaz. Ürün: ${productLine(vertical)}.
 Rakibe yazma. Açı: ${angleLabel(angle, vertical)}.
-Türkçe, 2-4 kısa cümle, profesyonel ve nazik. {ad} ve {ilçe} yer tutucuları aynen kalsın.
+Türkçe, 35-65 kelime, samimi ama profesyonel; kim olduğunu, neden yazdığını, sağlanabilecek faydayı ve cevaplaması kolay tek bir soruyu içersin.
+{ad} işletme adıdır, kişi adı değil: "Merhaba {ad}" diye selamlamaya yapıştırma, "{ad} için" gibi doğal bir cümlede kullan. {ilçe} isteğe bağlıdır.
+Şablon her işletmeye gideceği için yapılmamış işi yapılmış gibi yazma: "hazırladım", "tasarladım", "inceledim", "sitenize baktım", "daha önce yazmıştım" yasak.
+Sahte aciliyet, garanti, "en iyi", "dijital dünyada", "bir üst seviyeye" gibi klişeler yok.
 İYS, onay veya izin varmış gibi yazma. Fiyatı yalnızca playbook'ta açıkça varsa kullan. Playbook CTA'sı varsa onu kullan; yoksa kolay cevaplanabilir tek bir soru sor.
 ${book}
 ${extra}
 Çıktı yalnızca JSON:
-{"name":"kısa ad","body":"Merhaba {ad}, {ilçe} ..."}`;
+{"name":"kısa ad","body":"Merhaba, ... {ad} için ..."}`;
 }
 
 function rewritePrompt(body: string, playbook?: Playbook): string {
   const book = playbookToPrompt(playbook ?? { tone: "", rules: "", forbidden: "", offer: "", cta: "" });
+  const issues = truthIssues(body);
   return `Aşağıdaki WhatsApp taslağını düzelt. Spam, kaba dil, yasak kelime, İYS/onay iddiası ve kaçmış yer tutucu olmasın.
-2-3 cümle, {ad} ve {ilçe} zorunlu.
+${issues.length ? `Düzeltilecek doğruluk sorunları: ${issues.join("; ")}.\n` : ""}35-65 kelime, {ad} zorunlu (işletme adı; selamlamaya yapıştırma).
 ${book}
 Taslak:
 ${body}
@@ -337,6 +340,8 @@ export async function generateLlmCopy(opts: {
   });
   parsed = parseCopyJson(second) ?? parseCopyLoose(second);
   if (parsed) copy = sanitizeCopy(parsed, opts.angle, vertical);
+  // Düzeltmeden sonra da doğrulanmamış iddia kalırsa AI metni yerine hazır metin
+  if (truthIssues(copy.body).length) return generateSalesCopy(opts.angle, vertical);
   return copy;
 }
 
