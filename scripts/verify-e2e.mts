@@ -86,17 +86,36 @@ try {
   // Test kayıtları
   const aq = await lead("E2E-Aquails Su Arıtma Cihazları", { rating: 4.9, reviewCount: 37 });
   const yeni = await lead("E2E-Lezzet Kebap Restoran");
-  const onayli = await lead("E2E-Bella Güzellik Salonu", { consented: true, website: "https://bella-e2e.example" });
+  const onayli = await lead("E2E-Bella Güzellik Salonu", { website: "https://bella-e2e.example" });
   const ret = await lead("E2E-Kent Gayrimenkul", { status: "ilgilenmiyor" });
   const eski = await lead("E2E-Usta Oto Servis", { status: "yazildi" });
-  const takip = await lead("E2E-Ege Metal Sanayi", { status: "yazildi", consented: true });
+  const takip = await lead("E2E-Ege Metal Sanayi", { status: "yazildi" });
+  // Eski sürümden kalma, kaynağı kayıtlı olmayan "Onaylı" işareti (izin sayılmamalı)
+  const eskiOnay = await lead("E2E-Moda Butik", { consented: true });
   await prisma.outreachJob.create({ data: { tenantId: TENANT, leadId: takip.id, message: "E2E eski ilk mesaj", status: "sent", channel: "whatsapp", sentAt: new Date(Date.now() - 5 * day), createdAt: new Date(Date.now() - 5 * day) } });
+
+  // 13) İletişim izni: teknik uygunluktan ayrı hukuki dayanak
+  const isaret = await call(`/api/leads/${yeni.id}`, { method: "PATCH", body: { consented: true } });
+  check(isaret.status === 400, "kaynaksız “Onaylı” işareti reddedilir (izin otomatik oluşmaz)", isaret.json);
+  const yanlisTur = await call(`/api/leads/${yeni.id}`, { method: "PATCH", body: { legalBasis: { tur: "acik_onay" } } });
+  check(yanlisTur.status === 400, "kaynağı olmadan dayanak kaydedilmez");
+  const gEski = await call(`/api/leads/${eski.id}/mesaj`);
+  check(gEski.json.legal.durum === "yok" && !gEski.json.policy.allowed && gEski.json.policy.needsBasis, "“Yazıldı” durumu izin sayılmaz", gEski.json.policy);
+  const gEskiOnay = await call(`/api/leads/${eskiOnay.id}/mesaj`);
+  check(gEskiOnay.json.legal.durum === "kaynaksiz" && !gEskiOnay.json.policy.allowed, "kaynağı belirsiz eski işaret dayanak sayılmaz", gEskiOnay.json.legal);
+  const basisOnay = await call(`/api/leads/${onayli.id}`, { method: "PATCH", body: { legalBasis: { tur: "acik_onay", kaynak: "telefon", not: "E2E telefon görüşmesi" } } });
+  check(basisOnay.status === 200 && basisOnay.json.consented === true, "açık onay kaynağıyla kaydedilir");
+  await call(`/api/leads/${takip.id}`, { method: "PATCH", body: { legalBasis: { tur: "acik_onay", kaynak: "whatsapp_yazisma" } } });
+  await call(`/api/leads/${aq.id}`, { method: "PATCH", body: { legalBasis: { tur: "tacir_esnaf", kaynak: "operator_beyani", not: "E2E işletme hattı" } } });
+  const gOnayli = await call(`/api/leads/${onayli.id}/mesaj`);
+  check(gOnayli.json.legal.durum === "var" && gOnayli.json.legal.kaynak === "telefon" && gOnayli.json.legal.kapsam === "whatsapp_ticari_ileti" && Boolean(gOnayli.json.legal.zaman) && gOnayli.json.legal.kaydeden === env.ADMIN_EMAIL, "izin defteri: kaynak, kapsam, zaman ve kaydeden tutulur", gOnayli.json.legal);
 
   // 1-4) Kayıt, veri ve sektör tanıma, hizmet seçimi
   const g = await call(`/api/leads/${aq.id}/mesaj`);
   check(g.status === 200 && g.json.ctx.sector.id === "teknik" && g.json.ctx.shortName === "E2E-Aquails", "sektör tanıma ve kısa ad", g.json?.ctx?.sector);
-  check(g.json.category === "ilk_temas" && g.json.policy.kind === "ilk", "yeni müşteri → ilk temas", g.json?.policy);
+  check(g.json.category === "ilk_temas" && g.json.policy.kind === "ilk" && g.json.policy.retHakkiGerekli === true, "tacir/esnaf beyanlı yeni müşteri → ilk temas, ret hakkı zorunlu", g.json?.policy);
   check(g.json.ctx.facts.some((f: string) => f.includes("4.9") || f.includes("4,9")), "Google puanı doğrulanmış bilgi olarak bağlamda", g.json.ctx.facts);
+  await call(`/api/leads/${eski.id}`, { method: "PATCH", body: { legalBasis: { tur: "acik_onay", kaynak: "telefon" } } });
   const gOto = await call(`/api/leads/${eski.id}/mesaj`);
   check(gOto.json.policy.kind === "takip" && gOto.json.category === "takip", "kaydı olmayan Yazıldı müşteri → takip (ilk temas tekrar edilmez)", gOto.json.policy);
   const gTakip = await call(`/api/leads/${takip.id}/mesaj`);
@@ -106,6 +125,9 @@ try {
   const gen = await call(`/api/leads/${aq.id}/mesaj`, { body: { action: "generate", category: "ilk_temas", senderName: "Mehmet" } });
   check(gen.status === 200 && gen.json.result.drafts.length === 3, "üç alternatif üretildi", gen.status);
   check(gen.json.result.drafts.every((d: any) => !d.blockers.length && d.qualityScore >= 85), "taslaklar engelsiz ve ≥85", gen.json.result.drafts.map((d: any) => [d.qualityScore, d.qualityReasons]));
+  check(gen.json.result.drafts.every((d: any) => /tekrar yazmam|istemezseniz/i.test(d.message)), "tacir/esnaf beyanında taslaklar ret seçeneği içerir");
+  const retsiz = await call(`/api/leads/${aq.id}/mesaj`, { body: { action: "record", category: "ilk_temas", style: "elle", message: "Merhaba, ben Mehmet, Wexon.dev’den yazıyorum. E2E-Aquails için teklif almayı kolaylaştıran sade bir site önerim var. Kısaca anlatayım mı?" } });
+  check(retsiz.status === 422, "tacir/esnaf beyanında ret seçeneği olmayan mesaj kaydedilmez", retsiz.status);
   check(new Set(gen.json.result.drafts.map((d: any) => d.message.split(/(?<=[.!?])\s+/)[0])).size === 3, "üç taslağın açılışı farklı");
   check(gen.json.result.source === (gen.json.result.aiCalls ? "ai" : "local") || gen.json.result.source === "karma", "kaynak bilgisi tutarlı", gen.json.result.source);
   const genRet = await call(`/api/leads/${ret.id}/mesaj`, { body: { action: "generate", category: "ilk_temas" } });
@@ -136,15 +158,23 @@ try {
   check(sablon.status === 200 || sablon.status === 201, "şablon kaydedilir", sablon.status);
 
   // 13) İzin değişikliği denetim kaydı
-  await call(`/api/leads/${yeni.id}`, { method: "PATCH", body: { consented: true } });
-  await call(`/api/leads/${yeni.id}`, { method: "PATCH", body: { consented: false } });
+  await call(`/api/leads/${yeni.id}`, { method: "PATCH", body: { legalBasis: { tur: "acik_onay", kaynak: "form" } } });
+  check((await call(`/api/leads/${yeni.id}/mesaj`)).json.policy.allowed === true, "dayanak kaydından sonra elle yazılabilir");
+  await call(`/api/leads/${yeni.id}`, { method: "PATCH", body: { legalBasisRevoke: { neden: "E2E vazgeçti" } } });
   const audits = await prisma.auditLog.findMany({ where: { tenantId: TENANT, detail: { contains: yeni.id } }, orderBy: { createdAt: "asc" } });
-  check(audits.map((a) => a.action).join(",") === "lead.consent.granted,lead.consent.revoked", "onay verme/geri alma denetim kaydına yazılır", audits.map((a) => a.action));
+  check(audits.map((a) => a.action).join(",") === "lead.consent.granted,lead.consent.revoked", "onay verme/geri çekme izin defterine yazılır", audits.map((a) => a.action));
+  const gCekildi = await call(`/api/leads/${yeni.id}/mesaj`);
+  check(gCekildi.json.legal.durum === "geri_cekildi" && !gCekildi.json.policy.allowed && (await prisma.lead.findUnique({ where: { id: yeni.id } }))?.consented === false, "geri çekilen dayanakla satış mesajı yok", gCekildi.json.legal);
+  // Ret, izni de geri çeker
+  await call(`/api/leads/${takip.id}`, { method: "PATCH", body: { status: "ilgilenmiyor" } });
+  const gRet = await call(`/api/leads/${takip.id}/mesaj`);
+  check(gRet.json.legal.durum === "geri_cekildi" && (await prisma.lead.findUnique({ where: { id: takip.id } }))?.consented === false, "ret bildirimi izni geri çeker", gRet.json.legal);
+  check((await call(`/api/leads/${takip.id}`, { method: "PATCH", body: { legalBasis: { tur: "acik_onay", kaynak: "telefon" } } })).status === 400, "ret bildirene dayanak kaydedilemez");
 
   // 10) Kuyruğa ekleme
-  const q1 = await call("/api/outreach", { body: { leadIds: [yeni.id, ret.id, onayli.id], templateId: "auto" } });
-  check(q1.status === 200 && q1.json.queued === 1 && q1.json.skipped === 2, "kuyruk: yalnızca onaylı müşteri girer", q1.json);
-  check(Object.keys(q1.json.reasons).some((r) => r.includes("İletişim onayı")) && Object.keys(q1.json.reasons).some((r) => r.includes("iletişim istemediğini")), "kuyruk: atlama nedenleri raporlanır", q1.json.reasons);
+  const q1 = await call("/api/outreach", { body: { leadIds: [yeni.id, ret.id, onayli.id, aq.id, eskiOnay.id], templateId: "auto" } });
+  check(q1.status === 200 && q1.json.queued === 1 && q1.json.skipped === 4, "kuyruk: yalnızca kaynaklı açık onaylı müşteri girer (tacir/esnaf, eski işaret, geri çekilmiş, ret giremez)", q1.json);
+  check(Object.keys(q1.json.reasons).some((r) => r.includes("açık onay")) && Object.keys(q1.json.reasons).some((r) => r.includes("iletişim istemediğini")), "kuyruk: atlama nedenleri raporlanır", q1.json.reasons);
   const kotuSablon = await call("/api/templates", { body: { name: "E2E-kötü", body: "Merhaba, {ad} için web sitesi tasarımı hazırladım." } });
   const q2 = await call("/api/outreach", { body: { leadIds: [onayli.id], templateId: kotuSablon.json?.id } });
   check(q2.status === 400, "yalan iddialı şablon kuyruğa alınmaz", q2.status);
@@ -158,6 +188,13 @@ try {
   check(manuel.status === 400, "eski taslak elle 'Gönderdim' ile kaydedilemez", manuel.status);
   const onayRet = await call("/api/outreach/approve", { body: { id: eskiTaslak.id, action: "approve" } });
   check(onayRet.status === 200 && onayRet.json.updated === 0 && onayRet.json.blocked.length === 1, "eski taslak onaylanamaz", onayRet.json);
+
+  const onaysizTaslak = await prisma.outreachJob.create({ data: { tenantId: TENANT, leadId: aq.id, message: "Merhaba, Wexon.dev’den yazıyorum. E2E-Aquails için kısa bir fikrim var; istemezseniz tekrar yazmam.", status: "pending", channel: "whatsapp" } });
+  snap = await call("/api/outreach");
+  const onaysizKart = snap.json.drafts.find((d: any) => d.id === onaysizTaslak.id);
+  check(Boolean(onaysizKart?.blocked) && /açık onay/i.test(onaysizKart.blocked), "açık onayı olmayan eski kuyruk taslağı panelde engelli", onaysizKart);
+  check((await call("/api/outreach/approve", { body: { id: onaysizTaslak.id, action: "manual-sent" } })).status === 400, "açık onayı olmayan kuyruk taslağı elle “Gönderdim” ile de geçemez");
+  check((await prisma.outreachJob.findUnique({ where: { id: onaysizTaslak.id } }))?.status === "pending", "engellenen taslak silinmez, beklemede kalır");
 
   // 11) Kuyruk onayı + 15) zamanlanmış görev
   const bekleyen = snap.json.drafts.find((d: any) => d.name === "E2E-Bella Güzellik Salonu");
@@ -185,7 +222,8 @@ try {
     // Ayar API'si üzerinden: sunucunun ayar önbelleği de temizlenir
     await call("/api/settings", { method: "PUT", body: { waCloudToken: "E2E-SAHTE-TOKEN", waPhoneNumberId: "000000000000000" } });
     try {
-      const cloudLead = await lead("E2E-Cloud Kuaför", { consented: true });
+      const cloudLead = await lead("E2E-Cloud Kuaför");
+      await call(`/api/leads/${cloudLead.id}`, { method: "PATCH", body: { legalBasis: { tur: "acik_onay", kaynak: "telefon" } } });
       await prisma.outreachJob.create({ data: { tenantId: TENANT, leadId: cloudLead.id, message: "Merhaba, Wexon.dev’den yazıyorum. E2E-Cloud için kısa bir fikrim var; anlatayım mı?", status: "queued", channel: "whatsapp", scheduledAt: new Date(Date.now() - 1000) } });
       await call("/api/outreach/tick", { headers: { authorization: `Bearer ${env.CRON_SECRET}` } });
       const cj = await prisma.outreachJob.findFirst({ where: { leadId: cloudLead.id } });

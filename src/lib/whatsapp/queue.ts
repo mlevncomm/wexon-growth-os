@@ -431,7 +431,8 @@ export async function markManualSent(opts: {
   if (!message) throw new Error("Mesaj boş olamaz.");
   const issues = currentTenant().vertical === "software" ? truthIssues(message) : [];
   if (issues.length) throw new Error(`Kaydedilmedi: ${issues[0]}.`);
-  const policy = await leadPolicy(job.lead, "manual", undefined, job.id);
+  // Kuyruktan gelen taslak, elle "Gönderdim" denerek de kuyruk kurallarını (açık onay) aşamaz
+  const policy = await leadPolicy(job.lead, "queue", undefined, job.id);
   if (!policy.allowed) throw new Error(policy.reason);
 
   await prisma.$transaction([
@@ -515,7 +516,7 @@ export async function getQueueSnapshot() {
       : null,
     drafts: (await Promise.all(pendingJobs.map(async (job) => {
       const issues = currentTenant().vertical === "software" ? truthIssues(job.message) : [];
-      const policy = await leadPolicy(job.lead, "manual", undefined, job.id);
+      const policy = await leadPolicy(job.lead, "queue", undefined, job.id);
       return { job, blocked: !policy.allowed ? policy.reason : issues.length ? `${issues[0]}; metni düzeltin ya da reddedin.` : null };
     }))).map(({ job, blocked }) => ({
       id: job.id,

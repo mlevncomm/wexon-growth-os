@@ -2,12 +2,13 @@
 import { CATEGORIES, defaultCategory } from "../src/lib/sales/categories.ts";
 import { buildContext, startPriceFrom, type ContextInput } from "../src/lib/sales/context.ts";
 import { ablative, localDrafts } from "../src/lib/sales/drafts.ts";
-import { generateDrafts, refineDraft, SalesPolicyError, type ChatFn } from "../src/lib/sales/engine.ts";
+import { generateDrafts, LITE_KEEP, localResult, refineDraft, SalesPolicyError, type ChatFn } from "../src/lib/sales/engine.ts";
 import { llmChat, type LlmMeta } from "../src/lib/llm.ts";
 import { DEFAULT_LLM } from "../src/lib/llm-providers.ts";
 import { SECTOR_PROFILES } from "../src/lib/sales/profiles.ts";
 import { evaluateMessage, mentionsName, similarity } from "../src/lib/sales/quality.ts";
-import { categoryFits, contactPolicy } from "../src/lib/sales/policy.ts";
+import { categoryFits, contactPolicy, mentionsOptOut } from "../src/lib/sales/policy.ts";
+import { deriveLegal, type LegalState } from "../src/lib/sales/consent.ts";
 import { inferSector, type SectorId } from "../src/lib/sales/sector.ts";
 
 let failed = 0;
@@ -214,21 +215,49 @@ check(lyingRefine.draft.message === long && lyingRefine.warnings.length === 1, "
 // --- İletişim politikası (üretim, kayıt, kuyruk, onay ve gönderimde aynı kural) ---
 const day = 86_400_000;
 const nowP = new Date("2026-10-11T12:00:00Z");
+const ONAY: LegalState = { durum: "var", tur: "acik_onay", kaynak: "telefon" };
+const ESNAF: LegalState = { durum: "var", tur: "tacir_esnaf", kaynak: "operator_beyani" };
+const YOK: LegalState = { durum: "yok" };
 const pol = (o: Partial<Parameters<typeof contactPolicy>[0]>) =>
-  contactPolicy({ status: "yeni", notes: "", consented: false, history: { count: 0, lastAt: null }, mode: "manual", now: nowP, ...o });
+  contactPolicy({ status: "yeni", notes: "", legal: ONAY, history: { count: 0, lastAt: null }, mode: "manual", now: nowP, ...o });
+// Ret
 check(!pol({ status: "ilgilenmiyor" }).allowed, "politika: ret → elle satış yok");
-check(!pol({ status: "ilgilenmiyor", mode: "queue", consented: true }).allowed, "politika: ret → kuyruk yok (onay olsa bile)");
+check(!pol({ status: "ilgilenmiyor", mode: "queue" }).allowed, "politika: ret → kuyruk yok (açık onay olsa bile)");
 check(pol({ status: "ilgilenmiyor", category: "kapanis" }).allowed, "politika: ret → bir kez kapanış serbest");
 check(!pol({ status: "ilgilenmiyor", category: "kapanis", history: { count: 2, lastAt: nowP, closed: true } }).allowed, "politika: ikinci kapanış yok");
 check(!pol({ status: "yazildi", notes: "Müşteri iletişim istemiyor" }).allowed, "politika: notta ret");
-check(!pol({ mode: "queue" }).allowed && pol({ mode: "queue", consented: true }).allowed, "politika: kuyruk yalnızca onay kaydıyla");
-check(pol({}).allowed && pol({}).warnings.length === 1, "politika: elle ilk temas serbest ama onay uyarısı var");
+check(!pol({ legal: { durum: "geri_cekildi" } }).allowed && pol({ legal: { durum: "geri_cekildi" }, category: "kapanis" }).allowed, "politika: dayanak geri çekildi → yalnızca kapanış");
+check(!pol({ mode: "queue", category: "kapanis" }).allowed, "politika: kapanış kuyruktan gitmez");
+// Hukuki dayanak ile teknik uygunluk ayrı
+check(!pol({ mode: "queue", legal: YOK }).allowed && !pol({ mode: "queue", legal: ESNAF }).allowed && pol({ mode: "queue", legal: ONAY }).allowed, "politika: kuyruk yalnızca kaynaklı açık onayla");
+const noBasis = pol({ legal: YOK });
+check(!noBasis.allowed && noBasis.needsBasis === true, "politika: dayanak yoksa elle satış mesajı da yok", noBasis);
+check(!pol({ status: "yazildi", legal: YOK }).allowed, "politika: “Yazıldı” izin sayılmaz");
+const legacyFlag = pol({ legal: { durum: "kaynaksiz" } });
+check(!legacyFlag.allowed && legacyFlag.warnings.some((w) => w.includes("kaynağı")), "politika: kaynağı belirsiz eski “Onaylı” işareti dayanak değil", legacyFlag);
+const esnaf = pol({ legal: ESNAF });
+check(esnaf.allowed && esnaf.retHakkiGerekli === true, "politika: tacir/esnaf beyanı elle izinli, ret hakkı zorunlu", esnaf);
+check(pol({ legal: ONAY }).allowed && !pol({ legal: ONAY }).retHakkiGerekli, "politika: açık onayla elle ilk temas");
+// Teknik zamanlama (dayanak varken)
 check(!pol({ status: "yazildi", history: { count: 1, lastAt: new Date(nowP.getTime() - day) } }).allowed, "politika: takip 3 günden önce yok");
 const fu = pol({ status: "yazildi", history: { count: 1, lastAt: new Date(nowP.getTime() - 4 * day) } });
 check(fu.allowed && fu.kind === "takip", "6) politika: daha önce yazılan müşteriye izinli takip", fu);
-check(pol({ status: "yazildi", consented: true, mode: "queue", history: { count: 2, lastAt: new Date(nowP.getTime() - 5 * day) } }).allowed, "politika: onaylı müşteriye kuyruktan 2. takip");
-check(!pol({ status: "yazildi", consented: true, mode: "queue", history: { count: 3, lastAt: new Date(nowP.getTime() - 9 * day) } }).allowed, "politika: en fazla 2 takip");
-check(pol({ status: "donus_var", history: { count: 1, lastAt: nowP } }).kind === "yanit", "politika: dönen müşteriyle konuşma beklemesiz");
+check(pol({ status: "yazildi", mode: "queue", history: { count: 2, lastAt: new Date(nowP.getTime() - 5 * day) } }).allowed, "politika: açık onaylı müşteriye kuyruktan 2. takip");
+check(!pol({ status: "yazildi", mode: "queue", history: { count: 3, lastAt: new Date(nowP.getTime() - 9 * day) } }).allowed, "politika: en fazla 2 takip");
+check(pol({ status: "donus_var", legal: YOK, history: { count: 1, lastAt: nowP } }).kind === "yanit", "politika: müşteri yazdıysa elle yanıt (dayanak uyarısıyla)");
+check(!pol({ status: "donus_var", legal: YOK, mode: "queue" }).allowed, "politika: müşteri yazsa bile kuyruk açık onay ister");
+
+// İzin defteri
+const ev = (action: string, detail: Record<string, unknown>, at: string) => ({ action, detail: JSON.stringify({ leadId: "x", ...detail }), createdAt: at, actorEmail: "op@test" });
+check(deriveLegal([], false).durum === "yok", "defter: kayıt yok");
+check(deriveLegal([], true).durum === "kaynaksiz", "defter: kaynağı olmayan eski işaret geçersiz");
+check(deriveLegal([ev("lead.consent.granted", { kaynak: "musteriler-ekrani" }, "2026-10-01")], true).durum === "kaynaksiz", "defter: eski sürümün kaynaksız onayı geçersiz");
+const granted = deriveLegal([ev("lead.consent.granted", { tur: "acik_onay", kaynak: "telefon", kapsam: "whatsapp_ticari_ileti", not: "10.10 görüşme" }, "2026-10-02")], true);
+check(granted.durum === "var" && granted.kaynak === "telefon" && granted.kapsam === "whatsapp_ticari_ileti" && granted.kaydeden === "op@test" && Boolean(granted.zaman), "defter: kaynak, kapsam, zaman, kaydeden tutulur", granted);
+check(deriveLegal([ev("lead.consent.granted", { tur: "acik_onay", kaynak: "telefon" }, "2026-10-02"), ev("lead.consent.revoked", { neden: "vazgeçti" }, "2026-10-05")], false).durum === "geri_cekildi", "defter: geri çekme");
+check(deriveLegal([ev("lead.consent.granted", { tur: "acik_onay", kaynak: "telefon" }, "2026-10-02"), ev("lead.opt_out", {}, "2026-10-05")], false).durum === "geri_cekildi", "defter: ret = geri çekme");
+check(deriveLegal([ev("lead.opt_out", {}, "2026-10-05"), ev("lead.opt_out.cleared", {}, "2026-10-06")], false).durum === "yok", "defter: ret kaldırılınca dayanak kendiliğinden oluşmaz");
+check(deriveLegal([ev("lead.consent.revoked", {}, "2026-10-05"), ev("lead.consent.granted", { tur: "tacir_esnaf", kaynak: "operator_beyani" }, "2026-10-07")], false).tur === "tacir_esnaf", "defter: sıralama tarihe göre");
 check(!categoryFits("takip", "ilk_temas") && categoryFits("takip", "takip") && categoryFits("ilk", "ilk_temas"), "politika: yazılmış müşteriye ilk temas tekrar gitmez");
 
 // --- Kalite puanı kalibrasyonu: farklı kalitedeki mesajlar doğru sıralanmalı ---
@@ -303,7 +332,7 @@ check(distorted.reasons.includes("Google puanı ya da yorum sayısı çarpıtıl
 const faithful = evaluateMessage("Merhaba, Wexon.dev’den Mehmet. Google’da 4,9 puan ve 310 yorumla öne çıkan Adent için randevu almayı kolaylaştıran bir sayfa düşündük. Kısaca anlatayım mı?", adent, "ilk_temas");
 check(!faithful.reasons.includes("Google puanı ya da yorum sayısı çarpıtılmış"), "R4 doğru aktarım cezalandırılmaz", faithful);
 // R5: "Yazıldı" işaretli ama kaydı olmayan müşteriye ilk temas tekrar gitmez
-const legacy = pol({ status: "yazildi", history: { count: 0, lastAt: null } });
+const legacy = pol({ status: "yazildi", legal: ONAY, history: { count: 0, lastAt: null } });
 check(legacy.allowed && legacy.kind === "takip" && legacy.warnings.length > 0, "R5 kaydı olmayan Yazıldı = takip", legacy);
 check(!categoryFits(legacy.kind, "ilk_temas"), "R5 ilk temas seçilemez");
 // R6: AI üç taslağı aynı cümleyle açarsa ve hepsine fiyat koyarsa düzeltme turuna girer
@@ -389,6 +418,36 @@ const r15 = evaluateMessage("Köşe Ocakbaşı gibi Kadıköy'de öne çıkan i�
 check(r15.reasons.includes("Selamlama mesajın ortasında"), "R15 selamlama ortadaysa puan düşer", r15.reasons);
 const r16 = evaluateMessage("Nilüfer'de hizmet veren Usta Oto Servis için servis randevusunu kolaylaştıran bir sayfa düşündüm. Kısaca anlatayım mı?", oto, "ilk_temas");
 check(r16.warnings.some((w) => w.includes("kimin")), "R16 gönderen belli değilse uyarı", r16.warnings);
+
+// --- Bu turun regresyonları: yedek model kalitesi, ret hakkı ---
+// R17: işletme adı hatalı yazımı (gerçek 3.5-flash-lite çıktısı: "Mali Şüvirlik")
+const smmm = base({ name: "SMMM Yasin DOĞAN - Muhasebe ve Mali Müşavirlik Ofisi" });
+check(evaluateMessage("Merhaba, Wexon.dev yazılım stüdyosundan Mehmet ben. SMMM Yasin DOĞAN - Muhasebe ve Mali Şüvirlik Ofisi için bir başlangıç sayfası planlıyoruz. İncelemek ister misiniz?", smmm, "ilk_temas").blockers.some((b) => b.includes("hatalı yazılmış")), "R17 adın yanlış yazımı engellenir");
+check(!evaluateMessage("Merhaba, Wexon.dev’den Mehmet. Müşavirliğinize uygun sade bir sayfa önerim var; SMMM Yasin DOĞAN için kısaca anlatayım mı?", smmm, "ilk_temas").blockers.some((b) => b.includes("hatalı yazılmış")), "R17 ek almış doğru ad engellenmez");
+// R18: talimat metni sızıntısı ve Türkçe olmayan çıktı
+check(evaluateMessage("Merhaba, Wexon.dev’den Mehmet. Aquails için ana talep türünüze yönelik destek sağlayabiliriz. Anlatayım mı?", aq, "ilk_temas").blockers.some((b) => b.includes("sızmış")), "R18 talimat sızıntısı engellenir");
+check(evaluateMessage("Hello, this is Mehmet from Wexon.dev. We would like to build a website for your business. Interested?", aq, "ilk_temas").blockers.some((b) => b.includes("Türkçe")), "R18 İngilizce mesaj engellenir");
+// R19: yedek "lite" model: 85-89 puanlı AI taslağı güvenli yerel taslakla değiştirilir; ana modelde korunur
+const mid = "Merhaba, ben Mehmet, Wexon.dev’den yazıyorum. Aquails için teklif almayı kolaylaştıran sade bir site yapabiliriz, başlangıç 4.900 TL. Uygun olursa anlatayım mı?";
+const mkChat = (model: string): ChatFn => {
+  const f: ChatFn = async () => {
+    f.meta?.push({ model, thinking: true, ms: 10 });
+    return JSON.stringify({ variants: ["samimi", "profesyonel", "merak"].map((style, i) => ({ style, message: `${["Merhaba", "İyi günler", "Selamlar"][i]}, ben Mehmet, Wexon.dev’den yazıyorum. Aquails için teklif almayı kolaylaştıran sade bir site yapabiliriz, başlangıç 4.900 TL. Uygun olursa anlatayım mı?` })) });
+  };
+  f.meta = [];
+  return f;
+};
+const midScore = evaluateMessage(mid, aq, "ilk_temas").score;
+const viaLite = await generateDrafts({ ctx: aq, category: "ilk_temas", chat: mkChat("gemini-3.5-flash-lite") });
+const viaMain = await generateDrafts({ ctx: aq, category: "ilk_temas", chat: mkChat("gemini-3.6-flash") });
+check(midScore < LITE_KEEP, "R19 deneme taslağı yedek model eşiğinin altında", midScore);
+check(viaLite.drafts.every((d) => d.source === "local") && viaLite.warnings.some((w) => w.includes("yedek model")), "R19 yedek modelin sınırdaki taslakları güvenli taslakla değiştirilir", viaLite.warnings);
+check(viaMain.drafts.some((d) => d.source === "ai"), "R19 ana model aynı taslağı korur");
+// R20: tacir/esnaf beyanında ret seçeneği kendiliğinden eklenir
+const esnafCtx = { ...aq, retHakki: true };
+const esnafDrafts = localResult(esnafCtx, "ilk_temas").drafts;
+check(esnafDrafts.every((d) => mentionsOptOut(d.message)), "R20 ret seçeneği eklenir", esnafDrafts.map((d) => d.message.slice(-60)));
+check(!mentionsOptOut("Aquails için üretim kapasitesini anlatan bir site"), "R20 'üretim' kelimesi ret sayılmaz");
 
 console.log(`yerel taslak: ${localCount} adet, en düşük puan ${localMin}`);
 if (failed) {

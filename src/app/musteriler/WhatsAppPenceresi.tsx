@@ -3,14 +3,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { formatPhoneDisplay, isWhatsAppCapablePhone, normalizePhone } from "@/lib/phone";
 import { CATEGORIES, categoryById, REFINE_MODES, type CategoryId, type RefineMode } from "@/lib/sales/categories";
+import { BASIS_SOURCES, BASIS_TYPES, legalLabel, type BasisSource, type BasisType, type LegalState } from "@/lib/sales/consent";
 import { cleanExternal, cleanLink, contextSummary, type CustomerContext } from "@/lib/sales/context";
 import { localResult, type Draft, type DraftResult } from "@/lib/sales/engine";
 import { evaluateMessage, TARGET_SCORE } from "@/lib/sales/quality";
 
 export type MesajLead = { id: string; name: string; phone: string; notes: string; status: string };
 type Recent = { at: string; status: string; category: string };
-type Policy = { allowed: boolean; kind: "ilk" | "takip" | "yanit" | "kapanis"; reason: string; warnings: string[] };
-type Boot = { ctx: CustomerContext; policy: Policy; kapanisAllowed: boolean; category: CategoryId; hasLlm: boolean; recent: Recent[] };
+type Policy = { allowed: boolean; kind: "ilk" | "takip" | "yanit" | "kapanis"; reason: string; warnings: string[]; retHakkiGerekli?: boolean };
+type Boot = { ctx: CustomerContext; policy: Policy & { needsBasis?: boolean }; legal: LegalState; kapanisAllowed: boolean; category: CategoryId; hasLlm: boolean; recent: Recent[] };
 
 const AD_KEY = "growth-os:mesaj:ad";
 
@@ -49,6 +50,27 @@ export function WhatsAppPenceresi({ lead, onClose, onSent }: {
   const [info, setInfo] = useState("");
   const [error, setError] = useState("");
 
+  const [reload, setReload] = useState(0);
+  const [basisTur, setBasisTur] = useState<BasisType>("acik_onay");
+  const [basisKaynak, setBasisKaynak] = useState<BasisSource>("whatsapp_yazisma");
+  const [basisNot, setBasisNot] = useState("");
+
+  async function dayanakKaydet(revoke = false) {
+    setError("");
+    const r = await fetch(`/api/leads/${lead.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(revoke ? { legalBasisRevoke: { neden: "Operatör dayanağı geri çekti" } } : { legalBasis: { tur: basisTur, kaynak: basisKaynak, not: basisNot } }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      setError(j.error || "Dayanak kaydedilemedi");
+      return;
+    }
+    setInfo(revoke ? "Dayanak geri çekildi; bu müşteriye satış mesajı gönderilmez." : "İletişim dayanağı kaydedildi (kim, ne zaman, hangi kaynak).");
+    setReload((n) => n + 1);
+  }
+
   useEffect(() => {
     let alive = true;
     fetch(`/api/leads/${lead.id}/mesaj`)
@@ -60,7 +82,7 @@ export function WhatsAppPenceresi({ lead, onClose, onSent }: {
       .then((j) => { if (alive) setBoot(j); })
       .catch((e: Error) => { if (alive) setLoadError(e.message); });
     return () => { alive = false; };
-  }, [lead.id]);
+  }, [lead.id, reload]);
 
   useEffect(() => {
     const kapat = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -216,6 +238,43 @@ export function WhatsAppPenceresi({ lead, onClose, onSent }: {
           <>
             {!isWhatsAppCapablePhone(lead.phone) ? (
               <p className="notice" style={{ margin: 0 }}>Bu numara sabit hat, WhatsApp’ı yok. İşletmenin cep numarasını biliyorsan aşağıya yaz.</p>
+            ) : null}
+            {boot ? (
+              <div className="key-block" style={{ display: "grid", gap: 8 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <strong style={{ fontSize: 13 }}>İletişim dayanağı: {legalLabel(boot.legal)}</strong>
+                  {boot.legal.durum === "var" ? (
+                    <button type="button" className="btn btn-ghost" style={{ minHeight: 30, fontSize: 12.5 }} onClick={() => void dayanakKaydet(true)}>Geri çek</button>
+                  ) : null}
+                </div>
+                {boot.legal.zaman ? (
+                  <div className="muted" style={{ fontSize: 12 }}>
+                    {boot.legal.kaynak ? `${BASIS_SOURCES.find((s) => s.id === boot.legal.kaynak)?.label ?? boot.legal.kaynak} · ` : ""}
+                    {new Date(boot.legal.zaman).toLocaleString("tr-TR")}{boot.legal.kaydeden ? ` · ${boot.legal.kaydeden}` : ""}
+                    {boot.legal.not ? ` · ${boot.legal.not}` : ""}
+                  </div>
+                ) : null}
+                {boot.legal.durum !== "var" && !ctx.optedOut ? (
+                  <>
+                    <div className="muted" style={{ fontSize: 12.5 }}>
+                      Satış mesajı için dayanağı kaynağıyla kaydedin. “Yazıldı” durumu izin sayılmaz; kayıt otomatik oluşturulmaz.
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 8 }}>
+                      <select value={basisTur} onChange={(e) => { const t = e.target.value as BasisType; setBasisTur(t); setBasisKaynak(t === "tacir_esnaf" ? "operator_beyani" : "whatsapp_yazisma"); }} style={{ width: "100%" }}>
+                        {BASIS_TYPES.map((b) => <option key={b.id} value={b.id}>{b.label}</option>)}
+                      </select>
+                      <select value={basisKaynak} onChange={(e) => setBasisKaynak(e.target.value as BasisSource)} style={{ width: "100%" }}>
+                        {BASIS_SOURCES.filter((s) => (basisTur === "tacir_esnaf" ? s.id === "operator_beyani" : s.id !== "operator_beyani")).map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+                      </select>
+                      <input value={basisNot} onChange={(e) => setBasisNot(e.target.value)} placeholder="Not / kanıt (ör. yazışma tarihi)" />
+                    </div>
+                    <button type="button" className="btn btn-ghost" onClick={() => void dayanakKaydet()}>Dayanağı kaydet</button>
+                  </>
+                ) : null}
+                {boot.policy.retHakkiGerekli ? (
+                  <div className="muted" style={{ fontSize: 12 }}>Tacir/esnaf beyanıyla yazıldığı için mesaja ret seçeneği eklenir.</div>
+                ) : null}
+              </div>
             ) : null}
             {ctx.optedOut ? (
               <p className="error-box" style={{ margin: 0 }}>Bu müşteri iletişim istemediğini belirtmiş. Satış mesajı hazırlanmaz; yalnızca kapanış mesajı gönderebilirsin.</p>

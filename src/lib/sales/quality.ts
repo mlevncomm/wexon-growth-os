@@ -77,6 +77,41 @@ export function truthIssues(text: string, opts: { allowPriorContact?: boolean } 
   return out;
 }
 
+/** Basit düzenleme mesafesi (kısa kelimeler için) */
+function editDistance(a: string, b: string): number {
+  const dp = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j += 1) dp[0][j] = j;
+  for (let i = 1; i <= a.length; i += 1) {
+    for (let j = 1; j <= b.length; j += 1) {
+      dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+  }
+  return dp[a.length][b.length];
+}
+
+/**
+ * İşletme adının yanlış yazılması ("Mali Şüvirlik"): mesajda büyük harfle yazılmış, ada çok benzeyen
+ * ama ad parçasıyla aynı olmayan (ek almış hâli de olmayan) bir kelime.
+ */
+export function misspelledName(message: string, name: string): string | null {
+  const tokens = name.split(/[^\p{L}]+/u).filter((t) => t.length >= 5).map((t) => lower(t));
+  if (!tokens.length) return null;
+  const words = message.split(/[^\p{L}’']+/u).filter((w) => w.length >= 5 && /^\p{Lu}/u.test(w));
+  for (const raw of words) {
+    const w = lower(raw.split(/[’']/)[0]);
+    if (tokens.some((t) => w === t || w.startsWith(t) || t.startsWith(w))) continue;
+    for (const t of tokens) {
+      const d = editDistance(w, t);
+      if (d > 0 && 1 - d / Math.max(w.length, t.length) >= 0.7) return raw;
+    }
+  }
+  return null;
+}
+
+// Talimat ya da veri alanı adlarının mesaja sızması
+const PROMPT_LEAK = /(hitapIcinKisaAd|DOĞRULANMIŞ BİLGİ|VARSAYIM|MÜŞTERİ VERİSİ|customerContextUsed|suggestedCTA|"variants"|\bJSON\b|isletme:|bu satırı olduğu gibi|müşterilerinin genelde ilettiği|ana talep türü)/u;
+const ENGLISH_FUNCTION = /\b(the|and|for|your|with|you|we|our|this|that|business|would|like)\b/giu;
+
 export function wordCount(text: string): number {
   return text.trim().split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
 }
@@ -168,6 +203,10 @@ export function evaluateMessage(message: string, ctx: CustomerContext, categoryI
     blockers.push("Daha önce yazılmış gibi görünüyor ama kayıtlı bir temas yok");
   }
   if (URGENCY.test(text)) blockers.push("Sahte aciliyet, kıtlık ya da garanti ifadesi var");
+  if (PROMPT_LEAK.test(text)) blockers.push("Talimat ya da veri alanı metni mesaja sızmış");
+  if ((text.match(ENGLISH_FUNCTION)?.length ?? 0) >= 3) blockers.push("Mesaj Türkçe değil ya da yarı İngilizce");
+  const typo = misspelledName(text, ctx.name);
+  if (typo) blockers.push(`İşletme adı hatalı yazılmış gibi görünüyor (“${typo}”)`);
   if (RUDE_FOLLOWUP.test(text)) blockers.push("Baskı kuran ya da suçlayan takip ifadesi var");
   if (ctx.optedOut && category.sales) {
     blockers.push("Bu müşteri iletişim istemediğini belirtmiş; satış mesajı gönderilmez");

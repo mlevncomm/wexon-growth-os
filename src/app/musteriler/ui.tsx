@@ -86,7 +86,8 @@ export default function MusterilerPage() {
       body: JSON.stringify(body),
     });
     if (!res.ok) {
-      toast.push("Kayıt güncellenemedi", "bad");
+      const j = (await res.json().catch(() => ({}))) as { error?: string };
+      toast.push(j.error || "Kayıt güncellenemedi", "bad");
       return;
     }
     const updated = (await res.json()) as Lead;

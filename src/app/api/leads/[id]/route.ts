@@ -6,6 +6,8 @@ import { badRequest, readJson } from "@/lib/http";
 import { LEAD_STATUSES } from "@/lib/lead-status";
 import { bustStatsCache } from "@/lib/stats";
 import { withTenant } from "@/lib/tenant";
+import { DEFAULT_SCOPE, isBasisSource, isBasisType } from "@/lib/sales/consent";
+import { cleanExternal } from "@/lib/sales/context";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +24,10 @@ export async function PATCH(
       notes?: string;
       consented?: boolean;
       phone?: string;
+      /** İzin defterine dayanak kaydı: tür + kaynak zorunlu, not isteğe bağlı */
+      legalBasis?: { tur?: string; kaynak?: string; not?: string };
+      /** Dayanağı geri çek (müşteri vazgeçti) */
+      legalBasisRevoke?: { neden?: string };
     }>(request);
     if (!body) return badRequest("Geçersiz istek.");
 
@@ -42,7 +48,19 @@ export async function PATCH(
       data.status = body.status;
     }
     if (typeof body.notes === "string") data.notes = body.notes;
-    if (typeof body.consented === "boolean") data.consented = body.consented;
+    // "Onaylı" işareti tek başına izin kaydı değildir: kaynağı ve türü olmadan işaretlenemez
+    const basis = body.legalBasis;
+    if (basis) {
+      if (!isBasisType(basis.tur) || !isBasisSource(basis.kaynak)) {
+        return badRequest("Dayanak türü ve kaynağı gerekli.");
+      }
+      if (existing.status === "ilgilenmiyor") return badRequest("Ret bildiren müşteri için dayanak kaydedilemez; önce durumunu değiştirin.");
+      data.consented = basis.tur === "acik_onay";
+    } else if (body.consented === true) {
+      return badRequest("İzin kaynağı gerekli: WhatsApp’tan yaz penceresindeki “İletişim dayanağı” bölümünden kaydedin.");
+    }
+    if (body.consented === false || body.legalBasisRevoke) data.consented = false;
+    if (body.status === "ilgilenmiyor") data.consented = false;
     if (typeof body.phone === "string") {
       const region = resolveSearchLocations(existing.city ?? "")[0]?.regionCode ?? "";
       data.phone = normalizePhone(body.phone, region) ?? "";
@@ -50,20 +68,26 @@ export async function PATCH(
 
     const lead = await prisma.lead.update({ where: { id: existing.id }, data });
     // İleti onayı ve ret kayıtları kim, ne zaman sorusuna cevap verebilmek için denetim kaydına yazılır
-    const events: string[] = [];
-    if (typeof data.consented === "boolean" && data.consented !== existing.consented) {
-      events.push(data.consented ? "lead.consent.granted" : "lead.consent.revoked");
+    // İzin defteri: yalnızca ekleme yapılır; kim, ne zaman, hangi kaynak ve kapsamla
+    const events: { action: string; detail: Record<string, unknown> }[] = [];
+    if (basis && isBasisType(basis.tur) && isBasisSource(basis.kaynak)) {
+      events.push({
+        action: "lead.consent.granted",
+        detail: { tur: basis.tur, kaynak: basis.kaynak, kapsam: DEFAULT_SCOPE, not: cleanExternal(basis.not, 300) || undefined },
+      });
+    } else if (body.consented === false || body.legalBasisRevoke) {
+      events.push({ action: "lead.consent.revoked", detail: { neden: cleanExternal(body.legalBasisRevoke?.neden, 300) || "Onay işareti kaldırıldı" } });
     }
-    if (data.status === "ilgilenmiyor" && existing.status !== "ilgilenmiyor") events.push("lead.opt_out");
-    if (data.status && existing.status === "ilgilenmiyor" && data.status !== "ilgilenmiyor") events.push("lead.opt_out.cleared");
+    if (data.status === "ilgilenmiyor" && existing.status !== "ilgilenmiyor") events.push({ action: "lead.opt_out", detail: { neden: "Müşteri ilgilenmediğini bildirdi" } });
+    if (data.status && existing.status === "ilgilenmiyor" && data.status !== "ilgilenmiyor") events.push({ action: "lead.opt_out.cleared", detail: {} });
     if (events.length) {
       await prisma.auditLog.createMany({
-        data: events.map((action) => ({
+        data: events.map((e) => ({
           actorId: ctx.userId,
           actorEmail: ctx.email,
           tenantId: ctx.tenantId,
-          action,
-          detail: JSON.stringify({ leadId: existing.id, kaynak: "musteriler-ekrani" }),
+          action: e.action,
+          detail: JSON.stringify({ leadId: existing.id, ...e.detail }),
         })),
       });
     }

@@ -23,6 +23,8 @@ export type CustomerContext = {
   daysSinceContact: number | null;
   /** Son günlerde BAŞKA müşterilere açılan mesajlar; aynı metnin isim değiştirilerek gönderilmesini yakalamak için */
   recentOthers: string[];
+  /** Hukuki dayanak tacir/esnaf beyanıysa mesaj ret seçeneği içermeli */
+  retHakki?: boolean;
   /** Müşterinin son yazdığı mesaj (operatör yapıştırır) — güvenilmeyen veri */
   customerReply: string;
   optedOut: boolean;

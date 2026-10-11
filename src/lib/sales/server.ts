@@ -1,5 +1,6 @@
 import "server-only";
 import { llmChat } from "../llm";
+import { GEMINI_MODEL_FALLBACKS } from "../llm-providers";
 import { getPlaybook, playbookToPrompt } from "../playbook";
 import { prisma } from "../prisma";
 import { getSettings } from "../settings";
@@ -7,6 +8,7 @@ import { currentTenant, tenantId } from "../tenant";
 import { categoryById, type CategoryId, type StyleId } from "./categories";
 import { buildContext, type ContactRecord } from "./context";
 import type { ChatFn } from "./engine";
+import { CONSENT_ACTIONS, deriveLegal, type LegalState } from "./consent";
 import { contactPolicy, type ContactHistory, type SendMode } from "./policy";
 
 // Satış mesajı katmanının veritabanı ve AI bağlantısı. Mesaj göndermez.
@@ -76,6 +78,16 @@ export async function recentOtherMessages(leadId: string): Promise<string[]> {
   return jobs.map((j) => j.message);
 }
 
+/** İzin defterinden müşterinin güncel hukuki dayanağı */
+export async function leadLegal(lead: { id: string; consented: boolean }): Promise<LegalState> {
+  const events = await prisma.auditLog.findMany({
+    where: { tenantId: tenantId(), action: { in: [...CONSENT_ACTIONS] }, detail: { contains: `"leadId":"${lead.id}"` } },
+    orderBy: { createdAt: "asc" },
+    select: { action: true, createdAt: true, actorEmail: true, detail: true },
+  });
+  return deriveLegal(events, lead.consented);
+}
+
 export async function leadPolicy(
   lead: { id: string; status: string; notes: string; consented: boolean },
   mode: SendMode,
@@ -85,7 +97,7 @@ export async function leadPolicy(
   return contactPolicy({
     status: lead.status,
     notes: lead.notes,
-    consented: lead.consented,
+    legal: await leadLegal(lead),
     history: await contactHistory(lead.id, excludeJobId),
     mode,
     category,
@@ -113,15 +125,17 @@ export async function leadContext(
   return { lead, ctx, operatorPlaybook: playbookToPrompt(playbook) };
 }
 
-export async function salesChat(): Promise<ChatFn | undefined> {
+/** @param modelOverride yalnızca deneme modu için; izinli Gemini modellerinden biri olmalı */
+export async function salesChat(modelOverride?: string): Promise<ChatFn | undefined> {
   const settings = await getSettings();
   if (!settings.llmApiKey) return undefined;
+  const model = modelOverride && (GEMINI_MODEL_FALLBACKS as readonly string[]).includes(modelOverride) ? modelOverride : settings.llmModel;
   const meta: NonNullable<ChatFn["meta"]> = [];
   const chat: ChatFn = (messages, opts) =>
     llmChat({
       apiKey: settings.llmApiKey,
       baseUrl: settings.llmBaseUrl,
-      model: settings.llmModel,
+      model,
       messages,
       json: true,
       temperature: opts?.temperature ?? 0.7,

@@ -15,6 +15,8 @@ export const maxDuration = 60;
 type Body = {
   category?: string;
   senderName?: string;
+  /** Yalnızca izinli Gemini modelleri (test için) */
+  model?: string;
   recentOthers?: string[];
   lead?: { name?: string; district?: string; city?: string; website?: string; rating?: number; reviewCount?: number; campaignQuery?: string };
 };
@@ -45,7 +47,7 @@ export async function POST(request: Request) {
       playbookOffer: playbook.offer,
     });
     try {
-      const chat = await salesChat();
+      const chat = await salesChat(typeof body?.model === "string" ? body.model : undefined);
       const result = await generateDrafts({ ctx: customer, category, chat, operatorPlaybook: playbookToPrompt(playbook) });
       return NextResponse.json({ ctx: { sector: customer.sector, shortName: customer.shortName }, result: { ...result, aiMeta: chat?.meta ?? [] } });
     } catch (err) {

@@ -1,13 +1,17 @@
+import type { LegalState } from "./consent";
 import { isOptedOut } from "./context";
 
-// Kime, ne zaman, hangi yoldan yazılabilir? Tek karar noktası.
-// Üretim, elle açma kaydı, kuyruğa alma, onay ve gönderim anında aynı kurallar uygulanır.
+// Kime, ne zaman, hangi yoldan yazılabilir? Tek karar noktası. İki ayrı kontrol yapılır:
 //
-// - Ret bildiren müşteriye (İlgilenmiyor durumu ya da notta açık ret) satış mesajı hiçbir yoldan gitmez;
-//   yalnızca elle, bir kez kapanış mesajı yazılabilir.
-// - Otomatik/toplu gönderim (kuyruk) yalnızca iletişim onayı kaydı olan müşteriye yapılır (Meta opt-in kuralı).
-// - Daha önce yazılmış ama dönmemiş müşteriye takip yapılabilir: son temastan en az 3 gün sonra, en fazla 2 kez.
-// - Müşteri döndüyse (Dönüş var / Geri aranacak) konuşma sürdürülür; bekleme süresi yoktur.
+// 1) HUKUKİ DAYANAK (izin defteri, ./consent.ts):
+//    - Ret bildiren ya da dayanağı geri çekilen müşteriye satış mesajı hiçbir yoldan gitmez;
+//      yalnızca elle, bir kez kapanış mesajı yazılabilir.
+//    - Otomatik/toplu gönderim (kuyruk) yalnızca kaynağıyla kaydedilmiş AÇIK ONAY varsa yapılır (Meta opt-in kuralı).
+//    - Elle satış mesajı için kaydedilmiş bir dayanak gerekir: açık onay ya da operatörün tacir/esnaf beyanı.
+//    - "Yazıldı" durumu ve kaynağı belirsiz eski "Onaylı" işareti dayanak sayılmaz.
+// 2) TEKNİK UYGUNLUK (zamanlama ve sınırlar):
+//    - Daha önce yazılmış ama dönmemiş müşteriye takip: son temastan en az 3 gün sonra, en fazla 2 kez.
+//    - Müşteri döndüyse (Dönüş var / Geri aranacak) konuşma sürdürülür; bekleme süresi yoktur.
 
 export const MIN_FOLLOWUP_DAYS = 3;
 export const MAX_FOLLOWUPS = 2;
@@ -28,12 +32,21 @@ export type PolicyResult = {
   kind: ContactKind;
   reason: string;
   warnings: string[];
+  /** Engelin sebebi hukuki dayanak eksikliği mi (arayüz dayanak kaydı formunu gösterir) */
+  needsBasis?: boolean;
+  /** Hukuki dayanak tacir/esnaf beyanıysa mesajda ret hakkı belirtilmeli */
+  retHakkiGerekli?: boolean;
 };
+
+export const NO_BASIS =
+  "Bu müşteri için kayıtlı bir iletişim dayanağı yok. Önce dayanağı (açık onay ya da tacir/esnaf beyanı) kaynağıyla birlikte kaydedin; “Yazıldı” durumu izin sayılmaz.";
+export const NO_CONSENT_QUEUE =
+  "Kaynağıyla kaydedilmiş açık onay yok. Otomatik/toplu gönderim yalnızca açık onay veren müşterilere yapılır.";
 
 export function contactPolicy(input: {
   status: string;
   notes?: string | null;
-  consented: boolean;
+  legal: LegalState;
   history: ContactHistory;
   mode: SendMode;
   /** Gönderilecek mesajın türü (elle açmada bilinir) */
@@ -43,38 +56,46 @@ export function contactPolicy(input: {
   const now = input.now ?? new Date();
   const warnings: string[] = [];
   const replied = input.status === "donus_var" || input.status === "geri_ara";
-  const deny = (kind: ContactKind, reason: string): PolicyResult => ({ allowed: false, kind, reason, warnings });
+  const deny = (kind: ContactKind, reason: string, extra: Partial<PolicyResult> = {}): PolicyResult => ({ allowed: false, kind, reason, warnings, ...extra });
+  const closing = (): PolicyResult =>
+    input.history.closed
+      ? deny("kapanis", "Bu müşteriye kapanış mesajı zaten gönderildi; tekrar yazılmaz.")
+      : { allowed: true, kind: "kapanis", reason: "", warnings };
 
-  if (isOptedOut(input.status, input.notes)) {
-    if (input.mode === "manual" && input.category === "kapanis") {
-      if (input.history.closed) return deny("kapanis", "Bu müşteriye kapanış mesajı zaten gönderildi; tekrar yazılmaz.");
-      return { allowed: true, kind: "kapanis", reason: "", warnings };
-    }
-    return deny("kapanis", "Müşteri iletişim istemediğini bildirdi; bu müşteriye mesaj gönderilmez.");
+  // --- 1) Hukuki dayanak ---
+  const optedOut = isOptedOut(input.status, input.notes) || input.legal.durum === "geri_cekildi";
+  if (optedOut) {
+    if (input.mode === "manual" && input.category === "kapanis") return closing();
+    return deny("kapanis", "Müşteri iletişim istemediğini bildirdi ya da izni geri çekildi; bu müşteriye mesaj gönderilmez.");
   }
-  if (input.category === "kapanis") return { allowed: true, kind: "kapanis", reason: "", warnings };
+  if (input.category === "kapanis") return input.mode === "manual" ? closing() : deny("kapanis", "Kapanış mesajı yalnızca elle gönderilir.");
 
-  if (input.mode === "queue" && !input.consented) {
-    return deny(
-      input.history.count ? "takip" : "ilk",
-      "İletişim onayı kaydı yok. Otomatik/toplu gönderim yalnızca onay veren müşterilere yapılır; bu müşteriye Müşteriler ekranından elle yazabilirsiniz.",
-    );
+  const legalOk = input.legal.durum === "var";
+  const explicitConsent = legalOk && input.legal.tur === "acik_onay";
+  if (input.legal.durum === "kaynaksiz") {
+    warnings.push("Bu müşteride eski sürümden kalma, kaynağı kayıtlı olmayan bir “Onaylı” işareti var; dayanak sayılmaz.");
   }
+  if (input.mode === "queue" && !explicitConsent) {
+    return deny(input.history.count ? "takip" : "ilk", NO_CONSENT_QUEUE, { needsBasis: true });
+  }
+  // Müşterinin kendi yazdığı mesaja yanıt: konuşmayı sürdürmek için dayanak şartı aranmaz
+  if (replied) {
+    if (!legalOk) warnings.push("Müşteri size yazdı; yanıt verebilirsiniz. Satış teklifine geçmeden önce iletişim dayanağını kaydedin.");
+    return { allowed: true, kind: "yanit", reason: "", warnings };
+  }
+  if (!legalOk) {
+    return deny(input.history.count || input.status === "yazildi" ? "takip" : "ilk", NO_BASIS, { needsBasis: true });
+  }
+  const retHakkiGerekli = input.legal.tur === "tacir_esnaf";
 
-  if (replied) return { allowed: true, kind: "yanit", reason: "", warnings };
-
-  // "Yazıldı" işaretli ama sistemde kaydı olmayan müşteri (ör. eski sürümden ya da elle işaretlenmiş):
-  // ilk temas tekrar gönderilmez, takip sayılır; tarih bilinmediği için bekleme süresi uygulanamaz.
+  // --- 2) Teknik uygunluk ---
+  // "Yazıldı" işaretli ama sistemde kaydı olmayan müşteri: ilk temas tekrar gönderilmez, takip sayılır
   const history =
     input.status === "yazildi" && !input.history.count ? { ...input.history, count: 1 } : input.history;
   if (input.status === "yazildi" && !input.history.count) {
     warnings.push("Bu müşteri “Yazıldı” işaretli ama sistemde mesaj kaydı yok; son temas tarihi bilinmiyor.");
   }
-
-  if (!history.count) {
-    if (!input.consented) warnings.push("İletişim onayı kaydı yok: ilk mesaj kısa ve baskısız olsun; ret gelirse bir daha yazılmaz.");
-    return { allowed: true, kind: "ilk", reason: "", warnings };
-  }
+  if (!history.count) return { allowed: true, kind: "ilk", reason: "", warnings, retHakkiGerekli };
 
   const followups = history.count - 1;
   if (followups >= MAX_FOLLOWUPS) {
@@ -85,7 +106,7 @@ export function contactPolicy(input: {
     const left = Math.ceil(MIN_FOLLOWUP_DAYS - days);
     return deny("takip", `Son mesajdan bu yana ${MIN_FOLLOWUP_DAYS} gün geçmedi; takip için ${left} gün daha bekleyin. Müşteri döndüyse durumunu “Dönüş var” yapın.`);
   }
-  return { allowed: true, kind: "takip", reason: "", warnings };
+  return { allowed: true, kind: "takip", reason: "", warnings, retHakkiGerekli };
 }
 
 /** Elle açılan mesaj türü, politikanın izin verdiği temas türüyle uyumlu mu */
@@ -93,4 +114,9 @@ export function categoryFits(kind: ContactKind, category: string): boolean {
   if (kind === "kapanis") return category === "kapanis";
   if (kind === "takip") return category === "takip" || category === "kapanis";
   return true;
+}
+
+/** Tacir/esnaf beyanıyla yazılan mesajda ret hakkı geçiyor mu */
+export function mentionsOptOut(message: string): boolean {
+  return /(istemezseniz|uygun değilse|ilgilenmiyorsanız|rahatsız etmeyeyim|tekrar yazmam|yazmayayım|“hayır” yazmanız|bir daha yazmam)/iu.test(message);
 }

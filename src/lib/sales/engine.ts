@@ -2,6 +2,7 @@ import { categoryById, STYLES, type CategoryId, type RefineMode, type StyleId } 
 import { contextSummary, type CustomerContext } from "./context";
 import { localDrafts } from "./drafts";
 import { profileFor } from "./profiles";
+import { mentionsOptOut } from "./policy";
 import { evaluateMessage, REWRITE_BELOW, type QualityResult } from "./quality";
 
 // Merkezi satış mesajı üretim katmanı:
@@ -18,6 +19,9 @@ export type ChatFn = ((messages: ChatMessage[], opts?: { temperature?: number; t
 
 /** Sunucu fonksiyonu 60 sn'de kesilir: ilk üretim en fazla 32 sn, düzeltme turu yalnızca zaman kaldıysa */
 export const FIRST_CALL_MS = 32_000;
+/** "lite" yedek modelde düzeltme eşiği ve tutma alt sınırı */
+export const LITE_MIN = 90;
+export const LITE_KEEP = 88;
 export const TOTAL_BUDGET_MS = 50_000;
 
 export type Draft = {
@@ -173,13 +177,17 @@ function asStrings(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((v): v is string => typeof v === "string").map((v) => v.slice(0, 160)).slice(0, 6) : [];
 }
 
+export const OPT_OUT_LINE = "İstemezseniz yazmanız yeterli, tekrar yazmam.";
+
 function toDraft(
   ctx: CustomerContext,
   categoryId: CategoryId,
   style: StyleId,
-  message: string,
+  raw: string,
   extra: { suggestedCTA?: string; reason?: string; used?: string[]; source: "ai" | "local" },
 ): Draft {
+  // Tacir/esnaf beyanıyla yazılan satış mesajına ret seçeneği eklenir (yoksa)
+  const message = ctx.retHakki && categoryById(categoryId).sales && raw && !mentionsOptOut(raw) ? `${raw} ${OPT_OUT_LINE}` : raw;
   const q: QualityResult = evaluateMessage(message, ctx, categoryId);
   return {
     style,
@@ -302,12 +310,17 @@ export async function generateDrafts(opts: {
   });
 
   // Tek düzeltme turu: engelli ya da 85 altı AI taslakları
+  // Yanıt düşük kaliteli yedek modelden geldiyse eşik yükselir; kalitesizse güvenli taslak kullanılır
+  const answeredBy = opts.chat.meta?.at(-1)?.model ?? "";
+  const lite = /lite/i.test(answeredBy);
+  const threshold = lite ? LITE_MIN : REWRITE_BELOW;
+  if (lite) warnings.push(`Ana model yoğun olduğu için yanıt yedek modelden (${answeredBy}) geldi; daha sıkı kalite eşiği uygulandı.`);
   // Aynı açılış ve ilk temasta birden fazla taslakta fiyat da düzeltme turuna girer
   // (playbook'taki sabit cümle ya da fiyat her taslağa kopyalanmasın)
   markSameOpenings(drafts);
   const pricey = drafts.filter((d) => d.source === "ai" && categoryById(category).sales && category !== "fiyat" && /\d[\d.]*\s?(tl|₺)/iu.test(d.message));
   const weak = drafts.filter(
-    (d) => d.source === "ai" && (d.blockers.length || d.qualityScore < REWRITE_BELOW || d.qualityReasons.includes(SAME_OPENING) || pricey.indexOf(d) > 0),
+    (d) => d.source === "ai" && (d.blockers.length || d.qualityScore < threshold || d.qualityReasons.includes(SAME_OPENING) || pricey.indexOf(d) > 0),
   );
   const left = TOTAL_BUDGET_MS - (Date.now() - started);
   if (weak.length && left < 8_000) {
@@ -347,11 +360,11 @@ export async function generateDrafts(opts: {
     }
   }
 
-  // Hâlâ engelli olan AI taslağı yerine aynı tarzdaki yerel taslak
+  // Hâlâ engelli olan (ya da yedek modelden gelip eşiğin altında kalan) AI taslağı yerine aynı tarzdaki yerel taslak
   drafts = drafts.map((d, idx) => {
-    if (d.source !== "ai" || !d.blockers.length) return d;
+    if (d.source !== "ai" || (!d.blockers.length && !(lite && d.qualityScore < LITE_KEEP))) return d;
     const l = local.find((x) => x.style === d.style) ?? local[idx];
-    warnings.push(`${d.label} AI taslağı doğruluk kontrolünden geçemedi; yerine kayıtlı bilgiyle hazırlanan taslak kondu.`);
+    warnings.push(d.blockers.length ? `${d.label} AI taslağı doğruluk kontrolünden geçemedi; yerine kayıtlı bilgiyle hazırlanan taslak kondu.` : `${d.label} AI taslağı yedek modelin kalite eşiğinin altında kaldı; yerine kayıtlı bilgiyle hazırlanan taslak kondu.`);
     return toDraft(ctx, category, d.style, l.message, { suggestedCTA: l.suggestedCTA, source: "local" });
   });
 
