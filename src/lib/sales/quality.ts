@@ -240,7 +240,7 @@ export function evaluateMessage(message: string, ctx: CustomerContext, categoryI
     minus("dogallik", 4, "Selamlama mesajın ortasında");
   }
   // Eksikliği yüze vurmak (doğru bilgi olsa da marka kuralı)
-  if (/(web ?siten?iz(in)? (yok|olmadığını|bulunmadığını|görünmediğini)|web sitesi(nin)? (olmadığını|bulunmadığını|görünmediğini)|sitesi olmadığını|bağlantısının olmadığını)/iu.test(text)) {
+  if (/(web ?siten?iz(in)? (yok|olmadığını|bulunmadığını|görünmediğini)|web sitesi(nin)? (olmadığını|bulunmadığını|görünmediğini)|sitesi olmadığını|bağlantısının olmadığını|web sitesi (yer almıyor|bulunmuyor|görünmüyor)|web siteniz (yok|bulunmuyor))/iu.test(text)) {
     minus("uygunluk", 6, "Eksikliği yüze vuruyor (site yok demek)");
     warnings.push("Müşterinin eksiğini doğrudan söylemek savunmaya iter; sunacağınız faydayı anlatın.");
   }
@@ -323,6 +323,8 @@ export function evaluateMessage(message: string, ctx: CustomerContext, categoryI
   // Google puanı ve yorum sayısı aynen aktarılmalı; "310 hasta", "memnuniyet oranı" gibi yorumlar veriyi çarpıtır
   if (ctx.reviewCount && (new RegExp(`${ctx.reviewCount}\\s+(hasta|müşteri|kişi|danışan)\\p{L}*\\s+(?!yorum)`, "iu").test(text) || /memnuniyet oran/iu.test(text))) {
     minus("guven", 6, "Google puanı ya da yorum sayısı çarpıtılmış");
+    // Veriyi başka bir şeymiş gibi sunmak doğrulanmamış iddiadır: gönderilemez
+    blockers.push("Google verisi çarpıtılmış (yorum sayısı müşteri sayısı ya da puan “memnuniyet oranı” değildir)");
     warnings.push("Google verisi olduğu gibi aktarılmalı (ör. “Google’da 4,9 puan ve 310 yorum”); yorum sayısı hasta ya da müşteri sayısı değildir.");
   }
   if (profile.sensitive && /(tedavi garanti|iyileştir|şifa|hasta sayınızı|kesin çözüm|önce.?sonra)/iu.test(text)) {

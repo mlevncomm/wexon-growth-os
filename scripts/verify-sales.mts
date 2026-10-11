@@ -449,6 +449,11 @@ const esnafDrafts = localResult(esnafCtx, "ilk_temas").drafts;
 check(esnafDrafts.every((d) => mentionsOptOut(d.message)), "R20 ret seçeneği eklenir", esnafDrafts.map((d) => d.message.slice(-60)));
 check(!mentionsOptOut("Aquails için üretim kapasitesini anlatan bir site"), "R20 'üretim' kelimesi ret sayılmaz");
 
+// R21: canlı 3.5-flash-lite çıktıları — veri çarpıtma engellenir, "web sitesi yer almıyor" yakalanır
+const smmm5 = base({ name: "SMMM Yasin DOĞAN - Muhasebe ve Mali Müşavirlik Ofisi", rating: 5, reviewCount: 11 });
+check(evaluateMessage("Merhaba. Wexon.dev yazılım stüdyosundan Mehmet ben. SMMM Yasin DOĞAN ofisinin Google'daki 5,0 puanlık memnuniyet oranınızı destekleyecek bir web sayfası sunuyoruz. Detayları paylaşmamı ister misiniz?", smmm5, "ilk_temas").blockers.some((b) => b.includes("çarpıtılmış")), "R21 'memnuniyet oranı' gönderilemez");
+check(evaluateMessage("Merhaba, Wexon.dev'den Mehmet ben. SMMM Yasin DOĞAN için yazıyorum. Google harita kaydınızda henüz bir web sitesi yer almıyor; tanıtım ekranı işinizi kolaylaştırır mı?", smmm5, "ilk_temas").reasons.includes("Eksikliği yüze vuruyor (site yok demek)"), "R21 'web sitesi yer almıyor' yakalanır");
+
 console.log(`yerel taslak: ${localCount} adet, en düşük puan ${localMin}`);
 if (failed) {
   console.error(`${failed} kontrol başarısız, ${passed} geçti`);
