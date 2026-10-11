@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { formatPhoneDisplay, isWhatsAppCapablePhone, normalizePhone } from "@/lib/phone";
 import { CATEGORIES, categoryById, REFINE_MODES, type CategoryId, type RefineMode } from "@/lib/sales/categories";
-import { BASIS_SOURCES, BASIS_TYPES, legalLabel, type BasisSource, type BasisType, type LegalState } from "@/lib/sales/consent";
+import { BASIS_SOURCES, BASIS_TYPES, legalLabel, WHATSAPP_SOURCES, whatsappLabel, type BasisSource, type BasisType, type ChannelState, type LegalState, type WhatsAppSource } from "@/lib/sales/consent";
 import { cleanExternal, cleanLink, contextSummary, type CustomerContext } from "@/lib/sales/context";
 import { localResult, type Draft, type DraftResult } from "@/lib/sales/engine";
 import { evaluateMessage, TARGET_SCORE } from "@/lib/sales/quality";
@@ -11,7 +11,7 @@ import { evaluateMessage, TARGET_SCORE } from "@/lib/sales/quality";
 export type MesajLead = { id: string; name: string; phone: string; notes: string; status: string };
 type Recent = { at: string; status: string; category: string };
 type Policy = { allowed: boolean; kind: "ilk" | "takip" | "yanit" | "kapanis"; reason: string; warnings: string[]; retHakkiGerekli?: boolean };
-type Boot = { ctx: CustomerContext; policy: Policy & { needsBasis?: boolean }; legal: LegalState; kapanisAllowed: boolean; category: CategoryId; hasLlm: boolean; recent: Recent[] };
+type Boot = { ctx: CustomerContext; policy: Policy & { needsBasis?: boolean; needsWhatsApp?: boolean }; legal: LegalState; whatsapp: ChannelState; kapanisAllowed: boolean; category: CategoryId; hasLlm: boolean; recent: Recent[] };
 
 const AD_KEY = "growth-os:mesaj:ad";
 
@@ -54,6 +54,24 @@ export function WhatsAppPenceresi({ lead, onClose, onSent }: {
   const [basisTur, setBasisTur] = useState<BasisType>("acik_onay");
   const [basisKaynak, setBasisKaynak] = useState<BasisSource>("whatsapp_yazisma");
   const [basisNot, setBasisNot] = useState("");
+  const [waKaynak, setWaKaynak] = useState<WhatsAppSource>("musteri_whatsapp_yazdi");
+  const [waNot, setWaNot] = useState("");
+
+  async function waIzniKaydet(revoke = false) {
+    setError("");
+    const r = await fetch(`/api/leads/${lead.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(revoke ? { whatsappOptInRevoke: { neden: "Operatör WhatsApp iznini geri çekti" } } : { whatsappOptIn: { kaynak: waKaynak, not: waNot } }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      setError(j.error || "WhatsApp izni kaydedilemedi");
+      return;
+    }
+    setInfo(revoke ? "WhatsApp izni geri çekildi; bu müşteriye WhatsApp’tan yazılmaz." : "WhatsApp izni kaydedildi (kim, ne zaman, hangi kaynak).");
+    setReload((n) => n + 1);
+  }
 
   async function dayanakKaydet(revoke = false) {
     setError("");
@@ -269,6 +287,32 @@ export function WhatsAppPenceresi({ lead, onClose, onSent }: {
                       <input value={basisNot} onChange={(e) => setBasisNot(e.target.value)} placeholder="Not / kanıt (ör. yazışma tarihi)" />
                     </div>
                     <button type="button" className="btn btn-ghost" onClick={() => void dayanakKaydet()}>Dayanağı kaydet</button>
+                  </>
+                ) : null}
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap", alignItems: "center", borderTop: "1px solid var(--line)", paddingTop: 8 }}>
+                  <strong style={{ fontSize: 13 }}>{whatsappLabel(boot.whatsapp)}</strong>
+                  {boot.whatsapp.durum === "var" ? (
+                    <button type="button" className="btn btn-ghost" style={{ minHeight: 30, fontSize: 12.5 }} onClick={() => void waIzniKaydet(true)}>Geri çek</button>
+                  ) : null}
+                </div>
+                {boot.whatsapp.zaman ? (
+                  <div className="muted" style={{ fontSize: 12 }}>
+                    {boot.whatsapp.kaynak ? `${WHATSAPP_SOURCES.find((s) => s.id === boot.whatsapp.kaynak)?.label ?? boot.whatsapp.kaynak} · ` : ""}
+                    {new Date(boot.whatsapp.zaman).toLocaleString("tr-TR")}{boot.whatsapp.kaydeden ? ` · ${boot.whatsapp.kaydeden}` : ""}
+                  </div>
+                ) : null}
+                {boot.whatsapp.durum !== "var" && !ctx.optedOut ? (
+                  <>
+                    <div className="muted" style={{ fontSize: 12.5 }}>
+                      WhatsApp’tan yazmak için müşterinin bu kanalı kabul ettiği ayrıca kaydedilmeli. Taslak hazırlamak için gerekmez.
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 8 }}>
+                      <select value={waKaynak} onChange={(e) => setWaKaynak(e.target.value as WhatsAppSource)} style={{ width: "100%" }}>
+                        {WHATSAPP_SOURCES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+                      </select>
+                      <input value={waNot} onChange={(e) => setWaNot(e.target.value)} placeholder="Not / kanıt (ör. mesaj tarihi)" />
+                    </div>
+                    <button type="button" className="btn btn-ghost" onClick={() => void waIzniKaydet()}>WhatsApp iznini kaydet</button>
                   </>
                 ) : null}
                 {boot.policy.retHakkiGerekli ? (

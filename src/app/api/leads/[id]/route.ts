@@ -6,7 +6,7 @@ import { badRequest, readJson } from "@/lib/http";
 import { LEAD_STATUSES } from "@/lib/lead-status";
 import { bustStatsCache } from "@/lib/stats";
 import { withTenant } from "@/lib/tenant";
-import { DEFAULT_SCOPE, isBasisSource, isBasisType } from "@/lib/sales/consent";
+import { DEFAULT_SCOPE, isBasisSource, isBasisType, isWhatsAppSource } from "@/lib/sales/consent";
 import { cleanExternal } from "@/lib/sales/context";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +28,9 @@ export async function PATCH(
       legalBasis?: { tur?: string; kaynak?: string; not?: string };
       /** Dayanağı geri çek (müşteri vazgeçti) */
       legalBasisRevoke?: { neden?: string };
+      /** WhatsApp kanal izni (Meta opt-in): kaynak zorunlu */
+      whatsappOptIn?: { kaynak?: string; not?: string };
+      whatsappOptInRevoke?: { neden?: string };
     }>(request);
     if (!body) return badRequest("Geçersiz istek.");
 
@@ -60,6 +63,10 @@ export async function PATCH(
       return badRequest("İzin kaynağı gerekli: WhatsApp’tan yaz penceresindeki “İletişim dayanağı” bölümünden kaydedin.");
     }
     if (body.consented === false || body.legalBasisRevoke) data.consented = false;
+    if (body.whatsappOptIn) {
+      if (!isWhatsAppSource(body.whatsappOptIn.kaynak)) return badRequest("WhatsApp izninin kaynağı gerekli.");
+      if (existing.status === "ilgilenmiyor") return badRequest("Ret bildiren müşteri için WhatsApp izni kaydedilemez; önce durumunu değiştirin.");
+    }
     if (body.status === "ilgilenmiyor") data.consented = false;
     if (typeof body.phone === "string") {
       const region = resolveSearchLocations(existing.city ?? "")[0]?.regionCode ?? "";
@@ -77,6 +84,11 @@ export async function PATCH(
       });
     } else if (body.consented === false || body.legalBasisRevoke) {
       events.push({ action: "lead.consent.revoked", detail: { neden: cleanExternal(body.legalBasisRevoke?.neden, 300) || "Onay işareti kaldırıldı" } });
+    }
+    if (body.whatsappOptIn && isWhatsAppSource(body.whatsappOptIn.kaynak)) {
+      events.push({ action: "lead.whatsapp_optin.granted", detail: { kaynak: body.whatsappOptIn.kaynak, kanal: "whatsapp", not: cleanExternal(body.whatsappOptIn.not, 300) || undefined } });
+    } else if (body.whatsappOptInRevoke) {
+      events.push({ action: "lead.whatsapp_optin.revoked", detail: { kanal: "whatsapp", neden: cleanExternal(body.whatsappOptInRevoke.neden, 300) || "WhatsApp izni geri çekildi" } });
     }
     if (data.status === "ilgilenmiyor" && existing.status !== "ilgilenmiyor") events.push({ action: "lead.opt_out", detail: { neden: "Müşteri ilgilenmediğini bildirdi" } });
     if (data.status && existing.status === "ilgilenmiyor" && data.status !== "ilgilenmiyor") events.push({ action: "lead.opt_out.cleared", detail: {} });

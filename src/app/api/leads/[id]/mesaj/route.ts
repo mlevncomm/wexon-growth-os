@@ -11,6 +11,7 @@ import {
   leadContext,
   leadLegal,
   leadPolicy,
+  leadWhatsApp,
   nextStatus,
   OPENED_STATUS,
   recentContacts,
@@ -46,13 +47,14 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     const found = await leadContext(id, {});
     if (!found) return NextResponse.json({ error: "Müşteri bulunamadı" }, { status: 404 });
     const { lead, ctx } = found;
-    const [policy, legal] = await Promise.all([leadPolicy(lead, "manual"), leadLegal(lead)]);
+    const [policy, legal, whatsapp] = await Promise.all([leadPolicy(lead, "manual"), leadLegal(lead), leadWhatsApp(lead)]);
     ctx.retHakki = Boolean(policy.retHakkiGerekli);
     const byKind = { takip: "takip", yanit: "ilgili", kapanis: "kapanis" } as const;
     return NextResponse.json({
       ctx,
       policy,
       legal,
+      whatsapp,
       kapanisAllowed: (await leadPolicy(lead, "manual", "kapanis")).allowed,
       category: policy.kind === "ilk" ? defaultCategory(lead.status, ctx.website.kind === "site") : byKind[policy.kind],
       hasLlm: Boolean(await salesChat()),

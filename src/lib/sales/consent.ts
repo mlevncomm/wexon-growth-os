@@ -104,6 +104,61 @@ export function deriveLegal(events: LedgerEvent[], consentedFlag: boolean): Lega
   return state;
 }
 
+// ---------------------------------------------------------------------------
+// WhatsApp kanal izni (Meta alıcı opt-in'i). Ticari ileti dayanağından AYRIDIR:
+// tacir/esnaf beyanı ya da ret cümlesi WhatsApp'tan yazmak için yeterli değildir.
+// Her WhatsApp gönderimi (WhatsApp'ta aç, Gönderdim, kuyruk, Cloud API, zamanlanmış görev) bu kaydı ister.
+
+export const WHATSAPP_SOURCES = [
+  { id: "musteri_whatsapp_yazdi", label: "Müşteri bize WhatsApp’tan yazdı" },
+  { id: "whatsapp_kabul", label: "WhatsApp’tan ileti almayı açıkça kabul etti" },
+  { id: "form_whatsapp", label: "Formda WhatsApp iletişimini işaretledi" },
+  { id: "telefon_whatsapp", label: "Telefonda WhatsApp’tan yazılmasını kabul etti" },
+  { id: "yuz_yuze_whatsapp", label: "Yüz yüze WhatsApp’tan yazılmasını kabul etti" },
+] as const;
+export type WhatsAppSource = (typeof WHATSAPP_SOURCES)[number]["id"];
+
+export const WHATSAPP_ACTIONS = ["lead.whatsapp_optin.granted", "lead.whatsapp_optin.revoked", "lead.opt_out"] as const;
+
+export type ChannelState = {
+  durum: "var" | "yok" | "geri_cekildi";
+  kaynak?: WhatsAppSource;
+  not?: string;
+  zaman?: string;
+  kaydeden?: string;
+  /** Daha önce geçerli bir WhatsApp izni kaydedilmiş miydi (ret sonrası tek kapanış yanıtı için) */
+  dahaOnceVardi: boolean;
+};
+
+export function isWhatsAppSource(v: unknown): v is WhatsAppSource {
+  return WHATSAPP_SOURCES.some((s) => s.id === v);
+}
+
+export function deriveWhatsApp(events: LedgerEvent[]): ChannelState {
+  const sorted = [...events]
+    .filter((e) => (WHATSAPP_ACTIONS as readonly string[]).includes(e.action))
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  let state: ChannelState = { durum: "yok", dahaOnceVardi: false };
+  for (const e of sorted) {
+    const d = parse(e.detail);
+    const zaman = new Date(e.createdAt).toISOString();
+    if (e.action === "lead.whatsapp_optin.granted" && isWhatsAppSource(d.kaynak)) {
+      state = { durum: "var", kaynak: d.kaynak, not: typeof d.not === "string" ? d.not : undefined, zaman, kaydeden: e.actorEmail, dahaOnceVardi: true };
+    } else if (e.action === "lead.whatsapp_optin.revoked" || e.action === "lead.opt_out") {
+      if (state.durum === "var" || e.action === "lead.whatsapp_optin.revoked") {
+        state = { durum: "geri_cekildi", zaman, kaydeden: e.actorEmail, dahaOnceVardi: state.dahaOnceVardi };
+      }
+    }
+  }
+  return state;
+}
+
+export function whatsappLabel(s: ChannelState): string {
+  if (s.durum === "var") return "WhatsApp izni var";
+  if (s.durum === "geri_cekildi") return "WhatsApp izni geri çekildi";
+  return "WhatsApp izni yok";
+}
+
 export function legalLabel(s: LegalState): string {
   if (s.durum === "var") return s.tur === "acik_onay" ? "Açık onay var" : "Tacir/esnaf tanıtımı (operatör beyanı)";
   if (s.durum === "geri_cekildi") return "Geri çekildi / ret";

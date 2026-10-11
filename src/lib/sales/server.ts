@@ -8,7 +8,7 @@ import { currentTenant, tenantId } from "../tenant";
 import { categoryById, type CategoryId, type StyleId } from "./categories";
 import { buildContext, type ContactRecord } from "./context";
 import type { ChatFn } from "./engine";
-import { CONSENT_ACTIONS, deriveLegal, type LegalState } from "./consent";
+import { CONSENT_ACTIONS, deriveLegal, deriveWhatsApp, WHATSAPP_ACTIONS, type ChannelState, type LegalState } from "./consent";
 import { contactPolicy, type ContactHistory, type SendMode } from "./policy";
 
 // Satış mesajı katmanının veritabanı ve AI bağlantısı. Mesaj göndermez.
@@ -88,6 +88,16 @@ export async function leadLegal(lead: { id: string; consented: boolean }): Promi
   return deriveLegal(events, lead.consented);
 }
 
+/** İzin defterinden müşterinin WhatsApp kanal izni */
+export async function leadWhatsApp(lead: { id: string }): Promise<ChannelState> {
+  const events = await prisma.auditLog.findMany({
+    where: { tenantId: tenantId(), action: { in: [...WHATSAPP_ACTIONS] }, detail: { contains: `"leadId":"${lead.id}"` } },
+    orderBy: { createdAt: "asc" },
+    select: { action: true, createdAt: true, actorEmail: true, detail: true },
+  });
+  return deriveWhatsApp(events);
+}
+
 export async function leadPolicy(
   lead: { id: string; status: string; notes: string; consented: boolean },
   mode: SendMode,
@@ -98,6 +108,7 @@ export async function leadPolicy(
     status: lead.status,
     notes: lead.notes,
     legal: await leadLegal(lead),
+    whatsapp: await leadWhatsApp(lead),
     history: await contactHistory(lead.id, excludeJobId),
     mode,
     category,

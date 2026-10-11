@@ -8,7 +8,7 @@ import { DEFAULT_LLM } from "../src/lib/llm-providers.ts";
 import { SECTOR_PROFILES } from "../src/lib/sales/profiles.ts";
 import { evaluateMessage, mentionsName, similarity } from "../src/lib/sales/quality.ts";
 import { categoryFits, contactPolicy, mentionsOptOut } from "../src/lib/sales/policy.ts";
-import { deriveLegal, type LegalState } from "../src/lib/sales/consent.ts";
+import { deriveLegal, deriveWhatsApp, type ChannelState, type LegalState } from "../src/lib/sales/consent.ts";
 import { inferSector, type SectorId } from "../src/lib/sales/sector.ts";
 
 let failed = 0;
@@ -218,8 +218,10 @@ const nowP = new Date("2026-10-11T12:00:00Z");
 const ONAY: LegalState = { durum: "var", tur: "acik_onay", kaynak: "telefon" };
 const ESNAF: LegalState = { durum: "var", tur: "tacir_esnaf", kaynak: "operator_beyani" };
 const YOK: LegalState = { durum: "yok" };
+const WA: ChannelState = { durum: "var", kaynak: "musteri_whatsapp_yazdi", dahaOnceVardi: true };
+const WA_YOK: ChannelState = { durum: "yok", dahaOnceVardi: false };
 const pol = (o: Partial<Parameters<typeof contactPolicy>[0]>) =>
-  contactPolicy({ status: "yeni", notes: "", legal: ONAY, history: { count: 0, lastAt: null }, mode: "manual", now: nowP, ...o });
+  contactPolicy({ status: "yeni", notes: "", legal: ONAY, whatsapp: WA, history: { count: 0, lastAt: null }, mode: "manual", now: nowP, ...o });
 // Ret
 check(!pol({ status: "ilgilenmiyor" }).allowed, "politika: ret → elle satış yok");
 check(!pol({ status: "ilgilenmiyor", mode: "queue" }).allowed, "politika: ret → kuyruk yok (açık onay olsa bile)");
@@ -453,6 +455,27 @@ check(!mentionsOptOut("Aquails için üretim kapasitesini anlatan bir site"), "R
 const smmm5 = base({ name: "SMMM Yasin DOĞAN - Muhasebe ve Mali Müşavirlik Ofisi", rating: 5, reviewCount: 11 });
 check(evaluateMessage("Merhaba. Wexon.dev yazılım stüdyosundan Mehmet ben. SMMM Yasin DOĞAN ofisinin Google'daki 5,0 puanlık memnuniyet oranınızı destekleyecek bir web sayfası sunuyoruz. Detayları paylaşmamı ister misiniz?", smmm5, "ilk_temas").blockers.some((b) => b.includes("çarpıtılmış")), "R21 'memnuniyet oranı' gönderilemez");
 check(evaluateMessage("Merhaba, Wexon.dev'den Mehmet ben. SMMM Yasin DOĞAN için yazıyorum. Google harita kaydınızda henüz bir web sitesi yer almıyor; tanıtım ekranı işinizi kolaylaştırır mı?", smmm5, "ilk_temas").reasons.includes("Eksikliği yüze vuruyor (site yok demek)"), "R21 'web sitesi yer almıyor' yakalanır");
+
+// --- WhatsApp kanal izni (Meta opt-in) ticari ileti dayanağından ayrı ---
+const W1 = pol({ legal: ESNAF, whatsapp: WA_YOK });
+check(!W1.allowed && W1.needsWhatsApp === true, "WA: tacir/esnaf beyanı WhatsApp için yeterli değil", W1);
+check(!pol({ legal: ONAY, whatsapp: WA_YOK }).allowed, "WA: açık ticari onay da WhatsApp izni yerine geçmez");
+check(pol({ legal: ESNAF, whatsapp: WA }).allowed, "WA: dayanak + WhatsApp izni → elle izinli");
+check(!pol({ mode: "queue", legal: ONAY, whatsapp: WA_YOK }).allowed && pol({ mode: "queue", legal: ONAY, whatsapp: WA }).allowed, "WA: kuyruk/Cloud/cron açık onay + WhatsApp izni ister");
+check(!pol({ mode: "queue", legal: ESNAF, whatsapp: WA }).allowed, "WA: kuyruk tacir/esnaf beyanıyla çalışmaz");
+check(!pol({ status: "donus_var", legal: YOK, whatsapp: WA_YOK }).allowed, "WA: müşteri yanıtı da WhatsApp izni olmadan WhatsApp'tan yanıtlanmaz");
+check(!pol({ legal: ONAY, whatsapp: { durum: "geri_cekildi", dahaOnceVardi: true } }).allowed, "WA: geri çekilen izinle gönderim yok");
+check(!pol({ status: "ilgilenmiyor", category: "kapanis", whatsapp: WA_YOK }).allowed, "WA: hiç izin yoksa kapanış da WhatsApp'tan gitmez");
+check(pol({ status: "ilgilenmiyor", category: "kapanis", whatsapp: { durum: "geri_cekildi", dahaOnceVardi: true } }).allowed, "WA: izinli konuşmada ret sonrası tek kapanış");
+check(!pol({ category: "kapanis", whatsapp: WA_YOK }).allowed, "WA: retsiz kapanış da izin ister");
+const wev = (action: string, detail: Record<string, unknown>, at: string) => ({ action, detail: JSON.stringify({ leadId: "x", ...detail }), createdAt: at, actorEmail: "op@test" });
+check(deriveWhatsApp([]).durum === "yok", "WA defter: kayıt yok");
+check(deriveWhatsApp([wev("lead.whatsapp_optin.granted", {}, "2026-10-01")]).durum === "yok", "WA defter: kaynaksız kayıt geçersiz");
+const wg = deriveWhatsApp([wev("lead.whatsapp_optin.granted", { kaynak: "telefon_whatsapp" }, "2026-10-01")]);
+check(wg.durum === "var" && wg.kaynak === "telefon_whatsapp" && wg.kaydeden === "op@test" && Boolean(wg.zaman), "WA defter: kaynak, zaman, kaydeden", wg);
+const wo = deriveWhatsApp([wev("lead.whatsapp_optin.granted", { kaynak: "telefon_whatsapp" }, "2026-10-01"), wev("lead.opt_out", {}, "2026-10-03")]);
+check(wo.durum === "geri_cekildi" && wo.dahaOnceVardi, "WA defter: ret izni geri çeker");
+check(deriveLegal([wev("lead.consent.granted", { tur: "tacir_esnaf", kaynak: "operator_beyani" }, "2026-10-01")], false).durum === "var" && deriveWhatsApp([wev("lead.consent.granted", { tur: "acik_onay", kaynak: "telefon" }, "2026-10-01")]).durum === "yok", "WA defter: ticari dayanak kaydı WhatsApp izni oluşturmaz");
 
 console.log(`yerel taslak: ${localCount} adet, en düşük puan ${localMin}`);
 if (failed) {

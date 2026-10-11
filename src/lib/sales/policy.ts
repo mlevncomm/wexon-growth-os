@@ -1,4 +1,4 @@
-import type { LegalState } from "./consent";
+import type { ChannelState, LegalState } from "./consent";
 import { isOptedOut } from "./context";
 
 // Kime, ne zaman, hangi yoldan yazılabilir? Tek karar noktası. İki ayrı kontrol yapılır:
@@ -36,7 +36,12 @@ export type PolicyResult = {
   needsBasis?: boolean;
   /** Hukuki dayanak tacir/esnaf beyanıysa mesajda ret hakkı belirtilmeli */
   retHakkiGerekli?: boolean;
+  /** Engelin sebebi WhatsApp kanal izninin (Meta opt-in) olmaması mı */
+  needsWhatsApp?: boolean;
 };
+
+export const NO_WHATSAPP =
+  "Bu müşteri için kaydedilmiş WhatsApp izni (opt-in) yok. Ticari ileti dayanağı ya da ret cümlesi WhatsApp’tan yazmak için yeterli değildir; önce müşterinin WhatsApp’tan iletişimi kabul ettiğini kaynağıyla kaydedin."
 
 export const NO_BASIS =
   "Bu müşteri için kayıtlı bir iletişim dayanağı yok. Önce dayanağı (açık onay ya da tacir/esnaf beyanı) kaynağıyla birlikte kaydedin; “Yazıldı” durumu izin sayılmaz.";
@@ -47,6 +52,8 @@ export function contactPolicy(input: {
   status: string;
   notes?: string | null;
   legal: LegalState;
+  /** WhatsApp kanal izni (her WhatsApp gönderimi için ayrıca gerekli) */
+  whatsapp: ChannelState;
   history: ContactHistory;
   mode: SendMode;
   /** Gönderilecek mesajın türü (elle açmada bilinir) */
@@ -64,11 +71,25 @@ export function contactPolicy(input: {
 
   // --- 1) Hukuki dayanak ---
   const optedOut = isOptedOut(input.status, input.notes) || input.legal.durum === "geri_cekildi";
+  const waOk = input.whatsapp.durum === "var";
   if (optedOut) {
-    if (input.mode === "manual" && input.category === "kapanis") return closing();
+    if (input.mode === "manual" && input.category === "kapanis") {
+      // Ret sonrası tek kapanış yanıtı yalnızca daha önce WhatsApp izni kaydedilmiş bir konuşmada yazılabilir
+      if (!input.whatsapp.dahaOnceVardi) return deny("kapanis", "WhatsApp izni hiç kaydedilmediği için kapanış mesajı da WhatsApp’tan gönderilmez.", { needsWhatsApp: true });
+      return closing();
+    }
     return deny("kapanis", "Müşteri iletişim istemediğini bildirdi ya da izni geri çekildi; bu müşteriye mesaj gönderilmez.");
   }
-  if (input.category === "kapanis") return input.mode === "manual" ? closing() : deny("kapanis", "Kapanış mesajı yalnızca elle gönderilir.");
+  if (input.category === "kapanis") {
+    if (input.mode !== "manual") return deny("kapanis", "Kapanış mesajı yalnızca elle gönderilir.");
+    return waOk ? closing() : deny("kapanis", NO_WHATSAPP, { needsWhatsApp: true });
+  }
+
+  // --- 0) Kanal izni: WhatsApp'tan herhangi bir mesaj için Meta opt-in kaydı zorunlu ---
+  if (!waOk) {
+    const missingBasis = input.legal.durum !== "var";
+    return deny(input.history.count || input.status === "yazildi" ? "takip" : replied ? "yanit" : "ilk", NO_WHATSAPP, { needsWhatsApp: true, needsBasis: missingBasis });
+  }
 
   const legalOk = input.legal.durum === "var";
   const explicitConsent = legalOk && input.legal.tur === "acik_onay";
