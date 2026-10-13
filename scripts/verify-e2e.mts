@@ -286,22 +286,24 @@ try {
   // --- Uygulama profilleri: Wexon.dev / Aquails seçimi, profil şifresi, ortak anahtarlar ---
   const pins = JSON.parse(env.E2E_PROFIL_PINLERI ?? "{}") as Record<string, string>;
   if (pins.tnt_wexon_dev && pins.tnt_aquails) {
+    // Program e-postasız açılır: yalnızca profil + 4 haneli şifre
     const adminCookie = cookie;
     cookie = "";
-    const uyePw = randomBytes(18).toString("base64url");
-    await prisma.user.create({ data: { email: PROFIL_UYE, passwordHash: await hashPassword(uyePw), role: "member", tenantId: TENANT } });
-    check((await call("/api/auth", { body: { email: PROFIL_UYE, password: uyePw } })).status === 200, "profil: üye girişi");
+    await prisma.auditLog.deleteMany({ where: { action: "profile.pin_failed", actorId: "anonim" } });
+    if (!(await prisma.user.findFirst({ where: { role: "member", tenantId: { in: [TENANT, "tnt_aquails"] } } }))) {
+      await prisma.user.create({ data: { email: PROFIL_UYE, passwordHash: await hashPassword(randomBytes(18).toString("base64url")), role: "member", tenantId: TENANT } });
+    }
     const kapali = await call("/api/settings");
-    check(kapali.status === 428 && kapali.json.profil === true, "profil: seçilmeden işletme verisine erişilemez", kapali);
-    const sayfa = await fetch(BASE + "/ara", { headers: { cookie }, redirect: "manual" });
-    check([302, 307, 308].includes(sayfa.status) && /\/profil$/.test(new URL(sayfa.headers.get("location") ?? "", BASE).pathname), "profil: sayfalar profil seçimine yönlenir", sayfa.status);
+    check(kapali.status === 401, "profil: şifre girilmeden işletme verisine erişilemez", kapali.status);
+    const sayfa = await fetch(BASE + "/ara", { redirect: "manual" });
+    check([302, 307, 308].includes(sayfa.status) && /\/profil$/.test(new URL(sayfa.headers.get("location") ?? "", BASE).pathname), "profil: program açılışta e-posta değil profil şifresi ister", sayfa.status);
     const liste = await call("/api/profil");
-    check(liste.status === 200 && liste.json.profiller.length === 2 && liste.json.profiller.every((p: any) => p.sifreAyarli && !("pin" in p) && !("hash" in p)), "profil: iki profil listelenir, şifre bilgisi dönmez", liste.json);
+    check(liste.status === 200 && liste.json.profiller.length === 2 && liste.json.profiller.every((p: any) => p.sifreAyarli && typeof p.yanlis24 === "number" && !("pin" in p) && !("hash" in p)) && !JSON.stringify(liste.json).includes("@"), "profil: iki profil listelenir; şifre, özet ya da e-posta dönmez", liste.json);
     const yanlis = pins.tnt_aquails === "0000" ? "9999" : "0000";
     const y1 = await call("/api/profil", { body: { tenantId: "tnt_aquails", pin: yanlis } });
     check(y1.status === 401 && !String(y1.json?.git ?? ""), "profil: yanlış şifre reddedilir", y1.status);
     check((await call("/api/profil", { body: { tenantId: "tnt_akarsu", pin: pins.tnt_aquails } })).status === 400, "profil: grupta olmayan işletme açılamaz");
-    check((await call("/api/settings")).status === 428, "profil: yanlış şifreden sonra profil kapalı kalır");
+    check((await call("/api/settings")).status === 401, "profil: yanlış şifreden sonra program kapalı kalır");
     const ac = await call("/api/profil", { body: { tenantId: "tnt_aquails", pin: pins.tnt_aquails } });
     check(ac.status === 200 && ac.json.git === "/ara", "profil: Aquails doğru şifreyle açılır");
     // Veri ayrımı: Aquails profili Wexon.dev kayıtlarını göremez, değiştiremez, silemez
@@ -328,10 +330,13 @@ try {
     check(wx.status === 200 && setWx.status === 200 && setWx.json.ortakAnahtar === null && setWx.json.hasPlacesKey === setAq.json.hasPlacesKey && setWx.json.hasLlmKey === setAq.json.hasLlmKey, "profil: Wexon.dev'e geçiş, anahtar durumu iki profilde aynı");
     check(Boolean(meAq.json) && JSON.stringify(meAq.json).includes("Aquails"), "profil: /api/me açık profili gösterir", meAq.json);
     await call("/api/profil", { method: "DELETE" });
-    check((await call("/api/settings")).status === 428, "profil: profilden çıkınca yeniden seçim istenir");
+    check((await call("/api/settings")).status === 401, "profil: kilitleyince program kapanır, yeniden şifre istenir");
+    const uyari = await call("/api/profil");
+    check((uyari.json?.profiller ?? []).find((p: any) => p.tenantId === "tnt_aquails")?.yanlis24 >= 1, "profil: yanlış deneme profil ekranında uyarı olarak görünür");
     for (let i = 0; i < 5; i += 1) await call("/api/profil", { body: { tenantId: TENANT, pin: yanlis } });
     const kilit = await call("/api/profil", { body: { tenantId: TENANT, pin: pins.tnt_wexon_dev } });
-    check(kilit.status === 429, "profil: 5 yanlış denemeden sonra doğru şifre de 10 dakika kabul edilmez", kilit.status);
+    check(kilit.status === 429 && typeof kilit.json?.kilitBitis === "number", "profil: aynı cihazdan 5 yanlış denemeden sonra doğru şifre de kabul edilmez", kilit.status);
+    check((await call("/api/profil", { body: { tenantId: "tnt_aquails", pin: pins.tnt_aquails } })).status === 429, "profil: cihaz kilidi diğer profil için de geçerli");
     cookie = adminCookie;
   } else {
     check(false, "profil: .env.development.local içinde E2E_PROFIL_PINLERI yok");
@@ -340,6 +345,7 @@ try {
   failed += 1;
   console.error("HATA", err);
 } finally {
+  await prisma.auditLog.deleteMany({ where: { action: { in: ["profile.pin_failed", "profile.opened"] }, createdAt: { gte: new Date(Date.now() - day) } } });
   const uye = await prisma.user.findUnique({ where: { email: PROFIL_UYE } });
   if (uye) {
     await prisma.auditLog.deleteMany({ where: { actorId: uye.id } });

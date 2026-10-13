@@ -161,7 +161,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    // Program kısayolları: Ctrl+F ara, Ctrl+1-4 ekranlar, Ctrl+P profil
+    // Program kısayolları: Ctrl+F ara, Ctrl+1-4 ekranlar, Ctrl+P profil, Ctrl+L kilitle
     const ekranlar = [...MAIN, SETTINGS];
     const onFind = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
@@ -174,6 +174,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       if (k === "p") {
         e.preventDefault();
         router.push("/profil");
+        return;
+      }
+      if (k === "l") {
+        e.preventDefault();
+        void fetch("/api/profil", { method: "DELETE" }).then(() => {
+          window.location.href = "/profil";
+        });
         return;
       }
       const hedef = ekranlar.find((m) => m.kbd === k);

@@ -48,7 +48,7 @@ export function StatusBar({ tenantName, scanning, scanPct, queued }: { tenantNam
       ) : null}
       <span className="st-spacer" />
       <span className="st-item st-keys">
-        <kbd>Ctrl F</kbd> ara <kbd>Ctrl 1–4</kbd> ekranlar <kbd>Ctrl P</kbd> profil
+        <kbd>Ctrl F</kbd> ara <kbd>Ctrl 1–4</kbd> ekranlar <kbd>Ctrl P</kbd> profil <kbd>Ctrl L</kbd> kilitle
       </span>
       {surum ? <span className="st-item">Sürüm {surum}</span> : null}
     </footer>

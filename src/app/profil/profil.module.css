@@ -84,6 +84,19 @@
   min-width: 0;
 }
 
+.lockNote {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--faint);
+}
+
+.metaWarn {
+  color: #fcd34d;
+}
+
 .email {
   font-size: 13px;
   color: var(--faint);

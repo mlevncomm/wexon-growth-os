@@ -74,6 +74,10 @@ export function pinHashFor(tenantId: string): string | null {
   }
 }
 
-// --- Şifre deneme sınırı: kullanıcı + profil başına 10 dakikada 5 yanlış deneme (denetim kaydından sayılır) ---
+// --- Şifre deneme sınırı (denetim kaydından sayılır) ---
+/** Aynı cihaz (IP özeti): 15 dakikada 5 yanlış deneme */
 export const PIN_MAX_TRIES = 5;
-export const PIN_WINDOW_MS = 10 * 60 * 1000;
+export const PIN_WINDOW_MS = 15 * 60 * 1000;
+/** Aynı profil, tüm cihazlar: saatte 20 yanlış deneme */
+export const PROFILE_GLOBAL_MAX = 20;
+export const PROFILE_GLOBAL_WINDOW_MS = 60 * 60 * 1000;

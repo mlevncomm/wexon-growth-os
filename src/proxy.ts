@@ -3,9 +3,10 @@ import { decodeSession, SESSION_COOKIE, authConfigured } from "@/lib/session-tok
 import { decodeProfile, inProfileGroup, PROFILE_COOKIE } from "@/lib/app-profiles";
 
 // Profil seçmeden de açılabilen yollar (oturum yine gerekir)
-const PROFILE_FREE = ["/profil", "/api/profil", "/api/me"];
+const PROFILE_FREE = ["/api/me"];
 
-const PUBLIC = ["/giris", "/api/auth", "/api/instagram/webhook", "/api/outreach/tick", "/api/surum"];
+// Programa giriş profil ekranındaki 4 haneli şifreyle yapılır; /giris yalnızca üst yönetici içindir
+const PUBLIC = ["/giris", "/profil", "/api/profil", "/api/auth", "/api/instagram/webhook", "/api/outreach/tick", "/api/surum"];
 
 function isPublic(pathname: string) {
   return PUBLIC.some((p) => pathname === p || pathname.startsWith(`${p}/`));
@@ -25,8 +26,10 @@ export function proxy(request: NextRequest) {
       return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
     }
     const url = request.nextUrl.clone();
-    url.pathname = "/giris";
-    url.searchParams.set("next", pathname);
+    const yonetici = pathname === "/platform" || pathname.startsWith("/platform/");
+    url.pathname = yonetici ? "/giris" : "/profil";
+    url.search = "";
+    if (yonetici) url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
   }
 

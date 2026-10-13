@@ -111,9 +111,11 @@ export function NavRail({
   const links = platform ? ([{ href: "/platform", label: "Profiller", kbd: "1" }] as const) : MAIN;
   const kisaAd = email ? email.split("@")[0] : "Operatör";
 
-  function cikis() {
-    void fetch("/api/auth", { method: "DELETE" }).then(() => {
-      window.location.href = "/giris";
+  // Program e-postasız, profil şifresiyle açılır: "Kilitle" oturumu kapatıp profil ekranına döner
+  function kilitle() {
+    const [adres, hedef] = platform ? ["/api/auth", "/giris"] : ["/api/profil", "/profil"];
+    void fetch(adres, { method: "DELETE" }).then(() => {
+      window.location.href = hedef;
     });
   }
 
@@ -222,16 +224,24 @@ export function NavRail({
         )}
         <div className="rail-user">
           <span className="op-ava" aria-hidden>
-            {(kisaAd[0] || "W").toLocaleUpperCase("tr")}
+            {platform ? (kisaAd[0] || "W").toLocaleUpperCase("tr") : <i className="dot ok" />}
           </span>
           <span className="rail-copy">
-            <b>{kisaAd}</b>
-            <em>{email || (platform ? "Üst yönetici" : "")}</em>
+            <b>{platform ? kisaAd : "Program açık"}</b>
+            <em>{platform ? email || "Üst yönetici" : "Ctrl+L ile kilitle"}</em>
           </span>
-          <button type="button" className="rail-logout" onClick={cikis} aria-label="Çıkış yap" title="Çıkış yap" data-lpignore="true" data-1p-ignore="true">
+          <button
+            type="button"
+            className="rail-logout"
+            onClick={kilitle}
+            aria-label={platform ? "Çıkış yap" : "Programı kilitle"}
+            title={platform ? "Çıkış yap" : "Programı kilitle (Ctrl+L)"}
+            data-lpignore="true"
+            data-1p-ignore="true"
+          >
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M10 7V6.2A1.2 1.2 0 0 1 11.2 5h6.6A1.2 1.2 0 0 1 19 6.2v11.6a1.2 1.2 0 0 1-1.2 1.2h-6.6A1.2 1.2 0 0 1 10 17.8V17" />
-              <path d="M4.6 12H15M7.2 9l-2.6 3 2.6 3" />
+              <rect x="5" y="11" width="14" height="9" rx="2" />
+              <path d="M8 11V8a4 4 0 018 0v3" />
             </svg>
           </button>
         </div>

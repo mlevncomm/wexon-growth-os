@@ -15,6 +15,8 @@ type Profil = {
   sifreAyarli: boolean;
   sonAcilis: string | null;
   kilitBitis: number | null;
+  /** Son 24 saatteki yanlış deneme sayısı (tüm cihazlar) */
+  yanlis24: number;
 };
 
 type Durum = "bos" | "gonderiliyor" | "hata" | "tamam";
@@ -48,7 +50,6 @@ const TUSLAR = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "sil"] as 
 
 export default function ProfilPage() {
   const [profiller, setProfiller] = useState<Profil[] | null>(null);
-  const [eposta, setEposta] = useState("");
   const [secili, setSecili] = useState<Profil | null>(null);
   const [isaret, setIsaret] = useState<string | null>(null);
   const [pin, setPin] = useState("");
@@ -62,16 +63,13 @@ export default function ProfilPage() {
   const yukle = useCallback(async () => {
     setYukHata("");
     try {
-      // Ekran her açıldığında önceki profil kapanır: seçim ve şifre yeniden istenir
+      // Ekran her açıldığında program kilitlenir: profil ve şifre yeniden istenir
       await fetch("/api/profil", { method: "DELETE" });
       const r = await fetch("/api/profil", { cache: "no-store" });
-      if (r.status === 401) return window.location.replace("/giris?next=%2Fprofil");
-      if (r.status === 404) return window.location.replace("/");
       if (!r.ok) throw new Error();
-      const j = (await r.json()) as { profiller: Profil[]; eposta?: string };
+      const j = (await r.json()) as { profiller: Profil[] };
       setProfiller(j.profiller ?? []);
       setSimdi(Date.now());
-      setEposta(j.eposta ?? "");
     } catch {
       setYukHata("Profiller yüklenemedi. İnternet bağlantınızı kontrol edin.");
     }
@@ -187,10 +185,6 @@ export default function ProfilPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [secili, profiller, sec, geri]);
 
-  async function cikis() {
-    await fetch("/api/auth", { method: "DELETE" }).catch(() => undefined);
-    window.location.replace("/giris");
-  }
 
   const odak = secili ?? profiller?.find((p) => p.tenantId === isaret) ?? null;
   const sahne = useMemo(
@@ -211,14 +205,9 @@ export default function ProfilPage() {
             Wexon <b>Growth OS</b>
           </span>
         </div>
-        {eposta ? (
-          <div className={styles.account}>
-            <span className={styles.email}>{eposta}</span>
-            <button type="button" className={styles.ghost} onClick={() => void cikis()}>
-              Çıkış yap
-            </button>
-          </div>
-        ) : null}
+        <span className={styles.lockNote}>
+          <LockIcon /> Program kilitli
+        </span>
       </header>
 
       <main className={styles.stage}>
@@ -267,8 +256,12 @@ export default function ProfilPage() {
                       <span className={styles.cardDesc}>{p.aciklama}</span>
                     </span>
                     <span className={styles.cardFoot}>
-                      <span className={styles.meta}>
-                        {p.kilitBitis && p.kilitBitis > simdi ? (
+                      <span className={`${styles.meta} ${p.yanlis24 ? styles.metaWarn : ""}`}>
+                        {p.yanlis24 && !(p.kilitBitis && p.kilitBitis > simdi) ? (
+                          <>
+                            <WarnIcon /> Son 24 saatte {p.yanlis24} yanlış deneme
+                          </>
+                        ) : p.kilitBitis && p.kilitBitis > simdi ? (
                           <>
                             <LockIcon /> Geçici olarak kilitli
                           </>
@@ -402,6 +395,15 @@ function BackIcon() {
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M9 5h10a2 2 0 012 2v10a2 2 0 01-2 2H9l-6-7 6-7z" />
       <path d="M12.5 9.5l5 5M17.5 9.5l-5 5" />
+    </svg>
+  );
+}
+
+function WarnIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M12 4l9 16H3L12 4z" />
+      <path d="M12 10v4M12 17.5v.01" />
     </svg>
   );
 }
