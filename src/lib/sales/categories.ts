@@ -141,8 +141,23 @@ export const CATEGORIES: Category[] = [
   },
 ];
 
-export function categoryById(id: string): Category {
-  return CATEGORIES.find((c) => c.id === id) ?? CATEGORIES[0];
+// Su arıtmada (Aquails) otomasyon ve satış hunisi yok; bakım, filtre değişimi ve periyodik bakım demektir
+const WATER_HIDDEN: CategoryId[] = ["otomasyon", "huni"];
+const WATER_BAKIM: Partial<Category> = {
+  label: "Filtre ve bakım",
+  goal: "Su arıtma cihazı ya da sebili olabilecek işletmeye filtre değişimi ve periyodik bakım öner. Cihazı görmüş ya da suyu ölçmüş gibi konuşma; son filtre değişimini ya da cihaz modelini sor.",
+};
+
+/** Profilin iş alanına göre kullanılabilen mesaj türleri */
+export function categoriesFor(vertical: string = "software"): Category[] {
+  if (vertical !== "water") return CATEGORIES;
+  return CATEGORIES.filter((c) => !WATER_HIDDEN.includes(c.id)).map((c) => (c.id === "bakim" ? { ...c, ...WATER_BAKIM } : c));
+}
+
+/** Bilinmeyen ya da bu iş alanında olmayan tür ilk temasa döner */
+export function categoryById(id: string, vertical: string = "software"): Category {
+  const list = categoriesFor(vertical);
+  return list.find((c) => c.id === id) ?? list[0];
 }
 
 export function isCategoryId(id: unknown): id is CategoryId {
@@ -150,11 +165,11 @@ export function isCategoryId(id: unknown): id is CategoryId {
 }
 
 /** Müşterinin durumuna göre önerilen mesaj türü */
-export function defaultCategory(status: string, hasSite = false): CategoryId {
+export function defaultCategory(status: string, hasSite = false, vertical: string = "software"): CategoryId {
   if (status === "ilgilenmiyor") return "kapanis";
   if (status === "donus_var" || status === "geri_ara") return "ilgili";
   if (status === "yazildi") return "takip";
-  return hasSite ? "huni" : "ilk_temas";
+  return hasSite && vertical !== "water" ? "huni" : "ilk_temas";
 }
 
 export const STYLES = [

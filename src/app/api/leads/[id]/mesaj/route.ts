@@ -56,7 +56,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       legal,
       whatsapp,
       kapanisAllowed: (await leadPolicy(lead, "manual", "kapanis")).allowed,
-      category: policy.kind === "ilk" ? defaultCategory(lead.status, ctx.website.kind === "site") : byKind[policy.kind],
+      category: policy.kind === "ilk" ? defaultCategory(lead.status, ctx.website.kind === "site", ctx.vertical) : byKind[policy.kind],
       hasLlm: Boolean(await salesChat()),
       recent: await recentContacts(lead.id),
     });

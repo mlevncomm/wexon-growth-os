@@ -1,6 +1,7 @@
 import type { CategoryId, StyleId } from "./categories";
 import type { CustomerContext } from "./context";
 import { profileFor, type SectorProfile } from "./profiles";
+import { localDraftsWater } from "./water";
 
 // AI yokken ya da AI yanıtı kullanılamadığında devreye giren yerel taslaklar.
 // Her varyasyonun açılışı ve değer sunuşu farklıdır; yalnızca kayıtlı bilgiyi kullanır.
@@ -19,9 +20,9 @@ export function ablative(word: string): string {
   return `${word}’${d}${back ? "an" : "en"}`;
 }
 
-const cap = (s: string) => (s ? s.charAt(0).toLocaleUpperCase("tr") + s.slice(1) : s);
+export const cap = (s: string) => (s ? s.charAt(0).toLocaleUpperCase("tr") + s.slice(1) : s);
 
-function intros(ctx: CustomerContext) {
+export function intros(ctx: CustomerContext) {
   const from = ablative(ctx.brand);
   const s = ctx.senderName;
   const studio = /wexon/i.test(ctx.brand) ? `${ctx.brand} yazılım stüdyosundan` : from;
@@ -32,11 +33,11 @@ function intros(ctx: CustomerContext) {
   };
 }
 
-function q(p: SectorProfile, name: string, key: "question" | "automationQuestion" | "funnelQuestion") {
+export function q(p: SectorProfile, name: string, key: "question" | "automationQuestion" | "funnelQuestion") {
   return p[key].replaceAll("{isim}", name);
 }
 
-function when(days: number | null): string {
+export function when(days: number | null): string {
   if (days === null) return "Daha önce";
   if (days <= 2) return "Geçen gün";
   if (days <= 10) return "Geçen hafta";
@@ -64,7 +65,7 @@ function hash(text: string): number {
   return h >>> 0;
 }
 
-function pick<T>(items: T[], seed: string): T {
+export function pick<T>(items: T[], seed: string): T {
   return items[hash(seed) % items.length];
 }
 
@@ -75,7 +76,7 @@ function socialName(host: string): string {
   return SOCIAL_NAMES.find(([re]) => re.test(host))?.[1] ?? "sosyal medya";
 }
 
-const trNumber = (n: number) => n.toLocaleString("tr-TR", { maximumFractionDigits: 1 });
+export const trNumber = (n: number) => n.toLocaleString("tr-TR", { maximumFractionDigits: 1 });
 
 /**
  * İlk temas: üç tarzın yapısı farklıdır; her tarzın içinde açılış, gerekçe, fikir ve kapanış
@@ -215,7 +216,8 @@ function firstContact(ctx: CustomerContext, p: SectorProfile): LocalDraft[] {
 }
 
 export function localDrafts(ctx: CustomerContext, category: CategoryId): LocalDraft[] {
-  const p = profileFor(ctx.sector.id);
+  const p = profileFor(ctx.sector.id, ctx.vertical);
+  if (ctx.vertical === "water") return localDraftsWater(ctx, category, p);
   const i = intros(ctx);
   const n = ctx.shortName;
   const brand = ctx.brand;

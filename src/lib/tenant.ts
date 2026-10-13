@@ -7,6 +7,8 @@ import { authConfigured } from "./session-token";
 import { readSession, type Session } from "./session";
 import type { UserRole, Vertical } from "./verticals";
 import { isVertical } from "./verticals";
+import { cookies } from "next/headers";
+import { decodeProfile, inProfileGroup, PROFILE_COOKIE } from "./app-profiles";
 
 export type TenantCtx = {
   userId: string;
@@ -87,7 +89,17 @@ export async function requireTenant(): Promise<{ ctx: TenantCtx; denied: null } 
   if (!session) {
     return { ctx: null, denied: NextResponse.json({ error: "Giriş gerekli" }, { status: 401 }) };
   }
-  const ctx = await ctxFromSession(session);
+  // Profil grubundaki (Wexon.dev / Aquails) kullanıcılar seçtikleri profilin işletmesinde çalışır
+  let effective = session;
+  if (session.role === "member" && inProfileGroup(session.tenantId)) {
+    const jar = await cookies();
+    const profil = decodeProfile(jar.get(PROFILE_COOKIE)?.value, session.userId);
+    if (!profil) {
+      return { ctx: null, denied: NextResponse.json({ error: "Önce profil seçin.", profil: true }, { status: 428 }) };
+    }
+    effective = { ...session, tenantId: profil.tenantId };
+  }
+  const ctx = await ctxFromSession(effective);
   if (!ctx) {
     return {
       ctx: null,

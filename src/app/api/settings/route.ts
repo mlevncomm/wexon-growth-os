@@ -4,7 +4,8 @@ import { normalizeLlmConfig } from "@/lib/llm-providers";
 import { getSettings, updateSettings } from "@/lib/settings";
 import { bustStatsCache } from "@/lib/stats";
 import { deployHints } from "@/lib/platform";
-import { withTenant } from "@/lib/tenant";
+import { currentTenant, withTenant } from "@/lib/tenant";
+import { profileById, SHARED_KEYS_FROM } from "@/lib/app-profiles";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,8 @@ function payload() {
       hasLlmKey: Boolean(settings.llmApiKey),
       hasIgToken: Boolean(settings.igAccessToken),
       hasIgUserId: Boolean(settings.igUserId),
+      // Ortak anahtar kullanan profilde (Aquails) Google ve Gemini anahtarları kaynak profilden gelir
+      ortakAnahtar: SHARED_KEYS_FROM[currentTenant().tenantId] ? profileById(SHARED_KEYS_FROM[currentTenant().tenantId])?.ad ?? null : null,
       ...deploy,
     };
   });

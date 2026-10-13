@@ -6,7 +6,8 @@ const fs = require("node:fs");
 const { spawn } = require("node:child_process");
 
 const VARSAYILAN_ADRES = "https://wexon-growth-os.vercel.app";
-const ILK_SAYFA = "/ara";
+// Her açılışta önce profil (Wexon.dev / Aquails) ve profil şifresi istenir
+const ILK_SAYFA = "/profil";
 const IKON = path.join(__dirname, "build", "icon.ico");
 
 // ---------- ayarlar (kullanıcı klasöründe) ----------
@@ -151,6 +152,8 @@ function menuKur() {
         { label: "Mesaj", accelerator: "CmdOrCtrl+3", click: git("/whatsapp") },
         { label: "Ayarlar", accelerator: "CmdOrCtrl+4", click: git("/ayarlar") },
         { type: "separator" },
+        { label: "Profil değiştir", accelerator: "CmdOrCtrl+P", click: git("/profil") },
+        { type: "separator" },
         { label: "Çıkış", role: "quit" },
       ],
     },
@@ -175,9 +178,19 @@ function menuKur() {
   ]));
 }
 
-app.whenReady().then(() => {
+// Önceki açılıştan kalan profil çerezi silinir; profil seçimi her açılışta yeniden yapılır
+async function profiliKapat() {
+  try {
+    const ses = session.defaultSession;
+    const cerezler = await ses.cookies.get({ name: "wexon_profil" });
+    await Promise.all(cerezler.map((c) => ses.cookies.remove(`http${c.secure ? "s" : ""}://${c.domain.replace(/^\./, "")}${c.path}`, c.name)));
+  } catch {}
+}
+
+app.whenReady().then(async () => {
   izinleriAyarla();
   menuKur();
+  await profiliKapat();
   anaPencere();
   guncellemeyiKur();
   setTimeout(eskiKurulumuTemizle, 5000);

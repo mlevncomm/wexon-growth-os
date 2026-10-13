@@ -477,6 +477,63 @@ const wo = deriveWhatsApp([wev("lead.whatsapp_optin.granted", { kaynak: "telefon
 check(wo.durum === "geri_cekildi" && wo.dahaOnceVardi, "WA defter: ret izni geri çeker");
 check(deriveLegal([wev("lead.consent.granted", { tur: "tacir_esnaf", kaynak: "operator_beyani" }, "2026-10-01")], false).durum === "var" && deriveWhatsApp([wev("lead.consent.granted", { tur: "acik_onay", kaynak: "telefon" }, "2026-10-01")]).durum === "yok", "WA defter: ticari dayanak kaydı WhatsApp izni oluşturmaz");
 
+// --- Aquails (su arıtma) profili ---
+import { categoriesFor, categoryById } from "../src/lib/sales/categories.ts";
+import { WATER_PROFILES } from "../src/lib/sales/water.ts";
+import { systemPrompt } from "../src/lib/sales/engine.ts";
+let waterCount = 0;
+let waterMin = 100;
+const waterNames: Record<string, string> = {
+  restoran: "Lezzet Durağı Restoran", kafe: "Kahve Köşesi Cafe", otel: "Park Otel", kuafor: "Selin Kuaför", klinik: "Sağlık Polikliniği",
+  dis: "Gülüş Diş Kliniği", spor: "Fit Spor Salonu", egitim: "Bilgi Koleji", uretim: "Akın Tekstil Fabrikası", lojistik: "Hızlı Lojistik Depo",
+  insaat: "Yapı İnşaat", oto: "Usta Oto Servis", magaza: "Moda Mağazası", teknik: "Damla Su Arıtma Servis", ofis: "Merkez Ofis",
+  muhasebe: "Doğan Mali Müşavirlik", avukat: "Yılmaz Hukuk Bürosu", emlak: "Kale Emlak", yazilim: "Kod Yazılım", generic: "Tepe Ticaret",
+};
+for (const [sec, nm] of Object.entries(waterNames)) {
+  for (const [rating, reviews] of [[null, null], [4.8, 120]] as const) {
+    const wctx = buildContext({
+      lead: { id: `w-${sec}-${rating}`, name: nm, district: "Merkez", city: "Afyonkarahisar", website: "", status: "yeni", rating, reviewCount: reviews },
+      senderName: "Ayşe", brand: "Aquails", vertical: "water",
+    });
+    check(wctx.vertical === "water", `su: bağlam iş alanı ${sec}`);
+    for (const cat of ["ilk_temas", "bakim", "otomasyon", "huni"] as const) {
+      for (const d of localDrafts(wctx, cat)) {
+        const q = evaluateMessage(d.message, wctx, cat);
+        waterCount += 1;
+        waterMin = Math.min(waterMin, q.score);
+        check(q.blockers.length === 0 && q.score >= 85, `su: ${sec}/${cat}/${d.style} puan ${q.score}`, { m: d.message, r: q.reasons, b: q.blockers });
+        check(!/(web sitesi|yazılım|otomasyon|wexon)/iu.test(d.message.replace(nm, "")), `su: yazılım teklifi yok ${sec}/${cat}`, d.message);
+        check(!/(hastalık|tedavi|kanser|%\s?\d|ücretsiz|garanti)/iu.test(d.message), `su: sağlık/ücretsiz iddiası yok ${sec}/${cat}`, d.message);
+        check(/aquails/iu.test(d.message), `su: marka geçiyor ${sec}/${cat}`, d.message);
+      }
+    }
+  }
+}
+const wctx = buildContext({ lead: { id: "w1", name: "Lezzet Durağı Restoran", city: "Afyonkarahisar", status: "yazildi" }, brand: "Aquails", vertical: "water",
+  previousContacts: [{ message: "Merhaba, Aquails ekibinden yazıyorum.", at: "2026-10-01T10:00:00Z" }], now: new Date("2026-10-08T10:00:00Z") });
+for (const [cat, reply] of [["takip", ""], ["ilgili", "İlgileniyoruz"], ["fiyat", "Fiyat nedir?"], ["itiraz", "Zaten arıtma cihazımız var"], ["itiraz", "Bütçemiz yok"], ["kapanis", "İstemiyoruz"]] as const) {
+  const c2 = { ...wctx, customerReply: reply };
+  for (const d of localDrafts(c2, cat)) {
+    const q = evaluateMessage(d.message, c2, cat);
+    waterCount += 1;
+    waterMin = Math.min(waterMin, q.score);
+    check(q.blockers.length === 0 && q.score >= 85, `su: ${cat}/${d.style} puan ${q.score}`, { m: d.message, r: q.reasons, b: q.blockers });
+    check(!/(web sitesi|site)/iu.test(d.message), `su: ${cat} site yok`, d.message);
+  }
+}
+check(/filtre/iu.test(localDrafts({ ...wctx, customerReply: "Zaten arıtma cihazımız var" }, "itiraz")[0].message), "su: cihazı olana bakım önerilir");
+check(evaluateMessage("Merhaba, Aquails ekibinden Ayşe. Arıtılmış su hastalıklardan korur ve bakterilerin %99’unu yok eder. Lezzet Durağı için konuşalım mı?", wctx, "ilk_temas").blockers.length > 0, "su: sağlık iddiası engellenir");
+check(evaluateMessage("Merhaba, Aquails ekibinden Ayşe. Lezzet Durağı için içme suyu çözümü önerebilirim. Uygun olursa kısaca anlatayım mı?", { ...wctx, vertical: "software" }, "ilk_temas").blockers.length === 0, "su kuralı yalnızca su profilinde");
+check(categoriesFor("water").every((c) => c.id !== "otomasyon" && c.id !== "huni") && categoriesFor("water").find((c) => c.id === "bakim")?.label === "Filtre ve bakım", "su: mesaj türleri");
+check(categoriesFor("software").length === CATEGORIES.length && categoryById("huni", "water").id === "ilk_temas" && categoryById("huni").id === "huni", "su: tür eşleme");
+check(defaultCategory("yeni", true, "water") === "ilk_temas" && defaultCategory("yeni", true) === "huni", "su: varsayılan tür");
+const wsp = systemPrompt(wctx);
+check(/su arıtma/iu.test(wsp) && /Sağlık iddiası yok/u.test(wsp) && !/yazılım stüdyosu/u.test(wsp), "su: sistem talimatı Aquails");
+check(/yazılım stüdyosu/u.test(systemPrompt(base())) && !/SU ARITMA KURALLARI/u.test(systemPrompt(base())), "yazılım: sistem talimatı değişmedi");
+check(base().vertical === "software", "varsayılan iş alanı yazılım");
+check(Object.values(WATER_PROFILES).every((p) => p && !/(web|site|yazılım)/iu.test(`${p.web} ${p.benefit} ${p.question}`)), "su profilleri yazılım içermiyor");
+console.log(`su taslağı: ${waterCount} adet, en düşük puan ${waterMin}`);
+
 console.log(`yerel taslak: ${localCount} adet, en düşük puan ${localMin}`);
 if (failed) {
   console.error(`${failed} kontrol başarısız, ${passed} geçti`);

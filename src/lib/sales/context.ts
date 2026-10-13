@@ -6,8 +6,12 @@ import { siteKind, websiteHost, type SiteKind } from "../website";
 
 export type ContactRecord = { message: string; at: string; category?: string };
 
+export type Vertical = "software" | "water";
+
 export type CustomerContext = {
   leadId: string;
+  /** Profilin iş alanı: Wexon.dev yazılım, Aquails su arıtma */
+  vertical: Vertical;
   name: string;
   /** Mesajda doğal kullanım için kısa ad: "Aquails Su Arıtma Cihazları" → "Aquails" */
   shortName: string;
@@ -58,6 +62,7 @@ export type ContextInput = {
   brand?: string;
   senderName?: string;
   playbookOffer?: string;
+  vertical?: string;
   now?: Date;
 };
 
@@ -157,16 +162,18 @@ export function buildContext(input: ContextInput): CustomerContext {
   const assumptions = sector.id === "generic"
     ? []
     : [`Sektör tahmini: ${sector.label} (ad, adres veya arama sorgusundan çıkarıldı)`];
-  if (sector.id === "yazilim") assumptions.push("Aynı işi yapan bir firma olabilir: web sitesi satılmaz, iş birliği konuşulur");
+  const vertical: Vertical = input.vertical === "water" ? "water" : "software";
+  if (sector.id === "yazilim" && vertical === "software") assumptions.push("Aynı işi yapan bir firma olabilir: web sitesi satılmaz, iş birliği konuşulur");
   const unknowns = [
-    "İşletmenin mevcut iş süreçleri ve sorunları bilinmiyor",
-    kind === "site" ? "Web sitesinin içeriği ve durumu incelenmedi" : "",
+    vertical === "water" ? "İşletmenin içme suyunu nasıl karşıladığı ve mevcut bir arıtma cihazı olup olmadığı bilinmiyor" : "İşletmenin mevcut iş süreçleri ve sorunları bilinmiyor",
+    kind === "site" && vertical === "software" ? "Web sitesinin içeriği ve durumu incelenmedi" : "",
     sector.id === "generic" ? "Sektör belirlenemedi" : "",
     "Yetkili kişinin adı bilinmiyor",
   ].filter(Boolean);
 
   return {
     leadId: lead.id,
+    vertical,
     name,
     shortName,
     sector: { ...sector, inferred: sector.id !== "generic" },

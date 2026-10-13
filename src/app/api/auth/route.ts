@@ -12,6 +12,7 @@ import {
   SESSION_COOKIE,
 } from "@/lib/session";
 import type { UserRole } from "@/lib/verticals";
+import { PROFILE_COOKIE } from "@/lib/app-profiles";
 
 export const dynamic = "force-dynamic";
 
@@ -111,5 +112,6 @@ export async function POST(request: Request) {
 export async function DELETE() {
   const res = NextResponse.json({ ok: true });
   res.cookies.set({ name: SESSION_COOKIE, value: "", path: "/", maxAge: 0 });
+  res.cookies.set({ name: PROFILE_COOKIE, value: "", path: "/", maxAge: 0 });
   return res;
 }

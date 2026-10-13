@@ -49,7 +49,7 @@ const SLANG = /(?<!\p{L})(kanka|abi|abla|hocam|canım|reis|kardeşim|selamlar ya
 const LOW_VALUE = /(ücretsiz|bedava|beğenmezseniz|hiçbir ücreti yok|ücret almıyoruz)/iu;
 const PRICE = /(\d[\d.]*\s?(tl|₺)|lira\b)/iu;
 const MEETING = /(toplantı|görüntülü görüşme|zoom|meet\b)/iu;
-const BENEFIT = /(güncel|kolay|kolaylaştır|hızlı|tek yerde|tek bakışta|tek ekranda|tek listede|sade|bulur|bulabil|ulaş|talep|zaman|takip|hatırlat|görür|net)/iu;
+const BENEFIT = /(güncel|kolay|kolaylaştır|hızlı|tek yerde|tek bakışta|tek ekranda|tek listede|sade|bulur|bulabil|ulaş|talep|zaman|takip|hatırlat|görür|net|hazır|azal|derdi|tutarlı)/iu;
 const CTA = /(\?|isterseniz|ister misiniz|anlatayım|paylaşayım|göstereyim|gönderebilirim|paylaşabilirim|yazmanız yeterli|yazarsanız|haber verin|dönüş yaparsanız|konuşabiliriz|uygun mu|ilk izleniminizi)/iu;
 const SERVICES: [string, RegExp][] = [
   ["web sitesi", /(web sitesi|web sayfası|\bsite\b|sitesi\b)/iu],
@@ -60,6 +60,8 @@ const SERVICES: [string, RegExp][] = [
   ["bakım", /(bakım desteği|aylık bakım)/iu],
   ["reklam", /(reklam|google ads|sosyal medya yönetimi)/iu],
 ];
+// Su arıtmada sağlık vaadi ve kanıtlanmamış oranlar (reklam mevzuatı)
+const HEALTH_CLAIMS = /(hastalık|tedavi|kanser|bağışıklık|şifa|iyileştir|mikrop(lar)?ı (yok|öldür)|bakteri\p{L}* (tamamını|hepsini|yok eder|öldür)|%\s?\d{2}|yüzde \d{2}|sağlığınız için|sağlıklı yaşam)/iu;
 const EMOJI = /\p{Extended_Pictographic}/gu;
 const STOP_WORDS = new Set(["ltd", "şti", "sti", "san", "tic", "ve", "a.ş.", "aş", "ltd.", "şti.", "the", "&"]);
 
@@ -158,10 +160,12 @@ function repeatedTrigram(text: string): boolean {
 }
 
 export function evaluateMessage(message: string, ctx: CustomerContext, categoryId: CategoryId): QualityResult {
-  const profile = profileFor(ctx.sector.id);
+  const profile = profileFor(ctx.sector.id, ctx.vertical);
+  const water = ctx.vertical === "water";
   // Aynı işi yapan firmaya otomasyon/bakım/huni yerine iş birliği ilk teması yazılır
   const category = categoryById(
     profile.partner && ["otomasyon", "bakim", "huni"].includes(categoryId) ? "ilk_temas" : categoryId,
+    ctx.vertical,
   );
   const text = message.trim();
   const b: QualityBreakdown = { ...MAX };
@@ -208,6 +212,7 @@ export function evaluateMessage(message: string, ctx: CustomerContext, categoryI
   const typo = misspelledName(text, ctx.name);
   if (typo) blockers.push(`İşletme adı hatalı yazılmış gibi görünüyor (“${typo}”)`);
   if (RUDE_FOLLOWUP.test(text)) blockers.push("Baskı kuran ya da suçlayan takip ifadesi var");
+  if (water && HEALTH_CLAIMS.test(text)) blockers.push("Su arıtmada sağlık iddiası ya da kanıtlanmamış oran var (hastalık, tedavi, %99 gibi)");
   if (ctx.optedOut && category.sales) {
     blockers.push("Bu müşteri iletişim istemediğini belirtmiş; satış mesajı gönderilmez");
   }
@@ -279,7 +284,10 @@ export function evaluateMessage(message: string, ctx: CustomerContext, categoryI
     minus("uygunluk", 8, "Aynı işi yapan firmaya web sitesi satılmaya çalışılıyor");
     warnings.push("Bu işletme yazılım ya da ajans görünüyor; web sitesi satmak yerine iş birliği önerin.");
   }
-  if (category.id === "bakim" && ctx.website.kind !== "site") {
+  if (water && cold && /(web sitesi|web sayfası|yazılım|otomasyon)/iu.test(strip(text))) {
+    minus("uygunluk", 8, "Aquails profilinde su arıtma dışı bir hizmet teklif ediliyor");
+  }
+  if (category.id === "bakim" && ctx.website.kind !== "site" && !water) {
     minus("uygunluk", 8, "Kayıtlı web sitesi yok; bakım teklifi bu müşteriye uygun olmayabilir");
     warnings.push("Bu müşterinin kayıtlı bir web sitesi yok; bakım mesajı yerine ilk temas daha uygun");
   }

@@ -5,13 +5,15 @@
 //   2) Kilit açık:       WA_SENDING_ENABLED=1 npx next dev → npx tsx scripts/verify-e2e.mts --kilit-acik
 // Ortam: .env.development.local (DATABASE_URL=file:..., ADMIN_EMAIL, ADMIN_PASSWORD, CRON_SECRET). Değerler yazdırılmaz.
 import { readFileSync } from "node:fs";
+import { randomBytes } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
+import { hashPassword } from "../src/lib/password.ts";
 
 const env = Object.fromEntries(
   readFileSync(".env.development.local", "utf8")
     .split(/\r?\n/)
-    .filter((l) => /^[A-Z_]+=/.test(l))
-    .map((l) => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1).replace(/^"|"$/g, "")]),
+    .filter((l) => /^[A-Z0-9_]+=/.test(l))
+    .map((l) => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1).replace(/^(["'])(.*)\1$/, "$2")]),
 );
 if (!/^file:/.test(env.DATABASE_URL ?? "")) {
   console.error("Güvenlik: bu test yalnızca yerel SQLite veritabanında çalışır.");
@@ -26,6 +28,7 @@ if (!/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(BASE)) {
 const unlocked = process.argv.includes("--kilit-acik");
 const prisma = new PrismaClient();
 const TENANT = "tnt_wexon_dev";
+const PROFIL_UYE = "e2e-profil@uye.test";
 
 let failed = 0;
 let passed = 0;
@@ -279,10 +282,61 @@ try {
   check((await prisma.lead.count({ where: { tenantId: TENANT } })) === before, "deneme modu kayıt oluşturmaz");
   const anon = await fetch(BASE + "/api/mesaj-deneme", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
   check(anon.status === 401, "deneme modu girişsiz kullanılamaz", anon.status);
+
+  // --- Uygulama profilleri: Wexon.dev / Aquails seçimi, profil şifresi, ortak anahtarlar ---
+  const pins = JSON.parse(env.E2E_PROFIL_PINLERI ?? "{}") as Record<string, string>;
+  if (pins.tnt_wexon_dev && pins.tnt_aquails) {
+    const adminCookie = cookie;
+    cookie = "";
+    const uyePw = randomBytes(18).toString("base64url");
+    await prisma.user.create({ data: { email: PROFIL_UYE, passwordHash: await hashPassword(uyePw), role: "member", tenantId: TENANT } });
+    check((await call("/api/auth", { body: { email: PROFIL_UYE, password: uyePw } })).status === 200, "profil: üye girişi");
+    const kapali = await call("/api/settings");
+    check(kapali.status === 428 && kapali.json.profil === true, "profil: seçilmeden işletme verisine erişilemez", kapali);
+    const sayfa = await fetch(BASE + "/ara", { headers: { cookie }, redirect: "manual" });
+    check([302, 307, 308].includes(sayfa.status) && /\/profil$/.test(new URL(sayfa.headers.get("location") ?? "", BASE).pathname), "profil: sayfalar profil seçimine yönlenir", sayfa.status);
+    const liste = await call("/api/profil");
+    check(liste.status === 200 && liste.json.profiller.length === 2 && liste.json.profiller.every((p: any) => p.sifreAyarli && !("pin" in p) && !("hash" in p)), "profil: iki profil listelenir, şifre bilgisi dönmez", liste.json);
+    const yanlis = pins.tnt_aquails === "0000" ? "9999" : "0000";
+    const y1 = await call("/api/profil", { body: { tenantId: "tnt_aquails", pin: yanlis } });
+    check(y1.status === 401 && !String(y1.json?.git ?? ""), "profil: yanlış şifre reddedilir", y1.status);
+    check((await call("/api/profil", { body: { tenantId: "tnt_akarsu", pin: pins.tnt_aquails } })).status === 400, "profil: grupta olmayan işletme açılamaz");
+    check((await call("/api/settings")).status === 428, "profil: yanlış şifreden sonra profil kapalı kalır");
+    const ac = await call("/api/profil", { body: { tenantId: "tnt_aquails", pin: pins.tnt_aquails } });
+    check(ac.status === 200 && ac.json.git === "/ara", "profil: Aquails doğru şifreyle açılır");
+    const meAq = await call("/api/me");
+    const setAq = await call("/api/settings");
+    check(setAq.status === 200 && setAq.json.ortakAnahtar === "Wexon.dev", "profil: Aquails Google ve Gemini anahtarlarını Wexon.dev ile ortak kullanır", setAq.json?.ortakAnahtar);
+    const aqRow = await prisma.appSettings.findUnique({ where: { tenantId: "tnt_aquails" } }).catch(() => null);
+    check(setAq.json.hasCloudToken === Boolean(aqRow?.waCloudToken) && setAq.json.hasPhoneNumberId === Boolean(aqRow?.waPhoneNumberId), "profil: Aquails WhatsApp ayarı kendi kaydından gelir");
+    await call("/api/settings", { method: "PUT", body: { googlePlacesApiKey: "E2E-degistirilemez" } });
+    const wxRow = await prisma.appSettings.findUnique({ where: { tenantId: TENANT } }).catch(() => null);
+    check(wxRow?.googlePlacesApiKey !== "E2E-degistirilemez" && (await prisma.appSettings.findUnique({ where: { tenantId: "tnt_aquails" } }).catch(() => null))?.googlePlacesApiKey !== "E2E-degistirilemez", "profil: Aquails ortak anahtarı değiştiremez");
+    const aqLead = await call("/api/mesaj-deneme", { body: { lead: { name: "E2E Lezzet Durağı Restoran", city: "Afyonkarahisar" }, senderName: "Ayşe" } });
+    const aqMsg = aqLead.json?.result?.drafts?.map((d: any) => d.message).join(" ") ?? "";
+    check(aqLead.status === 200 && aqLead.json.ctx.vertical === "water" && /Aquails/.test(aqMsg) && !/web sitesi|Wexon/iu.test(aqMsg), "profil: Aquails taslakları su arıtma üzerine", { v: aqLead.json?.ctx?.vertical, m: aqMsg.slice(0, 300) });
+    const wx = await call("/api/profil", { body: { tenantId: TENANT, pin: pins.tnt_wexon_dev } });
+    const setWx = await call("/api/settings");
+    check(wx.status === 200 && setWx.status === 200 && setWx.json.ortakAnahtar === null && setWx.json.hasPlacesKey === setAq.json.hasPlacesKey && setWx.json.hasLlmKey === setAq.json.hasLlmKey, "profil: Wexon.dev'e geçiş, anahtar durumu iki profilde aynı");
+    check(Boolean(meAq.json) && JSON.stringify(meAq.json).includes("Aquails"), "profil: /api/me açık profili gösterir", meAq.json);
+    await call("/api/profil", { method: "DELETE" });
+    check((await call("/api/settings")).status === 428, "profil: profilden çıkınca yeniden seçim istenir");
+    for (let i = 0; i < 5; i += 1) await call("/api/profil", { body: { tenantId: TENANT, pin: yanlis } });
+    const kilit = await call("/api/profil", { body: { tenantId: TENANT, pin: pins.tnt_wexon_dev } });
+    check(kilit.status === 429, "profil: 5 yanlış denemeden sonra doğru şifre de 10 dakika kabul edilmez", kilit.status);
+    cookie = adminCookie;
+  } else {
+    check(false, "profil: .env.development.local içinde E2E_PROFIL_PINLERI yok");
+  }
 } catch (err) {
   failed += 1;
   console.error("HATA", err);
 } finally {
+  const uye = await prisma.user.findUnique({ where: { email: PROFIL_UYE } });
+  if (uye) {
+    await prisma.auditLog.deleteMany({ where: { actorId: uye.id } });
+    await prisma.user.delete({ where: { id: uye.id } });
+  }
   await cleanup();
   await prisma.$disconnect();
 }

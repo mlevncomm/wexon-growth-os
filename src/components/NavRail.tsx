@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { APP_PROFILES } from "@/lib/app-profiles-list";
 import { usePathname } from "next/navigation";
 
 const MAIN = [
@@ -213,6 +214,19 @@ export function NavRail({
           </span>
         </Link>
         )}
+        {!platform && APP_PROFILES.some((p) => p.ad === tenantName) ? (
+          <Link href="/profil" className="rail-row" onClick={onNavigate}>
+            <span className="rail-ico" aria-hidden>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
+                <path d="M7 7h11l-3-3M17 17H6l3 3" />
+              </svg>
+            </span>
+            <span className="rail-copy">
+              <b>Profil değiştir</b>
+              <em>{tenantName}</em>
+            </span>
+          </Link>
+        ) : null}
         <button
           className="rail-row rail-logout"
           type="button"

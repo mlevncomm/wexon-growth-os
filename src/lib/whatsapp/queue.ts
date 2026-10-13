@@ -262,7 +262,7 @@ function pitchFromLead(
     website: lead.website,
     notes: lead.notes,
     campaignQuery: lead.campaign?.query ?? "",
-  });
+  }, currentTenant().tenantName);
 }
 
 async function refreshGenericDrafts(owner: string, vertical: Vertical): Promise<void> {
@@ -331,7 +331,7 @@ export async function enqueueLeads(opts: {
     let message: string;
     if (policy.kind === "takip" || policy.kind === "yanit") {
       // Daha önce yazılmış müşteriye ilk temas şablonu tekrar gitmez; önceki mesajı bilen takip taslağı hazırlanır
-      const ctx = buildContext({ lead, campaignQuery: lead.campaign?.query ?? "", previousContacts: await previousContacts(lead.id), brand: currentTenant().tenantName });
+      const ctx = buildContext({ lead, campaignQuery: lead.campaign?.query ?? "", previousContacts: await previousContacts(lead.id), brand: currentTenant().tenantName, vertical: currentTenant().vertical });
       message = localDrafts(ctx, policy.kind === "takip" ? "takip" : "ilgili")[0].message;
     } else {
       message = useAuto

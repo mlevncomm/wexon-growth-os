@@ -43,13 +43,14 @@ export async function POST(request: Request) {
       campaignQuery: cleanExternal(lead?.campaignQuery, 80),
       recentOthers: Array.isArray(body?.recentOthers) ? body.recentOthers.filter((m): m is string => typeof m === "string").slice(0, 5) : [],
       brand: ctx.tenantName,
+      vertical: ctx.vertical,
       senderName: body?.senderName,
       playbookOffer: playbook.offer,
     });
     try {
       const chat = await salesChat(typeof body?.model === "string" ? body.model : undefined);
       const result = await generateDrafts({ ctx: customer, category, chat, operatorPlaybook: playbookToPrompt(playbook) });
-      return NextResponse.json({ ctx: { sector: customer.sector, shortName: customer.shortName }, result: { ...result, aiMeta: chat?.meta ?? [] } });
+      return NextResponse.json({ ctx: { sector: customer.sector, shortName: customer.shortName, vertical: customer.vertical }, result: { ...result, aiMeta: chat?.meta ?? [] } });
     } catch (err) {
       if (err instanceof SalesPolicyError) return NextResponse.json({ error: err.message }, { status: 409 });
       throw err;

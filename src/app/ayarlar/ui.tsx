@@ -101,6 +101,7 @@ export default function AyarlarPage() {
   const [mediaName, setMediaName] = useState("");
   const [hasMediaId, setHasMediaId] = useState(false);
   const [mediaProgress, setMediaProgress] = useState(0);
+  const [ortak, setOrtak] = useState<string | null>(null);
 
   useEffect(() => {
     const boot = window.setTimeout(() => {
@@ -135,6 +136,7 @@ export default function AyarlarPage() {
             hasIgToken: s.hasIgToken,
             hasIgUserId: s.hasIgUserId,
           });
+          setOrtak((s as Settings & { ortakAnahtar?: string | null }).ortakAnahtar ?? null);
           setMediaName(s.campaignMediaName ?? "");
           setHasMediaId(Boolean(s.campaignMediaId));
           setDeploy({
@@ -369,8 +371,10 @@ export default function AyarlarPage() {
                     onChange={(e) => setForm({ ...form, googlePlacesApiKey: e.target.value })}
                     placeholder="AIza..."
                     autoComplete="off"
+                    readOnly={Boolean(ortak)}
                   />
                 </label>
+                {ortak ? <div className="muted" style={{ fontSize: 12.5, marginTop: 6 }}>Bu profil Google Places anahtarını {ortak} ile ortak kullanır; değiştirmek için {ortak} profilini açın.</div> : null}
               </div>
               <div className="key-block">
                 <label className="field">
@@ -551,8 +555,10 @@ export default function AyarlarPage() {
                   }}
                   placeholder="AIza…"
                   autoComplete="off"
+                  readOnly={Boolean(ortak)}
                 />
               </label>
+              {ortak ? <div className="muted" style={{ fontSize: 12.5, marginTop: 6 }}>Bu profil Gemini ayarlarını {ortak} ile ortak kullanır; WhatsApp bağlantısı bu profile özeldir.</div> : null}
             </div>
             <div className="key-block">
               <label className="field">

@@ -130,6 +130,7 @@ export async function leadContext(
     designLink: input.designLink,
     customerReply: input.customerReply,
     brand: currentTenant().tenantName,
+    vertical: currentTenant().vertical,
     senderName: input.senderName,
     playbookOffer: playbook.offer,
   });

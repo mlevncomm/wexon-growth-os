@@ -188,6 +188,36 @@ check(
   "stale gemini model bumped",
 );
 
+// --- Uygulama profilleri (Wexon.dev / Aquails) ---
+{
+  process.env.AUTH_SECRET ??= "test-secret-test-secret-1234";
+  const { encodeProfile, decodeProfile, inProfileGroup, pinHashFor, SHARED_KEYS_FROM } = await import("../src/lib/app-profiles.ts");
+  const { hashPassword, verifyPassword } = await import("../src/lib/password.ts");
+  const t0 = Date.parse("2026-10-13T08:00:00Z");
+  const tok = encodeProfile("u1", "tnt_aquails", t0);
+  const ok = (cond: boolean, label: string) => { if (!cond) { failed += 1; console.error("FAIL", label); } };
+  ok(decodeProfile(tok, "u1", t0 + 1000)?.tenantId === "tnt_aquails", "profil çerezi çözülür");
+  ok(decodeProfile(tok, "u2", t0) === null, "başka kullanıcı profil çerezini kullanamaz");
+  ok(decodeProfile(tok, "u1", t0 + 13 * 3600_000) === null, "profil çerezi 12 saatte biter");
+  const [pl, mac] = tok.split(".");
+  const forged = Buffer.from(JSON.stringify({ userId: "u1", tenantId: "tnt_wexon_dev", exp: t0 + 3600_000 })).toString("base64url");
+  ok(decodeProfile(`${forged}.${mac}`, "u1", t0) === null && decodeProfile(`${pl}.x${mac.slice(1)}`, "u1", t0) === null, "imzasız profil çerezi reddedilir");
+  ok(decodeProfile(encodeProfile("u1", "tnt_akarsu", t0), "u1", t0) === null, "grupta olmayan profil reddedilir");
+  ok(inProfileGroup("tnt_wexon_dev") && inProfileGroup("tnt_aquails") && !inProfileGroup("tnt_akarsu") && !inProfileGroup(null), "profil grubu");
+  ok(SHARED_KEYS_FROM.tnt_aquails === "tnt_wexon_dev" && !SHARED_KEYS_FROM.tnt_wexon_dev, "Aquails anahtarları Wexon'dan");
+  const prev = process.env.PROFIL_PIN_OZETLERI;
+  const h = await hashPassword("4321");
+  process.env.PROFIL_PIN_OZETLERI = JSON.stringify({ tnt_aquails: h });
+  const ph = pinHashFor("tnt_aquails");
+  ok(Boolean(ph) && pinHashFor("tnt_wexon_dev") === null, "profil şifre özeti okunur");
+  ok((await verifyPassword("4321", ph!)) && !(await verifyPassword("1234", ph!)), "profil şifresi doğrulanır");
+  process.env.PROFIL_PIN_OZETLERI = "bozuk";
+  ok(pinHashFor("tnt_aquails") === null, "bozuk özet ayarı güvenli");
+  if (prev === undefined) delete process.env.PROFIL_PIN_OZETLERI; else process.env.PROFIL_PIN_OZETLERI = prev;
+  const aq = composePitch("water", { name: "Lezzet Durağı Restoran", district: "Merkez", city: "Afyonkarahisar", address: "", phone: "", website: "" }, "Aquails");
+  ok(/Aquails/.test(aq.body) && !/(web sitesi|Wexon|hastalık|%)/iu.test(aq.body), "Aquails kuyruk taslağı su arıtma");
+}
+
 if (failed) {
   console.error(`FAILED ${failed}`);
   process.exit(1);

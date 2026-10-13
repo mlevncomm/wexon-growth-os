@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { decodeSession, SESSION_COOKIE, authConfigured } from "@/lib/session-token";
+import { decodeProfile, inProfileGroup, PROFILE_COOKIE } from "@/lib/app-profiles";
+
+// Profil seçmeden de açılabilen yollar (oturum yine gerekir)
+const PROFILE_FREE = ["/profil", "/api/profil", "/api/me"];
 
 const PUBLIC = ["/giris", "/api/auth", "/api/instagram/webhook", "/api/outreach/tick", "/api/surum"];
 
@@ -50,6 +54,22 @@ export function proxy(request: NextRequest) {
   ) {
     const url = request.nextUrl.clone();
     url.pathname = "/platform";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
+
+  // Wexon.dev / Aquails kullanıcıları her açılışta profil seçer (profil çerezi program kapanınca silinir)
+  if (
+    session.role === "member" &&
+    inProfileGroup(session.tenantId) &&
+    !PROFILE_FREE.some((p) => pathname === p || pathname.startsWith(`${p}/`)) &&
+    !decodeProfile(request.cookies.get(PROFILE_COOKIE)?.value, session.userId)
+  ) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Önce profil seçin.", profil: true }, { status: 428 });
+    }
+    const url = request.nextUrl.clone();
+    url.pathname = "/profil";
     url.search = "";
     return NextResponse.redirect(url);
   }

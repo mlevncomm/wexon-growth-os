@@ -1,4 +1,5 @@
 import type { SectorId } from "./sector";
+import { waterProfileFor } from "./water";
 
 // Sektöre göre olası değer önerileri. Bunlar sektörden çıkarılan VARSAYIMLARDIR;
 // işletmede tespit edilmiş sorun gibi sunulmaz. Yeni sektör eklemek için tabloya satır eklemek yeterli.
@@ -351,6 +352,7 @@ export const SECTOR_PROFILES: Record<SectorId, SectorProfile> = {
   },
 };
 
-export function profileFor(sector: SectorId): SectorProfile {
+export function profileFor(sector: SectorId, vertical: string = "software"): SectorProfile {
+  if (vertical === "water") return waterProfileFor(sector);
   return SECTOR_PROFILES[sector] ?? GENERIC;
 }

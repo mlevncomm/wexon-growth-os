@@ -2,6 +2,7 @@ import { categoryById, STYLES, type CategoryId, type RefineMode, type StyleId } 
 import { contextSummary, type CustomerContext } from "./context";
 import { localDrafts } from "./drafts";
 import { profileFor } from "./profiles";
+import { WATER_BRAND_LINE, WATER_TRUTH_RULES } from "./water";
 import { mentionsOptOut } from "./policy";
 import { evaluateMessage, REWRITE_BELOW, type QualityResult } from "./quality";
 
@@ -63,10 +64,12 @@ function styleLabel(style: StyleId) {
 
 /** Katman 1: kalıcı marka kimliği, doğruluk ve güvenlik kuralları */
 export function systemPrompt(ctx: CustomerContext): string {
-  const profile = profileFor(ctx.sector.id);
+  const profile = profileFor(ctx.sector.id, ctx.vertical);
   return [
     `Sen ${ctx.brand} adına WhatsApp mesaj taslağı yazan deneyimli bir B2B satış iletişimcisisin. Taslağı bir insan okur, düzeltir ve kendisi gönderir.`,
-    `${ctx.brand}: işletmelere modern web siteleri, dönüşüm odaklı sayfalar, web uygulamaları, iş süreci otomasyonu, yapay zekâ entegrasyonları, özel yazılım ve bakım hizmeti veren bir yazılım stüdyosu.`,
+    ctx.vertical === "water"
+      ? WATER_BRAND_LINE
+      : `${ctx.brand}: işletmelere modern web siteleri, dönüşüm odaklı sayfalar, web uygulamaları, iş süreci otomasyonu, yapay zekâ entegrasyonları, özel yazılım ve bakım hizmeti veren bir yazılım stüdyosu.`,
     "Ton: samimi ama profesyonel, özgüvenli ama kibirsiz, ilgili ama ısrarcı değil. Teknik terim, gereksiz İngilizce, emoji, ünlem ve büyük harf yok. Laubali değil.",
     "DOĞRULUK KURALLARI (her şeyin üstünde):",
     "- Yalnızca DOĞRULANMIŞ BİLGİ bölümündeki bilgileri gerçek olarak kullan. VARSAYIM bölümündekileri işletmede tespit edilmiş sorun gibi sunma.",
@@ -78,13 +81,14 @@ export function systemPrompt(ctx: CustomerContext): string {
     profile.sensitive
       ? "- Bu işletme sağlık veya hukuk gibi kurallı bir alanda. Sonuç vaadi, tedavi iddiası, hasta/danışan sayısı vaadi yok; yalnızca bilgilendirme ve iletişim kolaylığından bahset."
       : "",
+    ctx.vertical === "water" ? `SU ARITMA KURALLARI:\n${WATER_TRUTH_RULES}` : "",
     "Çıktın yalnızca istenen JSON nesnesidir; başka metin yazma.",
   ].filter(Boolean).join("\n");
 }
 
 /** Katman 2: doğrulanmış müşteri bağlamı (güvenilmeyen veri olarak işaretli) */
 function contextBlock(ctx: CustomerContext): string {
-  const profile = profileFor(ctx.sector.id);
+  const profile = profileFor(ctx.sector.id, ctx.vertical);
   const data = {
     isletme: ctx.name,
     hitapIcinKisaAd: ctx.shortName,
@@ -116,8 +120,8 @@ function contextBlock(ctx: CustomerContext): string {
 }
 
 /** Katman 3: satış stratejisi */
-function strategyBlock(categoryId: CategoryId, operatorPlaybook: string): string {
-  const c = categoryById(categoryId);
+function strategyBlock(categoryId: CategoryId, operatorPlaybook: string, vertical = "software"): string {
+  const c = categoryById(categoryId, vertical);
   return [
     `MESAJ TÜRÜ: ${c.label}`,
     `Amaç: ${c.goal}`,
@@ -280,7 +284,7 @@ export async function generateDrafts(opts: {
 
   const messages: ChatMessage[] = [
     { role: "system", content: systemPrompt(ctx) },
-    { role: "user", content: [contextBlock(ctx), strategyBlock(category, opts.operatorPlaybook ?? ""), outputSpec()].join("\n\n") },
+    { role: "user", content: [contextBlock(ctx), strategyBlock(category, opts.operatorPlaybook ?? "", ctx.vertical), outputSpec()].join("\n\n") },
   ];
   let calls = 0;
   let raw: RawVariant[] = [];
@@ -334,7 +338,7 @@ export async function generateDrafts(opts: {
             messages[0],
             {
               role: "user",
-              content: `${contextBlock(ctx)}\n\n${strategyBlock(category, opts.operatorPlaybook ?? "")}\n\nAşağıdaki taslakları belirtilen sorunlara göre düzelt. Müşteri hakkında yeni bilgi uydurma; yalnızca sorunları gider, tarzı koru.\n${weak
+              content: `${contextBlock(ctx)}\n\n${strategyBlock(category, opts.operatorPlaybook ?? "", ctx.vertical)}\n\nAşağıdaki taslakları belirtilen sorunlara göre düzelt. Müşteri hakkında yeni bilgi uydurma; yalnızca sorunları gider, tarzı koru.\n${weak
                 .map((d) => `[${d.style}] ${d.message}\nSorunlar: ${[...d.blockers, ...d.qualityReasons].join("; ")}`)
                 .join("\n\n")}\n\nÇıktı JSON: {"variants":[{"style":"...","message":"...","suggestedCTA":"...","customerContextUsed":["..."],"reason":"..."}]}`,
             },
@@ -412,7 +416,7 @@ export async function refineDraft(opts: {
         { role: "system", content: systemPrompt(ctx) },
         {
           role: "user",
-          content: `${contextBlock(ctx)}\n\n${strategyBlock(category, opts.operatorPlaybook ?? "")}\n\nİSTEK: ${REFINE_GUIDE[mode]}\nMevcut taslak:\n"""${original.message}"""\nÇıktı JSON: {"message":"...","reason":"ne değişti, tek cümle"}`,
+          content: `${contextBlock(ctx)}\n\n${strategyBlock(category, opts.operatorPlaybook ?? "", ctx.vertical)}\n\nİSTEK: ${REFINE_GUIDE[mode]}\nMevcut taslak:\n"""${original.message}"""\nÇıktı JSON: {"message":"...","reason":"ne değişti, tek cümle"}`,
         },
       ],
       { temperature: 0.5, timeoutMs: FIRST_CALL_MS },

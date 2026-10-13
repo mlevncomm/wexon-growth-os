@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { formatPhoneDisplay, isWhatsAppCapablePhone, normalizePhone } from "@/lib/phone";
-import { CATEGORIES, categoryById, REFINE_MODES, type CategoryId, type RefineMode } from "@/lib/sales/categories";
+import { categoriesFor, categoryById, REFINE_MODES, type CategoryId, type RefineMode } from "@/lib/sales/categories";
 import { BASIS_SOURCES, BASIS_TYPES, legalLabel, WHATSAPP_SOURCES, whatsappLabel, type BasisSource, type BasisType, type ChannelState, type LegalState, type WhatsAppSource } from "@/lib/sales/consent";
 import { cleanExternal, cleanLink, contextSummary, type CustomerContext } from "@/lib/sales/context";
 import { localResult, type Draft, type DraftResult } from "@/lib/sales/engine";
@@ -109,7 +109,7 @@ export function WhatsAppPenceresi({ lead, onClose, onSent }: {
   }, [onClose]);
 
   const cat = category ?? boot?.category ?? "ilk_temas";
-  const catInfo = categoryById(cat);
+  const catInfo = categoryById(cat, boot?.ctx.vertical);
 
   // Operatörün girdileriyle güncellenmiş bağlam (link, ad, müşteri mesajı)
   const ctx = useMemo<CustomerContext | null>(() => {
@@ -330,7 +330,7 @@ export function WhatsAppPenceresi({ lead, onClose, onSent }: {
               <label className="field">
                 <span>Mesaj türü</span>
                 <select value={cat} onChange={(e) => { setCategory(e.target.value as CategoryId); resetDrafts(); }} style={{ width: "100%" }}>
-                  {CATEGORIES.map((c) => (
+                  {categoriesFor(ctx.vertical).map((c) => (
                     <option key={c.id} value={c.id} disabled={ctx.optedOut && c.sales}>{c.label}</option>
                   ))}
                 </select>
