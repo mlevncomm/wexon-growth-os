@@ -214,6 +214,12 @@ check(
   process.env.PROFIL_PIN_OZETLERI = "bozuk";
   ok(pinHashFor("tnt_aquails") === null, "bozuk özet ayarı güvenli");
   if (prev === undefined) delete process.env.PROFIL_PIN_OZETLERI; else process.env.PROFIL_PIN_OZETLERI = prev;
+  const { copyAngles: angles, generateSalesCopy: gen } = await import("../src/lib/copy-ai.ts");
+  const { truthIssues } = await import("../src/lib/sales/quality.ts");
+  for (const a of angles("water")) {
+    const body = gen(a.id, "water").body;
+    ok(/Aquails/.test(body) && !/(hastalık|tedavi|kanser|%|ücretsiz|garanti|keser|düşürüyoruz|web sitesi)/iu.test(body) && truthIssues(body, { allowPriorContact: a.id === "takip" }).length === 0, `Aquails hazır şablonu doğru: ${a.id}`);
+  }
   const aq = composePitch("water", { name: "Lezzet Durağı Restoran", district: "Merkez", city: "Afyonkarahisar", address: "", phone: "", website: "" }, "Aquails");
   ok(/Aquails/.test(aq.body) && !/(web sitesi|Wexon|hastalık|%)/iu.test(aq.body), "Aquails kuyruk taslağı su arıtma");
 }

@@ -1,10 +1,10 @@
 import type { Vertical } from "./verticals";
 
 export const WATER_ANGLES = [
-  { id: "kirec", label: "Kireç ve lezzet" },
-  { id: "maliyet", label: "Damacana maliyeti" },
-  { id: "hijyen", label: "Hijyen / sağlık" },
-  { id: "isletme", label: "Mutfak ve otel" },
+  { id: "kirec", label: "Kireç ve makineler" },
+  { id: "maliyet", label: "Damacana yerine arıtma" },
+  { id: "hijyen", label: "Sebil" },
+  { id: "isletme", label: "Filtre ve bakım" },
   { id: "takip", label: "Nazik takip" },
 ] as const;
 
@@ -121,31 +121,32 @@ export function generateSalesCopy(angle: CopyAngle, vertical: Vertical = "water"
         };
     }
   }
+  // Su arıtma (Aquails): yalnızca doğrulanmış ürün ve hizmetler; sağlık, oran ve tasarruf vaadi yok
   switch (angle) {
     case "kirec":
       return {
         name: "Su arıtma — kireç",
-        body: "Merhaba {ad}, {ilçe} işletmesinde kireç hem tadı hem ekipmanı bozar. Restoran ve otel mutfaklarına uygun arıtma ile lezzeti koruyup arıza sıklığını düşürüyoruz. 10 dakikalık bir keşif randevusu uygun mu?",
+        body: "Merhaba, Aquails ekibinden yazıyorum. {ad} için çay ocağına, kahve ve buz makinesine giden suyu arıtan bir sistem önerebilirim; makinelerde kireç birikimini azaltmaya yardımcı olur. Uygun olursa kısaca anlatayım mı?",
       };
     case "maliyet":
       return {
-        name: "Su arıtma — maliyet",
-        body: "Merhaba {ad}, damacana ve kargo {ilçe} işletmelerinde hızla birikir. Tek kurulumla litre maliyetini netleştiriyor, filtre değişimini planlıyoruz. Kısa bir karşılaştırma paylaşmamı ister misiniz?",
+        name: "Su arıtma — damacana",
+        body: "Merhaba, Aquails ekibinden yazıyorum. {ad} için içme suyunu damacana yerine tezgâh altı arıtma ya da sebille yerinde karşılayan bir çözüm önerebilirim; sipariş, taşıma ve stok derdi kalmaz. İçme suyunu şu an damacanayla mı karşılıyorsunuz?",
       };
     case "hijyen":
       return {
-        name: "Su arıtma — hijyen",
-        body: "Merhaba {ad}, misafir ve personel suyu {ilçe} adresinizde tabloda görünür bir konu. Kapalı devre arıtma koku, tortu ve kireç şikayetini keser. Uygun bir saatte yerinde bakabilir miyiz?",
+        name: "Su arıtma — sebil",
+        body: "Merhaba, Aquails ekibinden yazıyorum. {ad} için personel ve misafirlerin kullanabileceği, arıtmalı sebil kurulumu yapıyoruz; filtre değişimini ve periyodik bakımını da biz takip ediyoruz. İsterseniz uygun seçenekleri kısaca paylaşayım.",
       };
     case "isletme":
       return {
-        name: "Su arıtma — mutfak",
-        body: "Merhaba {ad}, {ilçe} mutfağında çay, buz ve bulaşık hatları kireçten yorulur. Endüstriyel arıtma ile servis sıklığını azaltıyoruz. Bu hafta 15 dakikalık ölçüm ayarlayabilir miyiz?",
+        name: "Su arıtma — filtre ve bakım",
+        body: "Merhaba, Aquails ekibinden yazıyorum. Su arıtma cihazı ve sebillerin filtre değişimini ve periyodik bakımını yapıyoruz. {ad} için filtre değişim zamanlarını takip edebiliriz. Cihazınızın filtreleri en son ne zaman değişti?",
       };
     default:
       return {
         name: "Su arıtma — takip",
-        body: "Merhaba {ad}, {ilçe} işletmesinde kireç ve damacana maliyeti birikir. Kurulum ve filtre planını kısaca özetleyebilirim. Size uyan bir gün var mı?",
+        body: "Merhaba, Aquails ekibinden yazıyorum. {ad} için içme suyu ve filtre konusunda kısa bir öneri paylaşmıştım. Şu an gündeminizde değilse hiç sorun değil; ileride ihtiyaç olursa bu numaradan bize yazabilirsiniz.",
       };
   }
 }
