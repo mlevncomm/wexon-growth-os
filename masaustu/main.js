@@ -55,13 +55,18 @@ function anaPencere(sayfa = ILK_SAYFA) {
     minHeight: 680,
     title: "Wexon Growth OS",
     icon: IKON,
-    backgroundColor: "#f5f7f9",
+    backgroundColor: "#05090b",
     show: false,
     webPreferences: { contextIsolation: true, sandbox: true, spellcheck: false },
   });
   if (a.buyuk) ana.maximize();
   ana.once("ready-to-show", () => ana.show());
-  void ana.loadURL(adres() + sayfa);
+  // Önce yerel açılış ekranı anında görünür; uygulama sayfası hazır olunca yerini alır
+  // (en az 0,8 sn görünür ki ekran yanıp sönmesin)
+  const acilis = ana.loadFile(path.join(__dirname, "acilis.html")).catch(() => undefined);
+  void Promise.all([acilis, new Promise((r) => setTimeout(r, 800))]).then(() => {
+    if (ana && !ana.isDestroyed()) void ana.loadURL(adres() + sayfa);
+  });
 
   // WhatsApp, harita gibi dış bağlantılar bilgisayardaki uygulamada / tarayıcıda açılır
   ana.webContents.setWindowOpenHandler(({ url }) => { void shell.openExternal(url); return { action: "deny" }; });

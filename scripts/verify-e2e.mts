@@ -304,6 +304,14 @@ try {
     check((await call("/api/settings")).status === 428, "profil: yanlış şifreden sonra profil kapalı kalır");
     const ac = await call("/api/profil", { body: { tenantId: "tnt_aquails", pin: pins.tnt_aquails } });
     check(ac.status === 200 && ac.json.git === "/ara", "profil: Aquails doğru şifreyle açılır");
+    // Veri ayrımı: Aquails profili Wexon.dev kayıtlarını göremez, değiştiremez, silemez
+    const aqListe = await call("/api/leads?limit=500");
+    const aqIds = new Set((Array.isArray(aqListe.json) ? aqListe.json : []).map((l: any) => l.id));
+    check(aqListe.status === 200 && !aqIds.has(yeni.id) && !aqIds.has(aq.id), "ayrım: Aquails listesinde Wexon.dev müşterisi yok", aqListe.status);
+    check((await call(`/api/leads/${yeni.id}/mesaj`)).status === 404, "ayrım: Aquails, Wexon.dev müşterisinin mesaj ekranını açamaz");
+    check((await call(`/api/leads/${yeni.id}`, { method: "PATCH", body: { notes: "E2E sızma" } })).status === 404, "ayrım: Aquails, Wexon.dev müşterisini değiştiremez");
+    check((await call(`/api/leads/${yeni.id}`, { method: "DELETE" })).status === 404, "ayrım: Aquails, Wexon.dev müşterisini silemez");
+    check(Boolean(await prisma.lead.findUnique({ where: { id: yeni.id } })) && (await prisma.lead.findUnique({ where: { id: yeni.id } }))?.notes !== "E2E sızma", "ayrım: Wexon.dev kaydı yerinde ve değişmedi");
     const meAq = await call("/api/me");
     const setAq = await call("/api/settings");
     check(setAq.status === 200 && setAq.json.ortakAnahtar === "Wexon.dev", "profil: Aquails Google ve Gemini anahtarlarını Wexon.dev ile ortak kullanır", setAq.json?.ortakAnahtar);

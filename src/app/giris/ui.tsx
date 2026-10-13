@@ -1,7 +1,8 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, KeyboardEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { AquailsMark, GrowthMark, WexonMark } from "@/components/BrandMarks";
 import styles from "./auth.module.css";
 
 function nextPath() {
@@ -10,18 +11,28 @@ function nextPath() {
   return n && n.startsWith("/") && !n.startsWith("//") ? n : "/";
 }
 
+const AKIS = [
+  { no: "01", baslik: "Müşteri bul", metin: "Bölge ve sektör seçin; Google’daki işletmeler puanı ve iletişim bilgisiyle listelensin." },
+  { no: "02", baslik: "Müşterilerini yönet", metin: "Durum, not ve iletişim izni her işletme için tek ekranda." },
+  { no: "03", baslik: "WhatsApp’tan yaz", metin: "Kalite kontrolünden geçmiş, işletmeye özel taslak; siz onaylamadan hiçbir şey gitmez." },
+];
+
 export default function GirisPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
+  const [caps, setCaps] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
 
   useEffect(() => {
     const restore = window.setTimeout(() => {
-      const saved = window.localStorage.getItem("wexon_admin_email");
-      if (saved) setEmail(saved);
+      try {
+        const saved = window.localStorage.getItem("wexon_admin_email");
+        if (saved) setEmail(saved);
+      } catch {}
     }, 0);
     void fetch("/api/auth", { cache: "no-store" })
       .then((r) => r.json())
@@ -36,6 +47,10 @@ export default function GirisPage() {
     return () => window.clearTimeout(restore);
   }, [router]);
 
+  function capsKontrol(e: KeyboardEvent<HTMLInputElement>) {
+    setCaps(e.getModifierState?.("CapsLock") ?? false);
+  }
+
   async function submit(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
@@ -46,9 +61,12 @@ export default function GirisPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Giriş olmadı");
-      window.localStorage.setItem("wexon_admin_email", email.trim().toLowerCase());
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || "Giriş yapılamadı");
+      try {
+        window.localStorage.setItem("wexon_admin_email", email.trim().toLowerCase());
+      } catch {}
+      setDone(true);
       const home = typeof json.home === "string" ? json.home : "/";
       const n = nextPath();
       if (json.role === "member" && n.startsWith("/platform")) router.replace("/");
@@ -56,94 +74,182 @@ export default function GirisPage() {
       else router.replace(n === "/" ? home : n);
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Giriş olmadı");
-    } finally {
+      setError(err instanceof Error ? err.message : "Giriş yapılamadı");
       setBusy(false);
     }
   }
 
   return (
     <div className={styles.shell}>
-      <div className={styles.card}>
-        <aside className={styles.brand}>
-          <div className={styles.mesh} aria-hidden />
-          <div className={styles.brandInner}>
-            <div className={styles.mark}>Wexon Growth OS</div>
-            <div className={styles.brandCopy}>
-              <h1>İşletme paneline hoş geldiniz</h1>
-              <p>Kendi listeniz, kuyruğunuz ve kanallarınız. Başka işletmenin verisi görünmez.</p>
-            </div>
-            <ol className={styles.steps}>
-              <li className={styles.on}>
-                <span>1</span>
-                Hesap girişi
-              </li>
-              <li>
-                <span>2</span>
-                WhatsApp Cloud bağla
-              </li>
-              <li>
-                <span>3</span>
-                Instagram DM bağla
-              </li>
-            </ol>
+      <aside className={styles.brand}>
+        <div className={styles.glow} aria-hidden />
+        <div className={styles.lines} aria-hidden />
+        <div className={styles.brandInner}>
+          <div className={styles.logo}>
+            <GrowthMark size={40} />
+            <span>
+              Wexon <b>Growth OS</b>
+            </span>
           </div>
-        </aside>
 
-        <main className={styles.panel}>
-          <form className={styles.form} onSubmit={(e) => void submit(e)}>
-            <header className={styles.head}>
-              <h2>Giriş</h2>
-              <p>Yalnızca size verilen işletme hesabı. Üst yönetici /platform ekranını görür.</p>
-            </header>
+          <div className={styles.pitch}>
+            <h1>
+              Doğru işletmeyi bulun, <em>doğru mesajı</em> yazın.
+            </h1>
+            <p>Yeni müşteri bulma, takip ve WhatsApp iletişimi tek bir sakin çalışma alanında.</p>
+          </div>
 
-            {error ? <p className={styles.alert}>{error}</p> : null}
+          <ol className={styles.flow}>
+            {AKIS.map((a) => (
+              <li key={a.no}>
+                <span className={styles.no}>{a.no}</span>
+                <div>
+                  <strong>{a.baslik}</strong>
+                  <p>{a.metin}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
 
-            <label className={styles.field}>
-              <span>E-posta</span>
+          <div className={styles.profiles}>
+            <span>Profiller</span>
+            <span className={styles.chip} style={{ color: "#3dff9a" }}>
+              <WexonMark size={16} /> Wexon.dev
+            </span>
+            <span className={styles.chip} style={{ color: "#5fd4ff" }}>
+              <AquailsMark size={16} /> Aquails
+            </span>
+          </div>
+        </div>
+      </aside>
+
+      <main className={styles.panel}>
+        <form className={styles.form} onSubmit={(e) => void submit(e)}>
+          <div className={styles.mobileLogo}>
+            <GrowthMark size={36} />
+            <span>
+              Wexon <b>Growth OS</b>
+            </span>
+          </div>
+          <header className={styles.head}>
+            <h2>Tekrar hoş geldiniz</h2>
+            <p>Hesabınızla giriş yapın; ardından çalışacağınız profili seçeceksiniz.</p>
+          </header>
+
+          {error ? (
+            <p className={styles.alert} role="alert">
+              <AlertIcon /> {error}
+            </p>
+          ) : null}
+
+          <label className={styles.field}>
+            <span>E-posta</span>
+            <div className={styles.control}>
+              <MailIcon />
               <input
                 type="email"
                 autoComplete="username"
                 autoFocus
-                placeholder="iris.p@example.org"
+                placeholder="ornek@firma.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                disabled={busy}
               />
-            </label>
+            </div>
+          </label>
 
-            <label className={styles.field}>
-              <span>Şifre</span>
-              <div className={styles.pass}>
-                <input
-                  type={showPass ? "text" : "password"}
-                  autoComplete="current-password"
-                  placeholder="Operatör şifresi"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-                <button
-                  type="button"
-                  className={styles.eye}
-                  aria-label={showPass ? "Şifreyi gizle" : "Şifreyi göster"}
-                  onClick={() => setShowPass((v) => !v)}
-                >
-                  {showPass ? <EyeOffIcon /> : <EyeIcon />}
-                </button>
-              </div>
-              <em>En az 8 karakter</em>
-            </label>
+          <label className={styles.field}>
+            <span>Şifre</span>
+            <div className={styles.control}>
+              <KeyIcon />
+              <input
+                type={showPass ? "text" : "password"}
+                autoComplete="current-password"
+                placeholder="Şifreniz"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={capsKontrol}
+                onKeyUp={capsKontrol}
+                onBlur={() => setCaps(false)}
+                required
+                disabled={busy}
+              />
+              <button
+                type="button"
+                className={styles.eye}
+                aria-label={showPass ? "Şifreyi gizle" : "Şifreyi göster"}
+                aria-pressed={showPass}
+                onClick={() => setShowPass((v) => !v)}
+              >
+                {showPass ? <EyeOffIcon /> : <EyeIcon />}
+              </button>
+            </div>
+            {caps ? <em className={styles.caps}>Büyük harf kilidi (Caps Lock) açık</em> : null}
+          </label>
 
-            <button className={styles.submit} type="submit" disabled={busy}>
-              {busy ? "Giriliyor…" : "Panele gir"}
-            </button>
+          <button className={styles.submit} type="submit" disabled={busy || !email || !password}>
+            {busy ? (
+              <>
+                <span className={styles.spinner} aria-hidden /> {done ? "Açılıyor…" : "Giriş yapılıyor…"}
+              </>
+            ) : (
+              <>
+                Giriş yap <ArrowIcon />
+              </>
+            )}
+          </button>
 
-            <p className={styles.foot}>Girişten sonra yalnızca kendi listeniz ve kanallarınız açılır.</p>
-          </form>
-        </main>
-      </div>
+          <p className={styles.foot}>
+            <ShieldIcon /> Oturumunuz bu cihazda şifreli çerezle tutulur. Her profil ayrıca kendi şifresiyle açılır.
+          </p>
+        </form>
+      </main>
     </div>
+  );
+}
+
+function MailIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="3" y="5" width="18" height="14" rx="3" />
+      <path d="M4 7.5l8 5.5 8-5.5" />
+    </svg>
+  );
+}
+
+function KeyIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
+      <rect x="4.5" y="10.5" width="15" height="10" rx="2.5" />
+      <path d="M8 10.5V7.5a4 4 0 018 0v3" />
+    </svg>
+  );
+}
+
+function ArrowIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M5 12h14M13 6l6 6-6 6" />
+    </svg>
+  );
+}
+
+function ShieldIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M12 3l7.5 3v5.5c0 4.6-3.2 8.4-7.5 9.5-4.3-1.1-7.5-4.9-7.5-9.5V6L12 3z" />
+      <path d="M9 12l2.2 2.2L15.5 10" />
+    </svg>
+  );
+}
+
+function AlertIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" aria-hidden>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7.5v5.5M12 16.5v.01" />
+    </svg>
   );
 }
 

@@ -1,7 +1,7 @@
 {
   "name": "wexon-growth-os-masaustu",
   "productName": "Wexon Growth OS",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Wexon Growth OS — müşteri bul, WhatsApp'tan yaz",
   "author": "Wexon",
   "private": true,
@@ -26,6 +26,7 @@
     },
     "files": [
       "main.js",
+      "acilis.html",
       "hata.html",
       "hata.js",
       "build/icon.ico"
