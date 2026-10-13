@@ -76,7 +76,8 @@ function waDurum(waCloud: boolean, waLocal: string): { durum: Durum; metin: stri
   if (waLocal === "qr") return { durum: "warn", metin: "QR bekleniyor" };
   if (waLocal === "starting") return { durum: "warn", metin: "Açılıyor" };
   if (waLocal === "error") return { durum: "bad", metin: "Hata" };
-  return { durum: "off", metin: "Bağlı değil" };
+  // API yoksa mesajlar bilgisayardaki WhatsApp uygulamasından elle gönderilir
+  return { durum: "ok", metin: "Elle (WhatsApp uygulaması)" };
 }
 
 export function NavRail({
@@ -196,7 +197,7 @@ export function NavRail({
               </span>
               <span className="rail-status-row">
                 <i className={`dot ${wa.durum}`} />
-                <span className="rail-copy">WhatsApp</span>
+                <span className="rail-copy">{wa.durum === "ok" && !(waCloud || waLocal === "ready") ? "Gönderim" : "WhatsApp"}</span>
                 <em>{wa.metin}</em>
               </span>
             </Link>
