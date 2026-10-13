@@ -8,7 +8,6 @@ import { OPEN_QUEUE, STATS_DIRTY } from "@/lib/os-events";
 import { fetchStats, invalidateStats } from "@/lib/stats-client";
 import { isActive, MAIN, NavRail, SETTINGS } from "./NavRail";
 import { StatusBar } from "./StatusBar";
-import { SurumKontrol } from "./SurumKontrol";
 
 const QueuePanel = dynamic(
   () => import("./QueuePanel").then((m) => ({ default: m.QueuePanel })),
@@ -294,7 +293,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="os-scan">{scanning ? <span style={{ width: `${scanPct}%` }} /> : null}</div>
         <main className="os-main">{children}</main>
         <StatusBar tenantName={me?.tenantName || ""} scanning={scanning} scanPct={scanPct} queued={queueCount} />
-        <SurumKontrol />
       </div>
       <nav className="os-dock" aria-label="Hızlı menü">
         {DOCK.map((item) => (

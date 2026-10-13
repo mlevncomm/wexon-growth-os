@@ -1,6 +1,6 @@
 // Wexon Growth OS masaüstü programı (Electron).
 // Müşteri bulma ve WhatsApp'tan mesaj gönderme ekranlarını kendi penceresinde açar; yeni sürüm çıkınca "Güncelle" sorar.
-const { app, BrowserWindow, Menu, shell, session, dialog } = require("electron");
+const { app, BrowserWindow, Menu, shell, session, dialog, powerMonitor, Notification } = require("electron");
 const path = require("node:path");
 const fs = require("node:fs");
 const { spawn } = require("node:child_process");
@@ -88,24 +88,34 @@ function anaPencere(sayfa = ILK_SAYFA) {
 let guncelleyici = null;
 let bekleyenSurum = null;
 let elleDenetim = false;
-let soruAcik = false;
 
-// Yeni sürüm indirilince her seferinde sor: "Güncelle" ya da "Sonra" (kapanırken kurulur)
-async function guncellemeyiSor() {
-  if (!bekleyenSurum || soruAcik) return;
-  soruAcik = true;
-  const { response } = await dialog.showMessageBox(ana || undefined, {
-    type: "info",
-    title: "Yeni sürüm var",
-    message: `Wexon Growth OS ${bekleyenSurum} hazır.`,
-    detail: "Güncelle'ye basınca program birkaç saniye içinde yeni sürümle yeniden açılır.",
-    buttons: ["Güncelle", "Sonra"],
-    defaultId: 0,
-    cancelId: 1,
-  });
-  soruAcik = false;
-  if (response === 0) guncelleyici.quitAndInstall(true, true);
-  else setTimeout(guncellemeyiSor, 60 * 60_000); // bir saat sonra tekrar hatırlat; kapanırken zaten kurulur
+// Yeni sürüm indirilince soru sormadan kurulur. İş yarıda kalmasın diye güvenli anı bekler:
+// bilgisayar 2 dakikadır boştaysa ya da program simge durumunda/arka plandaysa. Kapanırken de kurulur.
+const BOSTA_SN = 120;
+let kurulumZamanlayici = null;
+
+function guvenliAn() {
+  const bosta = (() => { try { return powerMonitor.getSystemIdleTime(); } catch { return 0; } })();
+  const arkaPlanda = !ana || ana.isDestroyed() || ana.isMinimized() || !ana.isVisible();
+  return bosta >= BOSTA_SN || arkaPlanda;
+}
+
+function simdiKur() {
+  if (!guncelleyici || !bekleyenSurum) return;
+  if (kurulumZamanlayici) { clearInterval(kurulumZamanlayici); kurulumZamanlayici = null; }
+  ayarYaz({ sonOtomatikGuncelleme: { surum: bekleyenSurum, zaman: new Date().toISOString() } });
+  guncelleyici.quitAndInstall(true, true); // sessiz kur, ardından yeniden aç
+}
+
+function otomatikKurulumuBaslat() {
+  if (kurulumZamanlayici || !bekleyenSurum) return;
+  try {
+    if (Notification.isSupported()) {
+      new Notification({ title: "Wexon Growth OS güncelleniyor", body: `${bekleyenSurum} sürümü hazır; bir süre işlem yapmadığınızda kendiliğinden kurulup yeniden açılacak.`, silent: true }).show();
+    }
+  } catch {}
+  if (guvenliAn()) { simdiKur(); return; }
+  kurulumZamanlayici = setInterval(() => { if (guvenliAn()) simdiKur(); }, 30_000);
 }
 
 function guncellemeyiKur() {
@@ -113,7 +123,7 @@ function guncellemeyiKur() {
   try { ({ autoUpdater: guncelleyici } = require("electron-updater")); } catch { return; }
   guncelleyici.autoDownload = true;
   guncelleyici.autoInstallOnAppQuit = true;
-  guncelleyici.on("update-downloaded", (bilgi) => { bekleyenSurum = bilgi.version; void guncellemeyiSor(); });
+  guncelleyici.on("update-downloaded", (bilgi) => { bekleyenSurum = bilgi.version; otomatikKurulumuBaslat(); });
   guncelleyici.on("update-not-available", () => {
     if (elleDenetim) { elleDenetim = false; void dialog.showMessageBox({ type: "info", title: "Güncel", message: `Wexon Growth OS güncel (${app.getVersion()}).` }); }
   });
@@ -122,7 +132,8 @@ function guncellemeyiKur() {
   });
   const denetle = () => guncelleyici.checkForUpdates().catch(() => undefined);
   setTimeout(denetle, 10_000);
-  setInterval(denetle, 60 * 60_000); // saatte bir bak
+  setInterval(denetle, 30 * 60_000); // yarım saatte bir bak
+  powerMonitor.on("resume", () => setTimeout(denetle, 15_000)); // uykudan dönünce de bak
 }
 
 function guncellemeleriDenetle() {
@@ -130,7 +141,7 @@ function guncellemeleriDenetle() {
     void dialog.showMessageBox({ type: "info", title: "Güncelleme", message: "Güncelleme sadece kurulu programda çalışır." });
     return;
   }
-  if (bekleyenSurum) { void guncellemeyiSor(); return; }
+  if (bekleyenSurum) { simdiKur(); return; }
   elleDenetim = true;
   guncelleyici.checkForUpdates().catch(() => undefined);
 }
@@ -158,6 +169,7 @@ function menuKur() {
         { label: "Ayarlar", accelerator: "CmdOrCtrl+4", click: git("/ayarlar") },
         { type: "separator" },
         { label: "Profil değiştir", accelerator: "CmdOrCtrl+P", click: git("/profil") },
+        { label: "Programı kilitle", accelerator: "CmdOrCtrl+L", click: git("/profil") },
         { type: "separator" },
         { label: "Çıkış", role: "quit" },
       ],
