@@ -319,8 +319,8 @@ export default function AraPage() {
       <h1 className="page-title">{software ? "Web alıcısı bul" : "Alıcı işletme bul"}</h1>
       <p className="page-copy">
         {software
-          ? "Müşteri her sektör olabilir: restoran, klinik, avukat, mağaza. Web hizmeti satıyorsan ‘Sitesi yok’u aç; yenileme satıyorsan ‘Sitesi var’."
-          : "İl, bölge veya dünya şehri seçin; birden fazla sektörü birlikte tarayın. Hedef dolunca durur, aynı işletme ikinci kez yazılmaz."}
+          ? "Müşteri her sektör olabilir: restoran, klinik, avukat, mağaza. Yeni site için ‘Sitesi yok’, yenileme için ‘Sitesi var’ filtresini seçin."
+          : "İl, bölge veya dünya şehri seçin; birden fazla sektörü birlikte tarayın. Hedef dolunca durur; aynı işletme listeye ikinci kez eklenmez."}
       </p>
 
       <div className="card" style={{ marginTop: 20 }}>

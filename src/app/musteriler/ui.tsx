@@ -186,11 +186,11 @@ export default function MusterilerPage() {
 
   return (
     <div>
-      <div className="page-kicker">CRM</div>
+      <div className="page-kicker">Liste</div>
       <h1 className="page-title">Müşteriler</h1>
       <p className="page-copy">
-        Alıcı listesi. Onaya al varsayılanı sektör + site: kuaföre randevu sitesi, restoranına rezervasyon,
-        sitesi olana yenileme. Sabit hatlar WhatsApp kuyruğuna alınmaz; yalnızca uygun mobil numaralar girer.
+        Bulduğunuz işletmeler, durumları ve notlarıyla. WhatsApp’tan yazmak için satırdaki düğmeyi kullanın; sabit hatlar
+        kuyruğa alınmaz.
       </p>
 
       <div className="toolbar">
@@ -227,7 +227,7 @@ export default function MusterilerPage() {
         <label className="field">
           <span>Şablon</span>
           <select value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
-            <option value="auto">Otomatik — sektör + site</option>
+            <option value="auto">Otomatik — işletmeye göre</option>
             {templates.map((t) => (
               <option key={t.id} value={t.id}>{t.name}</option>
             ))}
@@ -272,7 +272,7 @@ export default function MusterilerPage() {
           Listeyi temizle
         </button>
         <span className="muted" style={{ fontSize: 13 }}>
-          Silince place kaydı da gider, sonraki keşif aynı işletmeyi yeniden getirir. Ticari ileti İYS onayı operatörün sorumluluğu.
+          Silinen işletme sonraki aramada yeniden listelenebilir. Ticari ileti onayı (İYS) gönderen işletmenin sorumluluğundadır.
         </span>
       </div>
 

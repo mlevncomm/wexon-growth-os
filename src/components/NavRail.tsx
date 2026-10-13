@@ -1,14 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { APP_PROFILES } from "@/lib/app-profiles-list";
 import { usePathname } from "next/navigation";
+import { APP_PROFILES } from "@/lib/app-profiles-list";
+import { GrowthMark, ProfileMark } from "./BrandMarks";
 
-const MAIN = [
-  { href: "/ara", label: "Müşteri Bul" },
-  { href: "/musteriler", label: "Müşteriler" },
-  { href: "/whatsapp", label: "Mesaj" },
+export const MAIN = [
+  { href: "/ara", label: "Müşteri Bul", kbd: "1" },
+  { href: "/musteriler", label: "Müşteriler", kbd: "2" },
+  { href: "/whatsapp", label: "Mesaj", kbd: "3" },
 ] as const;
+
+export const SETTINGS = { href: "/ayarlar", label: "Ayarlar", kbd: "4" } as const;
 
 function Ico({ href }: { href: string }) {
   const p = {
@@ -19,22 +22,8 @@ function Ico({ href }: { href: string }) {
     strokeWidth: 1.75,
     strokeLinecap: "round" as const,
     strokeLinejoin: "round" as const,
+    "aria-hidden": true,
   };
-  if (href === "/") {
-    return (
-      <svg {...p}>
-        <path d="M4.5 11.2 12 4.6l7.5 6.6" />
-        <path d="M6.2 10.4V19a1.2 1.2 0 0 0 1.2 1.2h3.1v-5.1h3V20.2h3.1A1.2 1.2 0 0 0 17.8 19v-8.6" />
-      </svg>
-    );
-  }
-  if (href === "/arama") {
-    return (
-      <svg {...p}>
-        <path d="M6.6 4.8h2.6l1.3 3.4-1.7 1.1a9.4 9.4 0 0 0 5.9 5.9l1.1-1.7 3.4 1.3v2.6a1.6 1.6 0 0 1-1.7 1.6A13.6 13.6 0 0 1 5 6.5a1.6 1.6 0 0 1 1.6-1.7z" />
-      </svg>
-    );
-  }
   if (href === "/ara") {
     return (
       <svg {...p}>
@@ -60,14 +49,6 @@ function Ico({ href }: { href: string }) {
       </svg>
     );
   }
-  if (href === "/koc") {
-    return (
-      <svg {...p}>
-        <path d="M12 5.2 13.4 8l3 .4-2.2 2.1.6 3L12 12.1 9.2 13.5l.6-3L7.6 8.4l3-.4z" />
-        <path d="M5.4 16.4c1.4-1.6 3.8-2.6 6.6-2.6s5.2 1 6.6 2.6" />
-      </svg>
-    );
-  }
   if (href === "/platform") {
     return (
       <svg {...p}>
@@ -88,15 +69,14 @@ export function isActive(pathname: string, href: string) {
   return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(href + "/");
 }
 
-function operatorLine(opts: { places: boolean; waCloud: boolean; waLocal: string }) {
-  if (opts.waCloud || opts.waLocal === "ready") {
-    return opts.places ? "WhatsApp · Places hazır" : "WhatsApp bağlı";
-  }
-  if (opts.waLocal === "qr") return "QR bekleniyor";
-  if (opts.waLocal === "starting") return "WhatsApp açılıyor";
-  if (opts.waLocal === "error") return "WhatsApp hata";
-  if (opts.places) return "Places hazır · kanal kapalı";
-  return "Sistemi tamamla";
+type Durum = "ok" | "warn" | "bad" | "off";
+
+function waDurum(waCloud: boolean, waLocal: string): { durum: Durum; metin: string } {
+  if (waCloud || waLocal === "ready") return { durum: "ok", metin: "Bağlı" };
+  if (waLocal === "qr") return { durum: "warn", metin: "QR bekleniyor" };
+  if (waLocal === "starting") return { durum: "warn", metin: "Açılıyor" };
+  if (waLocal === "error") return { durum: "bad", metin: "Hata" };
+  return { durum: "off", metin: "Bağlı değil" };
 }
 
 export function NavRail({
@@ -107,7 +87,9 @@ export function NavRail({
   waCloud = false,
   waLocal = "disconnected",
   tenantName = "Wexon",
+  tenantId = "",
   email = "",
+  queued = 0,
   variant = "app",
 }: {
   queueOpen: boolean;
@@ -117,137 +99,142 @@ export function NavRail({
   waCloud?: boolean;
   waLocal?: string;
   tenantName?: string;
+  tenantId?: string;
   email?: string;
+  queued?: number;
   variant?: "app" | "platform";
 }) {
   const pathname = usePathname();
   const platform = variant === "platform";
-  const waOn = waCloud || waLocal === "ready";
-  const live = waOn || waLocal === "qr" || waLocal === "starting";
-  const line = platform ? "Üst yönetici" : operatorLine({ places, waCloud, waLocal });
-  const initial = (tenantName.trim()[0] || "W").toLocaleUpperCase("tr");
-  const links = platform ? ([{ href: "/platform", label: "Profiller" }] as const) : MAIN;
+  const profil = APP_PROFILES.find((p) => p.tenantId === tenantId) ?? APP_PROFILES.find((p) => p.ad === tenantName);
+  const wa = waDurum(waCloud, waLocal);
+  const links = platform ? ([{ href: "/platform", label: "Profiller", kbd: "1" }] as const) : MAIN;
+  const kisaAd = email ? email.split("@")[0] : "Operatör";
+
+  function cikis() {
+    void fetch("/api/auth", { method: "DELETE" }).then(() => {
+      window.location.href = "/giris";
+    });
+  }
+
+  const tile = (
+    <span className="rail-tile" aria-hidden>
+      {profil ? <ProfileMark tenantId={profil.tenantId} size={24} /> : <GrowthMark size={36} />}
+    </span>
+  );
+
   return (
     <nav className="os-rail" aria-label="Modüller">
-      <div className="brand">
-        <div className="brand-initial" aria-hidden>{initial}</div>
-        <div className="brand-name">
-          <strong>{tenantName}</strong>
-          <span>Growth OS</span>
+      {profil && !platform ? (
+        <Link href="/profil" className="brand rail-profile" onClick={onNavigate} title="Profil değiştir (Ctrl+P)">
+          {tile}
+          <span className="brand-name">
+            <strong>{profil.ad}</strong>
+            <span>{profil.alan}</span>
+          </span>
+          <svg className="rail-switch-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M8 9l4-4 4 4M8 15l4 4 4-4" />
+          </svg>
+        </Link>
+      ) : (
+        <div className="brand rail-profile is-static">
+          {tile}
+          <span className="brand-name">
+            <strong>{platform ? "Wexon" : tenantName}</strong>
+            <span>{platform ? "Üst yönetim" : "Growth OS"}</span>
+          </span>
         </div>
-      </div>
+      )}
 
-      <div className="nav-group">{platform ? "Yönetim" : "Satış"}</div>
+      <div className="nav-group">{platform ? "Yönetim" : "Çalışma alanı"}</div>
       {links.map((m) => (
         <Link
           key={m.href}
           href={m.href}
           className={`nav-link${isActive(pathname, m.href) ? " active" : ""}`}
           onClick={onNavigate}
+          aria-current={isActive(pathname, m.href) ? "page" : undefined}
+          title={`${m.label} (Ctrl+${m.kbd})`}
         >
-          <div className="nav-ico-wrap" aria-hidden>
+          <span className="nav-ico-wrap" aria-hidden>
             <Ico href={m.href} />
-          </div>
+          </span>
           <span className="nav-label">{m.label}</span>
+          <span className="nav-kbd">Ctrl {m.kbd}</span>
         </Link>
       ))}
 
       {platform ? null : (
         <>
-      <div className="nav-group">Ayarlar</div>
-      <Link
-        href="/ayarlar"
-        className={`nav-link${pathname.startsWith("/ayarlar") ? " active" : ""}`}
-        onClick={onNavigate}
-      >
-        <div className="nav-ico-wrap" aria-hidden>
-          <Ico href="/ayarlar" />
-        </div>
-        <span className="nav-label">Ayarlar</span>
-      </Link>
+          <div className="nav-group">Sistem</div>
+          <Link
+            href={SETTINGS.href}
+            className={`nav-link${isActive(pathname, SETTINGS.href) ? " active" : ""}`}
+            onClick={onNavigate}
+            aria-current={isActive(pathname, SETTINGS.href) ? "page" : undefined}
+            title={`${SETTINGS.label} (Ctrl+${SETTINGS.kbd})`}
+          >
+            <span className="nav-ico-wrap" aria-hidden>
+              <Ico href={SETTINGS.href} />
+            </span>
+            <span className="nav-label">{SETTINGS.label}</span>
+            <span className="nav-kbd">Ctrl {SETTINGS.kbd}</span>
+          </Link>
         </>
       )}
 
       <div className="rail-foot">
         {platform ? null : (
-        <button
-          type="button"
-          className={`rail-row${queueOpen ? " is-on" : ""}`}
-          aria-pressed={queueOpen}
-          aria-label={queueOpen ? "Kuyruğu kapat" : "Kuyruğu aç"}
-          onClick={onQueueToggle}
-        >
-          <span className="rail-ico" aria-hidden>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
-              <path d="M5 7h14M5 12h10M5 17h14" />
-            </svg>
+          <>
+            <Link href="/ayarlar" className="rail-status" onClick={onNavigate} title="Bağlantı ayarları">
+              <span className="rail-status-row">
+                <i className={`dot ${places ? "ok" : "off"}`} />
+                <span className="rail-copy">Google arama</span>
+                <em>{places ? "Hazır" : "Anahtar yok"}</em>
+              </span>
+              <span className="rail-status-row">
+                <i className={`dot ${wa.durum}`} />
+                <span className="rail-copy">WhatsApp</span>
+                <em>{wa.metin}</em>
+              </span>
+            </Link>
+            <button
+              type="button"
+              className={`rail-row${queueOpen ? " is-on" : ""}`}
+              aria-pressed={queueOpen}
+              aria-label={queueOpen ? "Kuyruğu kapat" : "Kuyruğu aç"}
+              onClick={onQueueToggle}
+            >
+              <span className="rail-ico" aria-hidden>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
+                  <path d="M5 7h14M5 12h10M5 17h14" />
+                </svg>
+              </span>
+              <span className="rail-copy">
+                <b>Gönderim kuyruğu</b>
+                <em>{queued ? `${queued} mesaj bekliyor` : "Boş"}</em>
+              </span>
+              <span className={`switch${queueOpen ? " on" : ""}`} aria-hidden>
+                <i />
+              </span>
+            </button>
+          </>
+        )}
+        <div className="rail-user">
+          <span className="op-ava" aria-hidden>
+            {(kisaAd[0] || "W").toLocaleUpperCase("tr")}
           </span>
           <span className="rail-copy">
-            <b>Kuyruk</b>
-            <em>{queueOpen ? "Açık" : "Kapalı"}</em>
+            <b>{kisaAd}</b>
+            <em>{email || (platform ? "Üst yönetici" : "")}</em>
           </span>
-          <span className={`switch${queueOpen ? " on" : ""}`} aria-hidden>
-            <i />
-          </span>
-        </button>
-        )}
-        {platform ? (
-          <div className="rail-row" style={{ cursor: "default" }}>
-            <span className="op-ava">
-              {initial}
-              <i className="op-dot" />
-            </span>
-            <span className="rail-copy">
-              <b>{email ? email.split("@")[0] : "Operatör"}</b>
-              <em>{line}</em>
-            </span>
-          </div>
-        ) : (
-        <Link href="/ayarlar" className="rail-row" onClick={onNavigate}>
-          <span className={`op-ava${live ? " on" : waLocal === "error" ? " bad" : ""}`}>
-            {initial}
-            <i className={`op-dot${waOn ? "" : waLocal === "error" ? " bad" : live ? " warn" : " off"}`} />
-          </span>
-          <span className="rail-copy">
-            <b>{email ? email.split("@")[0] : "Operatör"}</b>
-            <em>{line}</em>
-          </span>
-        </Link>
-        )}
-        {!platform && APP_PROFILES.some((p) => p.ad === tenantName) ? (
-          <Link href="/profil" className="rail-row" onClick={onNavigate}>
-            <span className="rail-ico" aria-hidden>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
-                <path d="M7 7h11l-3-3M17 17H6l3 3" />
-              </svg>
-            </span>
-            <span className="rail-copy">
-              <b>Profil değiştir</b>
-              <em>{tenantName}</em>
-            </span>
-          </Link>
-        ) : null}
-        <button
-          className="rail-row rail-logout"
-          type="button"
-          data-lpignore="true"
-          data-1p-ignore="true"
-          onClick={() => {
-            void fetch("/api/auth", { method: "DELETE" }).then(() => {
-              window.location.href = "/giris";
-            });
-          }}
-        >
-          <span className="rail-ico" aria-hidden>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
+          <button type="button" className="rail-logout" onClick={cikis} aria-label="Çıkış yap" title="Çıkış yap" data-lpignore="true" data-1p-ignore="true">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="M10 7V6.2A1.2 1.2 0 0 1 11.2 5h6.6A1.2 1.2 0 0 1 19 6.2v11.6a1.2 1.2 0 0 1-1.2 1.2h-6.6A1.2 1.2 0 0 1 10 17.8V17" />
               <path d="M4.6 12H15M7.2 9l-2.6 3 2.6 3" />
             </svg>
-          </span>
-          <span className="rail-copy">
-            <b>Çıkış</b>
-          </span>
-        </button>
+          </button>
+        </div>
       </div>
     </nav>
   );

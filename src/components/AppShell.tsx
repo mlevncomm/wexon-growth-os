@@ -6,7 +6,8 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { OPEN_QUEUE, STATS_DIRTY } from "@/lib/os-events";
 import { fetchStats, invalidateStats } from "@/lib/stats-client";
-import { isActive, NavRail } from "./NavRail";
+import { isActive, MAIN, NavRail, SETTINGS } from "./NavRail";
+import { StatusBar } from "./StatusBar";
 import { SurumKontrol } from "./SurumKontrol";
 
 const QueuePanel = dynamic(
@@ -76,6 +77,7 @@ function DockIco({ href }: { href: string }) {
 type Me = {
   email?: string;
   role?: string;
+  tenantId?: string | null;
   tenantName?: string | null;
   impersonating?: boolean;
 };
@@ -95,6 +97,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     ? Math.min(100, Math.round((campaign.foundCount / Math.max(1, campaign.targetCount)) * 100))
     : 0;
   const queueCount = stats?.queued ?? 0;
+  const sayfaAdi = [...MAIN, SETTINGS].find((m) => isActive(pathname, m.href))?.label ?? "Growth OS";
 
   useEffect(() => {
     let alive = true;
@@ -158,15 +161,30 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    // Program kısayolları: Ctrl+F ara, Ctrl+1-4 ekranlar, Ctrl+P profil
+    const ekranlar = [...MAIN, SETTINGS];
     const onFind = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      const k = e.key.toLowerCase();
+      if (k === "f") {
         e.preventDefault();
         searchRef.current?.focus();
+        return;
+      }
+      if (k === "p") {
+        e.preventDefault();
+        router.push("/profil");
+        return;
+      }
+      const hedef = ekranlar.find((m) => m.kbd === k);
+      if (hedef) {
+        e.preventDefault();
+        router.push(hedef.href);
       }
     };
     window.addEventListener("keydown", onFind);
     return () => window.removeEventListener("keydown", onFind);
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     if (!queueOpen && !navOpen) return;
@@ -207,7 +225,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </button>
         </div>
       ) : null}
-    <div className={`os${queueOpen ? " queue-open" : ""}${navOpen ? " nav-open" : ""}`}>
+    <div className={`os${queueOpen ? " queue-open" : ""}${navOpen ? " nav-open" : ""}`} data-profil={me?.tenantId ?? undefined}>
       <NavRail
         queueOpen={queueOpen}
         onQueueToggle={() => setQueueOpen((v) => !v)}
@@ -216,7 +234,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         waCloud={Boolean(stats?.waCloud)}
         waLocal={stats?.waLocal ?? "disconnected"}
         tenantName={me?.tenantName || "Wexon"}
+        tenantId={me?.tenantId ?? ""}
         email={me?.email || ""}
+        queued={queueCount}
       />
       <div className="os-stage">
         <header className="os-top">
@@ -225,6 +245,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <path d="M5 7h14M5 12h14M5 17h14" />
             </svg>
           </button>
+          <div className="top-title">
+            <span>{me?.tenantName || "Growth OS"}</span>
+            <b>{sayfaAdi}</b>
+          </div>
           <form className="search" onSubmit={search}>
             <span className="search-ico" aria-hidden>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
@@ -242,13 +266,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <kbd className="kbd">Ctrl F</kbd>
           </form>
           <div className="top-actions">
-            <div className="top-chip" title="Tarih aralığı gösterge içindir. Listeyi filtrelemez.">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
-                <rect x="4" y="5.5" width="16" height="14.5" rx="2.2" />
-                <path d="M8 3.8v3.2M16 3.8v3.2M4 10h16" />
-              </svg>
-              <span>Gösterge</span>
-            </div>
             {/* File download, not an App Router page */}
             {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
             <a className="top-export" href="/api/leads/export" title="Tüm müşteri listesini indirir. Ekran filtresi uygulanmaz.">
@@ -269,6 +286,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
         <div className="os-scan">{scanning ? <span style={{ width: `${scanPct}%` }} /> : null}</div>
         <main className="os-main">{children}</main>
+        <StatusBar tenantName={me?.tenantName || ""} scanning={scanning} scanPct={scanPct} queued={queueCount} />
         <SurumKontrol />
       </div>
       <nav className="os-dock" aria-label="Hızlı menü">

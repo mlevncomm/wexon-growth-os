@@ -304,9 +304,9 @@ export default function AyarlarPage() {
   return (
     <div>
       <div className="page-kicker">Sistem</div>
-      <h1 className="page-title">Anahtarlar ve tavan</h1>
+      <h1 className="page-title">Bağlantılar ve gönderim</h1>
       <p className="page-copy">
-        Her işletme kendi anahtarını buraya yazar; Aquails, Wexon.dev ve Akarsu karışmaz. Aşağıdaki kılavuzdan alın, yapıştırın, kaydedin. Maskeli alanı değiştirmezseniz eski sır korunur.
+        WhatsApp bağlantısı ve gönderim ayarları her profilde ayrıdır. Google ve Gemini anahtarları Wexon.dev ile Aquails arasında ortaktır. Maskeli bir alanı değiştirmezseniz kayıtlı değer korunur.
       </p>
 
       {error ? <p className="error-box" style={{ marginTop: 16 }}>{error}</p> : null}
@@ -323,7 +323,7 @@ export default function AyarlarPage() {
             id="anahtar-kilavuzu"
             kicker="Kılavuz"
             title="Kendi anahtarınızı alın"
-            note="Wexon size Gemini, Places veya WhatsApp vermez. Google / Meta hesabınızdan ücretsiz veya kendi kotanızla alın. Başka işletmenin anahtarını yapıştırmayın."
+            note="Gemini ve Google Places anahtarları Google hesabınızdan, WhatsApp Cloud bilgileri Meta hesabınızdan alınır. Google anahtarları Wexon.dev ve Aquails’te ortak kullanılır; WhatsApp her profil için ayrı girilir."
             steps={[
               {
                 title: "Google Gemini (mesaj asistanı)",

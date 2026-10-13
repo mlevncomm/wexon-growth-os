@@ -194,10 +194,10 @@ export default function OutreachPage() {
 
   return (
     <div>
-      <div className="page-kicker">Kanal</div>
-      <h1 className="page-title">Satış outreach</h1>
+      <div className="page-kicker">WhatsApp</div>
+      <h1 className="page-title">Mesaj şablonları ve bağlantı</h1>
       <p className="page-copy">
-        Solda playbook’a uygun metni üretip kaydedin. Gönderim onay kuyruğundan çıkar.
+        Toplu gönderimde kullanılacak şablonu hazırlayıp kaydedin. Hiçbir mesaj siz onaylamadan kuyruktan çıkmaz.
         {wa?.serverless
           ? " Canlı gönderim için WhatsApp Cloud API kullanılır."
           : " Yerel kurulumda WhatsApp Business'ı QR ile bağlayabilirsiniz."}
@@ -205,7 +205,7 @@ export default function OutreachPage() {
 
       <div className="notice" style={{ marginTop: 16 }}>
         {wa?.serverless
-          ? "Bu uygulama Vercel'de çalışıyor. Kesintisiz ve güvenilir gönderim için Ayarlar ekranına Meta WhatsApp Cloud token'ı ile Phone number ID girin; QR bağlantısı canlı sunucuda devre dışıdır."
+          ? "Uygulama bulutta çalıştığı için QR ile bağlantı kullanılamaz. Otomatik gönderim için Ayarlar’a bu profilin WhatsApp Cloud bilgilerini (erişim anahtarı ve telefon numarası kimliği) girin. Tek tek yazmak için Müşteriler ekranındaki “WhatsApp’tan yaz” düğmesi her zaman çalışır."
           : "“QR oturumu aç”a basın. Kod görünür görünmez WhatsApp Business → Ayarlar → Cihazlar → Cihaz bağla ile okutun."}
       </div>
 
@@ -225,19 +225,19 @@ export default function OutreachPage() {
                 <h2>Mesaj şablonu</h2>
               </div>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
-                {playbookActive ? <span className="pill ok">Playbook aktif</span> : null}
+                {playbookActive ? <span className="pill ok">Marka kuralları açık</span> : null}
                 <span className={`pill ${copySource === "ai" ? "ok" : "mute"}`}>
-                  {copyBusy ? "Yazıyor…" : copySource === "ai" ? "AI" : "Hazır metin"}
+                  {copyBusy ? "Yazıyor…" : copySource === "ai" ? "Yapay zekâ" : "Hazır metin"}
                 </span>
               </div>
             </div>
             <p className="panel-note">
-              Açı seçin veya AI’ya not yazın. {`{ad}`} ve {`{ilçe}`} gönderimde dolar.
-              {hasLlm ? " Ayarlar’daki Gemini playbook ile yazar." : " AI için Ayarlar’a Google Gemini anahtarı yazın."}
-              {playbookActive ? " Marka playbook’u uygulanır." : ""}
+              Bir konu seçin ya da yapay zekâya not yazın. {`{ad}`} ve {`{ilçe}`} gönderimde işletmenin bilgisiyle dolar.
+              {hasLlm ? " Metni Gemini yazar." : " Yapay zekâ için Ayarlar’a Gemini anahtarı girin."}
+              {playbookActive ? " Marka kurallarınız uygulanır." : ""}
             </p>
             <div className="field">
-              <span>Açı</span>
+              <span>Konu</span>
               <ChipStrip>
                 {angles.map((a) => (
                   <button
@@ -253,7 +253,7 @@ export default function OutreachPage() {
               </ChipStrip>
             </div>
             <label className="field" style={{ marginTop: 14 }}>
-              <span>AI’ya not (isteğe bağlı)</span>
+              <span>Yapay zekâya not (isteğe bağlı)</span>
               <input
                 value={brief}
                 onChange={(e) => setBrief(e.target.value)}
@@ -415,7 +415,7 @@ export default function OutreachPage() {
             },
             {
               title: "Canlı yayın için Cloud",
-              body: "Vercel gibi sunucusuz ortamlarda QR yerine WhatsApp Cloud API kullanın.",
+              body: "Bulutta çalışan sürümde QR yerine WhatsApp Cloud bağlantısı kullanılır.",
             },
           ]}
         />
