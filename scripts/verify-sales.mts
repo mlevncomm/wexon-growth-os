@@ -7,7 +7,7 @@ import { llmChat, type LlmMeta } from "../src/lib/llm.ts";
 import { DEFAULT_LLM } from "../src/lib/llm-providers.ts";
 import { SECTOR_PROFILES } from "../src/lib/sales/profiles.ts";
 import { evaluateMessage, mentionsName, similarity } from "../src/lib/sales/quality.ts";
-import { categoryFits, contactPolicy, mentionsOptOut } from "../src/lib/sales/policy.ts";
+import { categoryFits, contactPolicy, mentionsOptOut, OPT_OUT_LINE, withOptOut } from "../src/lib/sales/policy.ts";
 import { deriveLegal, deriveWhatsApp, type ChannelState, type LegalState } from "../src/lib/sales/consent.ts";
 import { inferSector, type SectorId } from "../src/lib/sales/sector.ts";
 
@@ -232,11 +232,11 @@ check(!pol({ legal: { durum: "geri_cekildi" } }).allowed && pol({ legal: { durum
 check(!pol({ mode: "queue", category: "kapanis" }).allowed, "politika: kapanış kuyruktan gitmez");
 // Hukuki dayanak ile teknik uygunluk ayrı
 check(!pol({ mode: "queue", legal: YOK }).allowed && !pol({ mode: "queue", legal: ESNAF }).allowed && pol({ mode: "queue", legal: ONAY }).allowed, "politika: kuyruk yalnızca kaynaklı açık onayla");
-const noBasis = pol({ legal: YOK });
-check(!noBasis.allowed && noBasis.needsBasis === true, "politika: dayanak yoksa elle satış mesajı da yok", noBasis);
-check(!pol({ status: "yazildi", legal: YOK }).allowed, "politika: “Yazıldı” izin sayılmaz");
+const noBasis = pol({ legal: YOK, whatsapp: WA_YOK });
+check(noBasis.allowed && noBasis.kind === "ilk" && noBasis.retHakkiGerekli === true, "politika: kayıt yokken elle ilk temas serbest, ret cümlesi zorunlu", noBasis);
+check(pol({ status: "yazildi", legal: YOK }).kind === "takip", "politika: “Yazıldı” müşteriye ilk temas tekrar gitmez, takip sayılır");
 const legacyFlag = pol({ legal: { durum: "kaynaksiz" } });
-check(!legacyFlag.allowed && legacyFlag.warnings.some((w) => w.includes("kaynağı")), "politika: kaynağı belirsiz eski “Onaylı” işareti dayanak değil", legacyFlag);
+check(legacyFlag.allowed && legacyFlag.retHakkiGerekli === true, "politika: kaynağı belirsiz eski “Onaylı” işareti açık onay sayılmaz (ret cümlesi eklenir)", legacyFlag);
 const esnaf = pol({ legal: ESNAF });
 check(esnaf.allowed && esnaf.retHakkiGerekli === true, "politika: tacir/esnaf beyanı elle izinli, ret hakkı zorunlu", esnaf);
 check(pol({ legal: ONAY }).allowed && !pol({ legal: ONAY }).retHakkiGerekli, "politika: açık onayla elle ilk temas");
@@ -458,16 +458,18 @@ check(evaluateMessage("Merhaba, Wexon.dev'den Mehmet ben. SMMM Yasin DOĞAN içi
 
 // --- WhatsApp kanal izni (Meta opt-in) ticari ileti dayanağından ayrı ---
 const W1 = pol({ legal: ESNAF, whatsapp: WA_YOK });
-check(!W1.allowed && W1.needsWhatsApp === true, "WA: tacir/esnaf beyanı WhatsApp için yeterli değil", W1);
-check(!pol({ legal: ONAY, whatsapp: WA_YOK }).allowed, "WA: açık ticari onay da WhatsApp izni yerine geçmez");
-check(pol({ legal: ESNAF, whatsapp: WA }).allowed, "WA: dayanak + WhatsApp izni → elle izinli");
+check(W1.allowed && W1.retHakkiGerekli === true, "WA: elle gönderim WhatsApp izni kaydı istemez", W1);
+check(pol({ legal: ONAY, whatsapp: WA_YOK }).allowed, "WA: açık onayla elle gönderim");
+const W2 = pol({ mode: "queue", legal: YOK, whatsapp: WA_YOK });
+check(!W2.allowed && W2.needsWhatsApp === true, "WA: otomatik gönderim WhatsApp izni ister", W2);
 check(!pol({ mode: "queue", legal: ONAY, whatsapp: WA_YOK }).allowed && pol({ mode: "queue", legal: ONAY, whatsapp: WA }).allowed, "WA: kuyruk/Cloud/cron açık onay + WhatsApp izni ister");
 check(!pol({ mode: "queue", legal: ESNAF, whatsapp: WA }).allowed, "WA: kuyruk tacir/esnaf beyanıyla çalışmaz");
-check(!pol({ status: "donus_var", legal: YOK, whatsapp: WA_YOK }).allowed, "WA: müşteri yanıtı da WhatsApp izni olmadan WhatsApp'tan yanıtlanmaz");
+check(pol({ status: "donus_var", legal: YOK, whatsapp: WA_YOK }).kind === "yanit" && pol({ status: "donus_var", legal: YOK, whatsapp: WA_YOK }).allowed, "WA: müşteri yazdıysa elle yanıt serbest");
 check(!pol({ legal: ONAY, whatsapp: { durum: "geri_cekildi", dahaOnceVardi: true } }).allowed, "WA: geri çekilen izinle gönderim yok");
-check(!pol({ status: "ilgilenmiyor", category: "kapanis", whatsapp: WA_YOK }).allowed, "WA: hiç izin yoksa kapanış da WhatsApp'tan gitmez");
+check(pol({ status: "ilgilenmiyor", category: "kapanis", whatsapp: WA_YOK }).allowed, "WA: ret sonrası elle tek kapanış (izin kaydı aranmaz)");
 check(pol({ status: "ilgilenmiyor", category: "kapanis", whatsapp: { durum: "geri_cekildi", dahaOnceVardi: true } }).allowed, "WA: izinli konuşmada ret sonrası tek kapanış");
-check(!pol({ category: "kapanis", whatsapp: WA_YOK }).allowed, "WA: retsiz kapanış da izin ister");
+check(pol({ category: "kapanis", whatsapp: WA_YOK }).allowed && !pol({ mode: "queue", category: "kapanis" }).allowed, "WA: kapanış elle serbest, otomatik değil");
+check(withOptOut("Merhaba.") === `Merhaba. ${OPT_OUT_LINE}` && withOptOut(`Merhaba. ${OPT_OUT_LINE}`) === `Merhaba. ${OPT_OUT_LINE}`, "ret cümlesi bir kez eklenir");
 const wev = (action: string, detail: Record<string, unknown>, at: string) => ({ action, detail: JSON.stringify({ leadId: "x", ...detail }), createdAt: at, actorEmail: "op@test" });
 check(deriveWhatsApp([]).durum === "yok", "WA defter: kayıt yok");
 check(deriveWhatsApp([wev("lead.whatsapp_optin.granted", {}, "2026-10-01")]).durum === "yok", "WA defter: kaynaksız kayıt geçersiz");

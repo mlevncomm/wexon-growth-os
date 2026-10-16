@@ -6,7 +6,7 @@ import { categoryById, defaultCategory, isCategoryId, REFINE_MODES, STYLES, type
 import { cleanExternal } from "@/lib/sales/context";
 import { generateDrafts, refineDraft, SalesPolicyError } from "@/lib/sales/engine";
 import { evaluateMessage } from "@/lib/sales/quality";
-import { categoryFits, mentionsOptOut } from "@/lib/sales/policy";
+import { categoryFits, withOptOut } from "@/lib/sales/policy";
 import {
   leadContext,
   leadLegal,
@@ -104,16 +104,15 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 
       if (body.action === "record") {
         // Operatör mesajı WhatsApp'ta açtı. Sunucu kuralları yeniden uygular; engelli mesaj kaydedilmez.
-        const message = String(body.message ?? "").trim().slice(0, 1500);
         const policy = await leadPolicy(lead, "manual", category);
+        const raw = String(body.message ?? "").trim().slice(0, 1500);
+        // Açık onay yoksa ret seçeneği kendiliğinden eklenir (pencere de aynı metni açar)
+        const message = policy.retHakkiGerekli && categoryById(category).sales ? withOptOut(raw) : raw;
         if (!policy.allowed) return NextResponse.json({ error: policy.reason, policy }, { status: 409 });
         if (!categoryFits(policy.kind, category)) {
           return NextResponse.json({ error: "Bu müşteriye daha önce yazıldı ve dönüş olmadı; ilk temas mesajı tekrar gönderilmez. “Nazik takip” türünü seçin." }, { status: 409 });
         }
         const q = evaluateMessage(message, ctx, category);
-        if (policy.retHakkiGerekli && !mentionsOptOut(message)) {
-          return NextResponse.json({ error: "Tacir/esnaf beyanıyla yazılan mesajda ret seçeneği olmalı (ör. “İstemezseniz yazmanız yeterli, tekrar yazmam.”)." }, { status: 422 });
-        }
         if (q.blockers.length) {
           return NextResponse.json({ error: q.blockers[0], quality: q }, { status: 422 });
         }

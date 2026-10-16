@@ -6,6 +6,7 @@ import { categoriesFor, categoryById, REFINE_MODES, type CategoryId, type Refine
 import { BASIS_SOURCES, BASIS_TYPES, legalLabel, WHATSAPP_SOURCES, whatsappLabel, type BasisSource, type BasisType, type ChannelState, type LegalState, type WhatsAppSource } from "@/lib/sales/consent";
 import { cleanExternal, cleanLink, contextSummary, type CustomerContext } from "@/lib/sales/context";
 import { localResult, type Draft, type DraftResult } from "@/lib/sales/engine";
+import { OPT_OUT_LINE, withOptOut } from "@/lib/sales/policy";
 import { evaluateMessage, TARGET_SCORE } from "@/lib/sales/quality";
 
 export type MesajLead = { id: string; name: string; phone: string; notes: string; status: string };
@@ -198,7 +199,9 @@ export function WhatsAppPenceresi({ lead, onClose, onSent }: {
     if (!digits || !mesaj.trim() || !quality || quality.blockers.length) return;
     if (duplicate && !window.confirm(`Bu müşteriye son 24 saat içinde “${categoryById(duplicate.category).label}” mesajı açılmış. Yine de devam edilsin mi?`)) return;
     try { localStorage.setItem(AD_KEY, ad.trim()); } catch {}
-    const metin = encodeURIComponent(mesaj.trim());
+    // Açık onay yoksa ret cümlesi kendiliğinden eklenir; sunucu da aynı metni kaydeder
+    const gidecek = boot?.policy.retHakkiGerekli && catInfo.sales ? withOptOut(mesaj) : mesaj.trim();
+    const metin = encodeURIComponent(gidecek);
     // Pencere tıklamayla hemen açılmalı (açılır pencere engeli); kayıt arkasından yapılır
     window.open(masaustu ? `whatsapp://send?phone=${digits}&text=${metin}` : `https://wa.me/${digits}?text=${metin}`, "_blank", "noopener");
     setBusy("kayit");
@@ -206,7 +209,7 @@ export function WhatsAppPenceresi({ lead, onClose, onSent }: {
       const r = await fetch(`/api/leads/${lead.id}/mesaj`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: body({ action: "record", style: edited !== null ? "elle" : draft?.style, message: mesaj.trim(), phone: numara }),
+        body: body({ action: "record", style: edited !== null ? "elle" : draft?.style, message: gidecek, phone: numara }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Kayıt yapılamadı");
@@ -258,7 +261,9 @@ export function WhatsAppPenceresi({ lead, onClose, onSent }: {
               <p className="notice" style={{ margin: 0 }}>Bu numara sabit hat, WhatsApp’ı yok. İşletmenin cep numarasını biliyorsan aşağıya yaz.</p>
             ) : null}
             {boot ? (
-              <div className="key-block" style={{ display: "grid", gap: 8 }}>
+              <details className="key-block">
+                <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 600 }}>İzin kayıtları · isteğe bağlı, yalnızca otomatik gönderim için</summary>
+                <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                   <strong style={{ fontSize: 13 }}>İletişim dayanağı: {legalLabel(boot.legal)}</strong>
                   {boot.legal.durum === "var" ? (
@@ -275,7 +280,7 @@ export function WhatsAppPenceresi({ lead, onClose, onSent }: {
                 {boot.legal.durum !== "var" && !ctx.optedOut ? (
                   <>
                     <div className="muted" style={{ fontSize: 12.5 }}>
-                      Satış mesajı için dayanağı kaynağıyla kaydedin. “Yazıldı” durumu izin sayılmaz; kayıt otomatik oluşturulmaz.
+                      Müşteri açıkça onay verdiyse kaydet; böylece otomatik gönderim açılır ve ret cümlesi eklenmez.
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 8 }}>
                       <select value={basisTur} onChange={(e) => { const t = e.target.value as BasisType; setBasisTur(t); setBasisKaynak(t === "tacir_esnaf" ? "operator_beyani" : "whatsapp_yazisma"); }} style={{ width: "100%" }}>
@@ -304,7 +309,7 @@ export function WhatsAppPenceresi({ lead, onClose, onSent }: {
                 {boot.whatsapp.durum !== "var" && !ctx.optedOut ? (
                   <>
                     <div className="muted" style={{ fontSize: 12.5 }}>
-                      WhatsApp’tan yazmak için müşterinin bu kanalı kabul ettiği ayrıca kaydedilmeli. Taslak hazırlamak için gerekmez.
+                      Otomatik gönderim için müşterinin WhatsApp’ı kabul ettiğini kaydet. Elle göndermek için gerekmez.
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 8 }}>
                       <select value={waKaynak} onChange={(e) => setWaKaynak(e.target.value as WhatsAppSource)} style={{ width: "100%" }}>
@@ -315,10 +320,11 @@ export function WhatsAppPenceresi({ lead, onClose, onSent }: {
                     <button type="button" className="btn btn-ghost" onClick={() => void waIzniKaydet()}>WhatsApp iznini kaydet</button>
                   </>
                 ) : null}
-                {boot.policy.retHakkiGerekli ? (
-                  <div className="muted" style={{ fontSize: 12 }}>Tacir/esnaf beyanıyla yazıldığı için mesaja ret seçeneği eklenir.</div>
-                ) : null}
-              </div>
+                </div>
+              </details>
+            ) : null}
+            {boot?.policy.retHakkiGerekli && catInfo.sales ? (
+              <div className="muted" style={{ fontSize: 12 }}>Mesajın sonuna “{OPT_OUT_LINE}” cümlesi kendiliğinden eklenir.</div>
             ) : null}
             {ctx.optedOut ? (
               <p className="error-box" style={{ margin: 0 }}>Bu müşteri iletişim istemediğini belirtmiş. Satış mesajı hazırlanmaz; yalnızca kapanış mesajı gönderebilirsin.</p>

@@ -115,7 +115,7 @@ export default function MusterilerPage() {
     markStatsDirty();
     openQueue();
     const reasons = Object.entries((json.reasons ?? {}) as Record<string, number>).map(([why, n]) => `${n}: ${why}`);
-    toast.push(`${json.queued} kişi onay bekliyor${json.skipped ? `, ${json.skipped} atlandı` : ""}. Kuyruk çekmecesinden Onayla.`);
+    toast.push(`${json.queued} taslak kuyrukta hazır${json.skipped ? `, ${json.skipped} atlandı` : ""}. Sağdaki kuyruktan sırayla gönder.`);
     if (reasons.length) toast.push(`Atlananlar — ${reasons.slice(0, 2).join(" · ")}`, json.queued ? undefined : "bad");
   }
 

@@ -3,6 +3,7 @@ import { isWhatsAppCapablePhone } from "../phone";
 import { buildContext } from "../sales/context";
 import { localDrafts } from "../sales/drafts";
 import { truthIssues } from "../sales/quality";
+import { withOptOut, type SendMode } from "../sales/policy";
 import { leadPolicy, previousContacts } from "../sales/server";
 import { prisma } from "../prisma";
 import { isServerless } from "../platform";
@@ -55,6 +56,19 @@ export async function sentTodayCount(): Promise<number> {
   return prisma.outreachJob.count({
     where: { tenantId: tid(), status: "sent", sentAt: { gte: todayStart() } },
   });
+}
+
+/**
+ * Cloud bağlıysa onaylanan taslağı robot gönderir (otomatik kurallar: açık onay + WhatsApp izni).
+ * Değilse taslak kuyrukta "WhatsApp'ta aç" ile elle gönderilir (elle kurallar).
+ */
+async function draftMode(): Promise<SendMode> {
+  return (await cloudConfigured()) ? "queue" : "manual";
+}
+
+/** Açık onay yoksa elle gönderilen mesaja ret seçeneği eklenir */
+function finalMessage(message: string, retHakkiGerekli?: boolean): string {
+  return retHakkiGerekli ? withOptOut(message) : message.trim();
 }
 
 function jitter(minSec: number, maxSec: number): number {
@@ -302,6 +316,7 @@ export async function enqueueLeads(opts: {
   if (issues.length) throw new Error(`Bu şablon toplu gönderime uygun değil: ${issues[0]}. Şablonu Mesaj ekranında düzeltin.`);
 
   const { renderTemplate } = await import("../templates");
+  const mode = await draftMode();
   let queued = 0;
   let skipped = 0;
 
@@ -322,7 +337,7 @@ export async function enqueueLeads(opts: {
       continue;
     }
     // Ret, onay kaydı, takip aralığı ve takip sınırı (elle açılan mesajlar da temas sayılır)
-    const policy = await leadPolicy(lead, "queue");
+    const policy = await leadPolicy(lead, mode);
     if (!policy.allowed) {
       skip(policy.reason);
       continue;
@@ -345,7 +360,7 @@ export async function enqueueLeads(opts: {
         tenantId: owner,
         leadId,
         templateId: useAuto || policy.kind !== "ilk" ? null : template!.id,
-        message,
+        message: finalMessage(message, policy.retHakkiGerekli),
         status: "pending",
         channel: "whatsapp",
       },
@@ -370,7 +385,9 @@ export async function moderateJobs(opts: {
     include: { lead: true },
   });
   let updated = 0;
+  let queuedAny = false;
   const settings = await getSettings();
+  const mode = await draftMode();
   let offsetSec = 0;
   for (const job of jobs) {
     if (opts.action === "reject") {
@@ -386,10 +403,16 @@ export async function moderateJobs(opts: {
     const issues = currentTenant().vertical === "software" ? truthIssues(message) : [];
     if (issues.length) throw new Error(`Onaylanmadı: ${issues[0]}. Metni düzeltip tekrar onaylayın.`);
     // Onay anında politika yeniden: taslak oluşturulduktan sonra ret gelmiş olabilir
-    const policy = await leadPolicy(job.lead, "queue", undefined, job.id);
+    const policy = await leadPolicy(job.lead, mode, undefined, job.id);
     if (!policy.allowed) {
       await prisma.outreachJob.update({ where: { id: job.id }, data: { status: "rejected", error: policy.reason } });
       blocked.push(`${job.lead.name}: ${policy.reason}`);
+      continue;
+    }
+    if (mode === "manual") {
+      // Elle gönderimde taslak kuyrukta kalır; "WhatsApp'ta aç" ile gönderilir
+      await prisma.outreachJob.update({ where: { id: job.id }, data: { message: finalMessage(message, policy.retHakkiGerekli), error: null } });
+      updated += 1;
       continue;
     }
     const wait = isServerless() ? 0 : jitter(settings.delayMinSec, settings.delayMaxSec) + offsetSec;
@@ -404,8 +427,9 @@ export async function moderateJobs(opts: {
       },
     });
     updated += 1;
+    queuedAny = true;
   }
-  if (updated && (opts.action === "approve" || opts.action === "edit")) {
+  if (queuedAny) {
     await updateSettings({ queueStopped: false, queuePaused: false });
     ensureQueueLoop();
   }
@@ -431,15 +455,16 @@ export async function markManualSent(opts: {
   if (!message) throw new Error("Mesaj boş olamaz.");
   const issues = currentTenant().vertical === "software" ? truthIssues(message) : [];
   if (issues.length) throw new Error(`Kaydedilmedi: ${issues[0]}.`);
-  // Kuyruktan gelen taslak, elle "Gönderdim" denerek de kuyruk kurallarını (açık onay) aşamaz
-  const policy = await leadPolicy(job.lead, "queue", undefined, job.id);
+  // Operatör WhatsApp'ta kendisi gönderdi: elle gönderim kuralları (ret, takip aralığı) yeniden uygulanır
+  const policy = await leadPolicy(job.lead, "manual", undefined, job.id);
   if (!policy.allowed) throw new Error(policy.reason);
+  const sentMessage = finalMessage(message, policy.retHakkiGerekli);
 
   await prisma.$transaction([
     prisma.outreachJob.update({
       where: { id: job.id },
       data: {
-        message,
+        message: sentMessage,
         status: "sent",
         sentAt: new Date(),
         error: null,
@@ -456,6 +481,7 @@ export async function markManualSent(opts: {
 export async function getQueueSnapshot() {
   const owner = tid();
   const settings = await getSettings();
+  const mode = await draftMode();
   try {
     await refreshGenericDrafts(owner, currentTenant().vertical);
   } catch {
@@ -516,13 +542,14 @@ export async function getQueueSnapshot() {
       : null,
     drafts: (await Promise.all(pendingJobs.map(async (job) => {
       const issues = currentTenant().vertical === "software" ? truthIssues(job.message) : [];
-      const policy = await leadPolicy(job.lead, "queue", undefined, job.id);
-      return { job, blocked: !policy.allowed ? policy.reason : issues.length ? `${issues[0]}; metni düzeltin ya da reddedin.` : null };
-    }))).map(({ job, blocked }) => ({
+      const policy = await leadPolicy(job.lead, mode, undefined, job.id);
+      const message = policy.allowed ? finalMessage(job.message, policy.retHakkiGerekli) : job.message;
+      return { job, message, blocked: !policy.allowed ? policy.reason : issues.length ? `${issues[0]}; metni düzeltin ya da reddedin.` : null };
+    }))).map(({ job, message, blocked }) => ({
       id: job.id,
       name: job.lead.name,
       phone: job.lead.phone,
-      message: job.message,
+      message,
       channel: job.channel,
       firstContact: job.lead.status === "yeni",
       blocked,

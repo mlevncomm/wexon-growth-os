@@ -1,17 +1,16 @@
 import type { ChannelState, LegalState } from "./consent";
 import { isOptedOut } from "./context";
 
-// Kime, ne zaman, hangi yoldan yazılabilir? Tek karar noktası. İki ayrı kontrol yapılır:
+// Kime, ne zaman, hangi yoldan yazılabilir? Tek karar noktası. İki gönderim yolu vardır:
 //
-// 1) HUKUKİ DAYANAK (izin defteri, ./consent.ts):
-//    - Ret bildiren ya da dayanağı geri çekilen müşteriye satış mesajı hiçbir yoldan gitmez;
-//      yalnızca elle, bir kez kapanış mesajı yazılabilir.
-//    - Otomatik/toplu gönderim (kuyruk) yalnızca kaynağıyla kaydedilmiş AÇIK ONAY varsa yapılır (Meta opt-in kuralı).
-//    - Elle satış mesajı için kaydedilmiş bir dayanak gerekir: açık onay ya da operatörün tacir/esnaf beyanı.
-//    - "Yazıldı" durumu ve kaynağı belirsiz eski "Onaylı" işareti dayanak sayılmaz.
-// 2) TEKNİK UYGUNLUK (zamanlama ve sınırlar):
-//    - Daha önce yazılmış ama dönmemiş müşteriye takip: son temastan en az 3 gün sonra, en fazla 2 kez.
-//    - Müşteri döndüyse (Dönüş var / Geri aranacak) konuşma sürdürülür; bekleme süresi yoktur.
+// 1) ELLE (manual): mesaj WhatsApp'ta açılır, son "Gönder"e operatör basar (satırdaki düğme ya da
+//    kuyruktaki "WhatsApp'ta aç"). İşletmelere tacir/esnaf olarak ayrı izin kaydı istenmeden yazılır;
+//    açık onay kaydı yoksa mesaja ret seçeneği kendiliğinden eklenir.
+// 2) OTOMATİK (queue): robot gönderir (Cloud API / QR). Yalnızca kaynağıyla kaydedilmiş açık onay
+//    ve WhatsApp izni (Meta opt-in) olan müşterilere gider.
+//
+// Her iki yolda da: ret bildiren ya da iznini geri çeken müşteriye satış mesajı gitmez (elle bir kez
+// kapanış yazılabilir); dönmeyen müşteriye takip son temastan en az 3 gün sonra, en fazla 2 kez.
 
 export const MIN_FOLLOWUP_DAYS = 3;
 export const MAX_FOLLOWUPS = 2;
@@ -32,27 +31,25 @@ export type PolicyResult = {
   kind: ContactKind;
   reason: string;
   warnings: string[];
-  /** Engelin sebebi hukuki dayanak eksikliği mi (arayüz dayanak kaydı formunu gösterir) */
+  /** Engelin sebebi otomatik gönderim için açık onay eksikliği mi */
   needsBasis?: boolean;
-  /** Hukuki dayanak tacir/esnaf beyanıysa mesajda ret hakkı belirtilmeli */
+  /** Açık onay yoksa mesajda ret seçeneği bulunmalı (kendiliğinden eklenir) */
   retHakkiGerekli?: boolean;
-  /** Engelin sebebi WhatsApp kanal izninin (Meta opt-in) olmaması mı */
+  /** Engelin sebebi otomatik gönderim için WhatsApp izninin (Meta opt-in) olmaması mı */
   needsWhatsApp?: boolean;
 };
 
 export const NO_WHATSAPP =
-  "Bu müşteri için kaydedilmiş WhatsApp izni (opt-in) yok. Ticari ileti dayanağı ya da ret cümlesi WhatsApp’tan yazmak için yeterli değildir; önce müşterinin WhatsApp’tan iletişimi kabul ettiğini kaynağıyla kaydedin."
-
-export const NO_BASIS =
-  "Bu müşteri için kayıtlı bir iletişim dayanağı yok. Önce dayanağı (açık onay ya da tacir/esnaf beyanı) kaynağıyla birlikte kaydedin; “Yazıldı” durumu izin sayılmaz.";
+  "Otomatik gönderim yalnızca WhatsApp izni kaydedilmiş müşterilere yapılır. Bu müşteriye kuyruktan “WhatsApp’ta aç” ile kendin gönderebilirsin.";
 export const NO_CONSENT_QUEUE =
-  "Kaynağıyla kaydedilmiş açık onay yok. Otomatik/toplu gönderim yalnızca açık onay veren müşterilere yapılır.";
+  "Otomatik gönderim yalnızca açık onay veren müşterilere yapılır. Bu müşteriye kuyruktan “WhatsApp’ta aç” ile kendin gönderebilirsin.";
+export const WA_REVOKED = "Bu müşterinin WhatsApp izni geri çekildi; WhatsApp’tan yazılmaz.";
 
 export function contactPolicy(input: {
   status: string;
   notes?: string | null;
   legal: LegalState;
-  /** WhatsApp kanal izni (her WhatsApp gönderimi için ayrıca gerekli) */
+  /** WhatsApp kanal izni (yalnızca otomatik gönderimde gerekli) */
   whatsapp: ChannelState;
   history: ContactHistory;
   mode: SendMode;
@@ -62,6 +59,7 @@ export function contactPolicy(input: {
 }): PolicyResult {
   const now = input.now ?? new Date();
   const warnings: string[] = [];
+  const auto = input.mode === "queue";
   const replied = input.status === "donus_var" || input.status === "geri_ara";
   const deny = (kind: ContactKind, reason: string, extra: Partial<PolicyResult> = {}): PolicyResult => ({ allowed: false, kind, reason, warnings, ...extra });
   const closing = (): PolicyResult =>
@@ -69,47 +67,30 @@ export function contactPolicy(input: {
       ? deny("kapanis", "Bu müşteriye kapanış mesajı zaten gönderildi; tekrar yazılmaz.")
       : { allowed: true, kind: "kapanis", reason: "", warnings };
 
-  // --- 1) Hukuki dayanak ---
+  // --- 1) Ret ve geri çekme ---
   const optedOut = isOptedOut(input.status, input.notes) || input.legal.durum === "geri_cekildi";
-  const waOk = input.whatsapp.durum === "var";
   if (optedOut) {
-    if (input.mode === "manual" && input.category === "kapanis") {
-      // Ret sonrası tek kapanış yanıtı yalnızca daha önce WhatsApp izni kaydedilmiş bir konuşmada yazılabilir
-      if (!input.whatsapp.dahaOnceVardi) return deny("kapanis", "WhatsApp izni hiç kaydedilmediği için kapanış mesajı da WhatsApp’tan gönderilmez.", { needsWhatsApp: true });
-      return closing();
-    }
+    if (!auto && input.category === "kapanis") return closing();
     return deny("kapanis", "Müşteri iletişim istemediğini bildirdi ya da izni geri çekildi; bu müşteriye mesaj gönderilmez.");
   }
+  if (input.whatsapp.durum === "geri_cekildi") return deny("kapanis", WA_REVOKED);
   if (input.category === "kapanis") {
-    if (input.mode !== "manual") return deny("kapanis", "Kapanış mesajı yalnızca elle gönderilir.");
-    return waOk ? closing() : deny("kapanis", NO_WHATSAPP, { needsWhatsApp: true });
+    return auto ? deny("kapanis", "Kapanış mesajı yalnızca elle gönderilir.") : closing();
   }
 
-  // --- 0) Kanal izni: WhatsApp'tan herhangi bir mesaj için Meta opt-in kaydı zorunlu ---
-  if (!waOk) {
-    const missingBasis = input.legal.durum !== "var";
-    return deny(input.history.count || input.status === "yazildi" ? "takip" : replied ? "yanit" : "ilk", NO_WHATSAPP, { needsWhatsApp: true, needsBasis: missingBasis });
+  // --- 2) Otomatik gönderim: açık onay + WhatsApp izni şart ---
+  const explicitConsent = input.legal.durum === "var" && input.legal.tur === "acik_onay";
+  const wasContacted = input.history.count > 0 || input.status === "yazildi";
+  if (auto) {
+    if (input.whatsapp.durum !== "var") return deny(wasContacted ? "takip" : replied ? "yanit" : "ilk", NO_WHATSAPP, { needsWhatsApp: true, needsBasis: !explicitConsent });
+    if (!explicitConsent) return deny(wasContacted ? "takip" : "ilk", NO_CONSENT_QUEUE, { needsBasis: true });
   }
 
-  const legalOk = input.legal.durum === "var";
-  const explicitConsent = legalOk && input.legal.tur === "acik_onay";
-  if (input.legal.durum === "kaynaksiz") {
-    warnings.push("Bu müşteride eski sürümden kalma, kaynağı kayıtlı olmayan bir “Onaylı” işareti var; dayanak sayılmaz.");
-  }
-  if (input.mode === "queue" && !explicitConsent) {
-    return deny(input.history.count ? "takip" : "ilk", NO_CONSENT_QUEUE, { needsBasis: true });
-  }
-  // Müşterinin kendi yazdığı mesaja yanıt: konuşmayı sürdürmek için dayanak şartı aranmaz
-  if (replied) {
-    if (!legalOk) warnings.push("Müşteri size yazdı; yanıt verebilirsiniz. Satış teklifine geçmeden önce iletişim dayanağını kaydedin.");
-    return { allowed: true, kind: "yanit", reason: "", warnings };
-  }
-  if (!legalOk) {
-    return deny(input.history.count || input.status === "yazildi" ? "takip" : "ilk", NO_BASIS, { needsBasis: true });
-  }
-  const retHakkiGerekli = input.legal.tur === "tacir_esnaf";
+  // Müşterinin kendi yazdığı mesaja yanıt: konuşma sürdürülür
+  if (replied) return { allowed: true, kind: "yanit", reason: "", warnings };
+  const retHakkiGerekli = !explicitConsent;
 
-  // --- 2) Teknik uygunluk ---
+  // --- 3) Teknik uygunluk ---
   // "Yazıldı" işaretli ama sistemde kaydı olmayan müşteri: ilk temas tekrar gönderilmez, takip sayılır
   const history =
     input.status === "yazildi" && !input.history.count ? { ...input.history, count: 1 } : input.history;
@@ -137,7 +118,15 @@ export function categoryFits(kind: ContactKind, category: string): boolean {
   return true;
 }
 
-/** Tacir/esnaf beyanıyla yazılan mesajda ret hakkı geçiyor mu */
+export const OPT_OUT_LINE = "İstemezseniz yazmanız yeterli, tekrar yazmam.";
+
+/** Açık onay yokken mesajın sonuna ret seçeneği ekler (zaten varsa dokunmaz) */
+export function withOptOut(message: string): string {
+  const m = message.trim();
+  return !m || mentionsOptOut(m) ? m : `${m} ${OPT_OUT_LINE}`;
+}
+
+/** Mesajda ret seçeneği geçiyor mu */
 export function mentionsOptOut(message: string): boolean {
   return /(istemezseniz|uygun değilse|ilgilenmiyorsanız|rahatsız etmeyeyim|tekrar yazmam|yazmayayım|“hayır” yazmanız|bir daha yazmam)/iu.test(message);
 }

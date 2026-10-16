@@ -3,7 +3,7 @@ import { contextSummary, type CustomerContext } from "./context";
 import { localDrafts } from "./drafts";
 import { profileFor } from "./profiles";
 import { WATER_BRAND_LINE, WATER_TRUTH_RULES } from "./water";
-import { mentionsOptOut } from "./policy";
+import { mentionsOptOut, OPT_OUT_LINE } from "./policy";
 import { evaluateMessage, REWRITE_BELOW, type QualityResult } from "./quality";
 
 // Merkezi satış mesajı üretim katmanı:
@@ -181,7 +181,7 @@ function asStrings(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((v): v is string => typeof v === "string").map((v) => v.slice(0, 160)).slice(0, 6) : [];
 }
 
-export const OPT_OUT_LINE = "İstemezseniz yazmanız yeterli, tekrar yazmam.";
+export { OPT_OUT_LINE };
 
 function toDraft(
   ctx: CustomerContext,
@@ -190,7 +190,7 @@ function toDraft(
   raw: string,
   extra: { suggestedCTA?: string; reason?: string; used?: string[]; source: "ai" | "local" },
 ): Draft {
-  // Tacir/esnaf beyanıyla yazılan satış mesajına ret seçeneği eklenir (yoksa)
+  // Açık onay yoksa satış mesajına ret seçeneği eklenir (yoksa)
   const message = ctx.retHakki && categoryById(categoryId).sales && raw && !mentionsOptOut(raw) ? `${raw} ${OPT_OUT_LINE}` : raw;
   const q: QualityResult = evaluateMessage(message, ctx, categoryId);
   return {

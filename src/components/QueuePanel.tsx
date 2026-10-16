@@ -105,7 +105,9 @@ export function QueuePanel({ onClose, open = false }: { onClose?: () => void; op
     toast.push(
       action === "reject"
         ? "Reddedildi"
-        : snap?.sendingLocked
+        : !snap?.cloud
+          ? "Taslak güncellendi; “WhatsApp’ta aç” ile gönder"
+          : snap?.sendingLocked
           ? "Onaylandı; otomatik gönderim kilitli olduğu için sırada bekliyor"
           : action === "edit" ? "Düzenlenip kuyruğa alındı" : "Onaylandı, gönderim deneniyor",
     );
