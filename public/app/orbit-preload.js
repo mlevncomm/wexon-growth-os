@@ -1,0 +1,168 @@
+// Üretildi: scripts/build-web.js ← src/main/preload.js (elle düzenlemeyin)
+(() => {
+const require = (m) => { if (m === 'electron') return window.__orbitElectron; throw new Error('Web: ' + m); };
+const { contextBridge, ipcRenderer } = require('electron');
+
+const call = async (ch, ...args) => {
+  const r = await ipcRenderer.invoke(ch, ...args);
+  if (!r.ok) throw new Error(r.error);
+  return r.data;
+};
+const on = (ch) => (cb) => {
+  const fn = (_e, p) => cb(p);
+  ipcRenderer.on(ch, fn);
+  return () => ipcRenderer.removeListener(ch, fn);
+};
+
+contextBridge.exposeInMainWorld('orbit', {
+  system: {
+    info: (force) => call('system:info', force),
+    isAdmin: () => call('system:isAdmin'),
+    installed: () => call('system:installed'),
+    relaunchAdmin: () => call('system:relaunchAdmin'),
+    restart: () => call('system:restart'),
+    open: (url) => call('shell:open', url),
+    openLocal: (url) => call('shell:open-local', url),
+  },
+  catalog: {
+    get: () => call('catalog:get'),
+    addCustom: (a) => call('catalog:addCustom', a),
+    removeCustom: (k) => call('catalog:removeCustom', k),
+    search: (q) => call('catalog:search', q),
+  },
+  selection: { get: () => call('selection:get'), set: (k) => call('selection:set', k) },
+  profile: { export: () => call('profile:export'), import: () => call('profile:import') },
+  icons: { files: (list) => call('icons:files', list) },
+  growth: {
+    status: () => call('growth:status'),
+    profiles: () => call('growth:profiles'),
+    open: (tenantId, pin) => call('growth:open', tenantId, pin),
+    setPin: (tenantId, pin, current) => call('growth:set-pin', tenantId, pin, current),
+    message: (id) => call('growth:message', id),
+    messageAction: (id, body) => call('growth:message-action', id, body),
+    deleteLead: (id) => call('growth:lead-delete', id),
+    templates: () => call('growth:templates'),
+    saveTemplate: (t) => call('growth:template-save', t),
+    deleteTemplate: (id) => call('growth:template-delete', id),
+    stopCampaign: (id) => call('growth:campaign-stop', id),
+    queueControl: (a) => call('growth:queue-control', a),
+    exportLeads: (opts) => call('growth:export', opts),
+    openWhatsApp: (digits, text) => call('growth:open-whatsapp', digits, text),
+    settings: () => call('growth:settings'),
+    saveSettings: (p) => call('growth:save-settings', p),
+    whatsapp: () => call('growth:whatsapp'),
+    whatsappAction: (a) => call('growth:whatsapp-action', a),
+    importData: (url) => call('growth:import', url),
+    goLive: (url) => call('growth:go-live', url),
+    goLocal: () => call('growth:go-local'),
+    copyPinDigest: () => call('growth:copy-pin-digest'),
+    sending: (on) => call('growth:sending', on),
+    lock: () => call('growth:lock'),
+    overview: () => call('growth:overview'),
+    leads: (opts) => call('growth:leads', opts),
+    lead: (id, patch) => call('growth:lead', id, patch),
+    campaigns: () => call('growth:campaigns'),
+    campaign: (o) => call('growth:campaign', o),
+    queue: () => call('growth:queue'),
+    draft: (ids) => call('growth:draft', ids),
+    moderate: (ids, action, message) => call('growth:moderate', ids, action, message),
+  },
+  site: {
+    start: (url, opts) => call('site:start', url, opts),
+    cancel: () => call('site:cancel'),
+    status: () => call('site:status'),
+    history: () => call('site:history'),
+    open: (target, what) => call('site:open', target, what),
+    onStatus: on('site:status'),
+    onHistory: on('site:history'),
+  },
+  memory: {
+    state: () => call('memory:state'),
+    add: (text, cat) => call('memory:add', text, cat),
+    update: (id, patch) => call('memory:update', id, patch),
+    remove: (id) => call('memory:remove', id),
+    clear: (source) => call('memory:clear', source),
+    sources: (patch) => call('memory:sources', patch),
+    learn: () => call('memory:learn'),
+    onChanged: on('memory:changed'),
+  },
+  drivers: { recommend: () => call('drivers:recommend'), amdLatest: () => call('drivers:amd-latest'), scan: () => call('drivers:scan'), installed: (force) => call('drivers:installed', force) },
+  bootstrap: { check: () => call('bootstrap:check'), repair: (a) => call('bootstrap:repair', a) },
+  esp32: {
+    ports: () => call('esp32:ports'),
+    status: () => call('esp32:status'),
+    connect: (port, baud) => call('esp32:connect', port, baud),
+    disconnect: () => call('esp32:disconnect'),
+    command: (cmd, args) => call('esp32:command', cmd, args),
+    readStatus: () => call('esp32:read-status'),
+    boards: () => call('esp32:boards'),
+    identify: (port) => call('esp32:identify', port),
+    raw: (text) => call('esp32:raw', text),
+    onStatus: on('esp32:status'),
+    onLog: on('esp32:log'),
+    wifi: () => call('esp32:wifi'),
+    wifiSetup: (ssid, pass) => call('esp32:wifi-setup', ssid, pass),
+    wifiOff: () => call('esp32:wifi-off'),
+    onWifi: on('esp32:wifi'),
+  },
+  automation: {
+    actions: () => call('automation:actions'),
+    history: () => call('automation:history'),
+    run: (action, arg) => call('automation:run', action, arg),
+    onHistory: on('automation:history'),
+    onDrivers: on('automation:drivers'),
+  },
+  onSettingsChanged: on('settings:changed'),
+  bridge: { info: () => call('bridge:info') },
+  inventory: { get: (force) => call('inventory:get', force), onChanged: on('inventory:changed') },
+  install: {
+    run: (items) => call('install:run', items),
+    cancel: () => call('install:cancel'),
+    list: () => call('install:list'),
+    skip: (key) => call('install:skip', key),
+    retry: (key) => call('install:retry', key),
+    reinstall: (key) => call('install:reinstall', key),
+    pending: () => call('install:pending'),
+    resume: () => call('install:resume'),
+    discard: () => call('install:discard'),
+    onProgress: on('install:progress'),
+    onState: on('install:state'),
+  },
+  settings: { get: () => call('settings:get'), set: (p) => call('settings:set', p) },
+  ui: { get: () => call('ui:get'), set: (p) => call('ui:set', p) },
+  chat: { get: () => call('chat:get'), set: (list) => call('chat:set', list) },
+  app: {
+    info: () => call('app:info'),
+    openLogs: () => call('app:openLogs'),
+    log: (level, msg) => ipcRenderer.send('app:log', level, String(msg).slice(0, 2000)),
+  },
+  history: { get: () => call('history:get') },
+  rgb: {
+    status: () => call('rgb:status'),
+    connect: () => call('rgb:connect'),
+    refresh: () => call('rgb:refresh'),
+    apply: (profile, deviceId) => call('rgb:apply', profile, deviceId),
+    native: (deviceId, mode, opts) => call('rgb:native', deviceId, mode, opts),
+    live: () => call('rgb:live'),
+    conflicts: () => call('rgb:conflicts'),
+    power: (on) => call('rgb:power', on),
+    exclude: (id, ex) => call('rgb:exclude', id, ex),
+    save: (p) => call('rgb:save', p).finally(() => ipcRenderer.send('tray:rebuild')),
+    remove: (id) => call('rgb:delete', id).finally(() => ipcRenderer.send('tray:rebuild')),
+    onStatus: on('rgb:status'),
+  },
+  update: {
+    status: () => call('update:status'),
+    check: () => call('update:check'),
+    download: () => call('update:download'),
+    install: () => call('update:install'),
+    onStatus: on('update:status'),
+  },
+  ai: {
+    chat: (history) => call('ai:chat', history),
+    onProposal: on('ai:proposal'),
+    onTool: on('ai:tool'),
+  },
+});
+
+})();
